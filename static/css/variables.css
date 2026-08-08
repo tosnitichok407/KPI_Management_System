@@ -1,0 +1,29 @@
+/* ================================
+           ADVANCE GROUP COLOR
+        ================================= */
+:root {
+  --advance-orange: #ed4924;
+  --advance-orange-light: #fff0ec;
+
+  --advance-navy: #3d4d64;
+  --advance-navy-light: #eef2f6;
+
+  --background: #f5f6f8;
+  --white: #ffffff;
+
+  --text: #1f2937;
+  --text-light: #8a94a6;
+
+  --success: #3eaa65;
+  --success-light: #eaf7ef;
+
+  --warning: #e7a51c;
+  --warning-light: #fff7e2;
+
+  --danger: #e05252;
+  --danger-light: #fdecec;
+
+  --border: #e8ebef;
+
+  --shadow: 0 4px 20px rgba(61, 77, 100, 0.06);
+}
