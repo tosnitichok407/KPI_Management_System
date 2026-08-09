@@ -1,4 +1,5 @@
 <?php
+
 session_start();
 require_once "config/database.php";
 
@@ -10,20 +11,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $password = $_POST["password"];
 
     if (empty($employee_id) || empty($password)) {
+
         $error = "Please enter Employee ID and Password.";
     } else {
 
-        $sql = "SELECT 
-                    u.userid,
-                    u.employee_id,
-                    u.password_hash,
-                    u.status,
-                    u.role_id
-                FROM users u
-                WHERE u.employee_id = :employee_id
+        $sql = "SELECT
+                    id,
+                    employee_id,
+                    password_hash,
+                    status,
+                    role_id
+                FROM users
+                WHERE employee_id = :employee_id
                 LIMIT 1";
 
         $stmt = $pdo->prepare($sql);
+
         $stmt->execute([
             ":employee_id" => $employee_id
         ]);
@@ -33,6 +36,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($user && password_verify($password, $user["password_hash"])) {
 
             if ($user["status"] !== "active") {
+
                 $error = "Your account is inactive.";
             } else {
 
@@ -44,111 +48,286 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 exit;
             }
         } else {
+
             $error = "Invalid Employee ID or Password.";
         }
     }
 }
+
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>KPI Management System - Login</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="assets/css/login.css">
+    <title>Advance KPI System - Login</title>
+
+    <link
+        rel="stylesheet"
+        href="assets/css/login.css">
+
 </head>
 
 <body>
 
-    <main class="login-container">
+    <div class="page-container">
 
-        <section class="login-card">
+        <div class="login-wrapper">
 
-            <div class="login-header">
+            <!-- LEFT SIDE -->
+            <section class="login-left">
 
-                <div class="logo">
-                    KPI
-                </div>
+                <div class="illustration">
 
-                <h1>KPI Management System</h1>
+                    <div class="dashboard-card">
 
-                <p>Employee Performance Management</p>
+                        <div class="card-header">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
 
-            </div>
+                        <div class="chart-area">
 
-            <?php if (!empty($error)): ?>
+                            <div class="chart-bar bar-1"></div>
+                            <div class="chart-bar bar-2"></div>
+                            <div class="chart-bar bar-3"></div>
+                            <div class="chart-bar bar-4"></div>
+                            <div class="chart-bar bar-5"></div>
 
-                <div class="error-message">
-                    <?= htmlspecialchars($error) ?>
-                </div>
+                        </div>
 
-            <?php endif; ?>
+                        <div class="card-footer">
 
-            <form method="POST" action="">
+                            <div></div>
+                            <div></div>
 
-                <div class="form-group">
+                        </div>
 
-                    <label for="employee_id">
-                        Employee ID
-                    </label>
+                    </div>
 
-                    <input
-                        type="text"
-                        id="employee_id"
-                        name="employee_id"
-                        placeholder="Enter your Employee ID"
-                        required>
+                    <div class="target-icon">
+                        ✓
+                    </div>
 
-                </div>
-
-                <div class="form-group">
-
-                    <label for="password">
-                        Password
-                    </label>
-
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Enter your password"
-                        required>
+                    <div class="floating-card">
+                        <strong>92%</strong>
+                        <small>KPI Performance</small>
+                    </div>
 
                 </div>
 
-                <div class="form-options">
+                <div class="left-text">
 
-                    <label>
-                        <input
-                            type="checkbox"
-                            name="remember">
+                    <h2>
+                        Performance<br>
+                        starts with <span>progress.</span>
+                    </h2>
 
-                        Remember me
-                    </label>
+                    <p>
+                        Manage employee performance,
+                        track KPI results and improve
+                        organizational efficiency.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <!-- RIGHT SIDE -->
+            <section class="login-right">
+
+                <div class="top-link">
+
+                    <span>
+                        Don't have an account?
+                    </span>
 
                     <a href="#">
-                        Forgot Password?
+                        CONTACT ADMIN
                     </a>
 
                 </div>
 
-                <button type="submit">
-                    Login
-                </button>
 
-            </form>
+                <div class="form-container">
 
-            <footer>
-                <p>© 2026 KPI Management System</p>
-            </footer>
+                    <div class="form-header">
 
-        </section>
+                        <div class="brand">
 
-    </main>
+                            <div class="brand-icon">
+                                <img src="assets/images/Advance-Logo.png"
+                                    alt="Advance Group Asia Logo">
+                            </div>
+
+                        </div>
+
+                        <h1>
+                            Welcome!
+                        </h1>
+
+                        <p>
+                            Sign in to your KPI Management System
+                        </p>
+
+                    </div>
+
+
+                    <?php if (!empty($error)): ?>
+
+                        <div class="error-message">
+                            <?= htmlspecialchars($error) ?>
+                        </div>
+
+                    <?php endif; ?>
+
+
+                    <form
+                        method="POST"
+                        action="">
+
+                        <!-- Employee ID -->
+
+                        <div class="form-group">
+
+                            <label for="employee_id">
+                                Employee ID
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    ID
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="employee_id"
+                                    name="employee_id"
+                                    placeholder="Enter your Employee ID"
+                                    autocomplete="username"
+                                    required>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- Password -->
+
+                        <div class="form-group">
+
+                            <label for="password">
+                                Password
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    •
+                                </span>
+
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    placeholder="Enter your password"
+                                    autocomplete="current-password"
+                                    required>
+
+                                <button
+                                    type="button"
+                                    class="show-password"
+                                    onclick="togglePassword()">
+                                    ◉
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- Options -->
+
+                        <div class="form-options">
+
+                            <label class="remember">
+
+                                <input
+                                    type="checkbox"
+                                    name="remember">
+
+                                <span>
+                                    Remember me
+                                </span>
+
+                            </label>
+
+                            <a href="#">
+                                Forgot Password?
+                            </a>
+
+                        </div>
+
+
+                        <!-- Login -->
+
+                        <button
+                            type="submit"
+                            class="login-button">
+                            LOGIN
+                        </button>
+
+                    </form>
+
+
+                    <div class="login-footer">
+
+                        <p>
+                            © 2026 Advance Group Asia
+                        </p>
+
+                        <span>
+                            KPI Management System
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </div>
+
+
+    <script>
+        function togglePassword() {
+
+            const password =
+                document.getElementById("password");
+
+            if (password.type === "password") {
+
+                password.type = "text";
+
+            } else {
+
+                password.type = "password";
+
+            }
+        }
+    </script>
 
 </body>
 
