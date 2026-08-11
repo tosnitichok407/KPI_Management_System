@@ -16,19 +16,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } else {
 
         $sql = "SELECT
-                    id,
-                    employee_id,
-                    password_hash,
-                    status,
-                    role_id
-                FROM users
-                WHERE employee_id = :employee_id
+                    u.id,
+                    u.username,
+                    u.password_hash,
+                    u.status,
+                    u.role_id,
+                    u.must_change_password,
+                    e.employee_code,
+                    e.first_name,
+                    e.last_name
+                FROM users u
+                INNER JOIN employees e
+                    ON u.employee_id = e.id
+                WHERE u.username = :username
                 LIMIT 1";
 
         $stmt = $pdo->prepare($sql);
 
         $stmt->execute([
-            ":employee_id" => $employee_id
+            ":username" => $employee_id
         ]);
 
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
