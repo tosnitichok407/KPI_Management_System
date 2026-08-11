@@ -1,340 +1,375 @@
 <?php
 
 session_start();
+
 require_once "config/database.php";
 
 $error = "";
 
+
+/*
+|--------------------------------------------------------------------------
+| Redirect if already logged in
+|--------------------------------------------------------------------------
+*/
+
+if (isset($_SESSION["user_id"])) {
+
+    if ($_SESSION["must_change_password"] == 1) {
+
+        header("Location: change-password.php");
+        exit;
+    }
+
+    header("Location: dashboard/index.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Login
+|--------------------------------------------------------------------------
+*/
+
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $employee_id = trim($_POST["employee_id"]);
-    $password = $_POST["password"];
+    $username = trim($_POST["username"] ?? "");
+    $password = $_POST["password"] ?? "";
 
-    if (empty($employee_id) || empty($password)) {
 
-        $error = "Please enter Employee ID and Password.";
+    /*
+    |--------------------------------------------------------------------------
+    | Validate Input
+    |--------------------------------------------------------------------------
+    */
+
+    if (empty($username) || empty($password)) {
+
+        $error = "Please enter Username and Password.";
+
     } else {
 
-        $sql = "SELECT
-                    u.id,
-                    u.username,
-                    u.password_hash,
-                    u.status,
-                    u.role_id,
-                    u.must_change_password,
-                    e.employee_code,
-                    e.first_name,
-                    e.last_name
-                FROM users u
-                INNER JOIN employees e
-                    ON u.employee_id = e.id
-                WHERE u.username = :username
-                LIMIT 1";
+
+        /*
+        |--------------------------------------------------------------------------
+        | Find User
+        |--------------------------------------------------------------------------
+        */
+
+        $sql = "
+    SELECT
+        u.user_id,
+        u.username,
+        u.password_hash,
+        u.email AS user_email,
+        u.employee_id,
+        u.role_id,
+        u.status AS user_status,
+
+        e.employee_code,
+        e.first_name,
+        e.last_name,
+        e.gender,
+        e.phone,
+        e.email AS employee_email,
+        e.department_id,
+        e.position_id,
+        e.hire_date,
+        e.status AS employee_status,
+
+        r.role_name,
+
+        d.department_name
+
+    FROM users u
+
+    INNER JOIN employees e
+        ON u.employee_id = e.employee_id
+
+    INNER JOIN roles r
+        ON u.role_id = r.role_id
+
+    LEFT JOIN departments d
+        ON e.department_id = d.department_id
+
+    WHERE u.username = :username
+
+    LIMIT 1
+        ";
 
         $stmt = $pdo->prepare($sql);
 
         $stmt->execute([
-            ":username" => $employee_id
+            ":username" => $username
         ]);
 
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user && password_verify($password, $user["password_hash"])) {
 
-            if ($user["status"] !== "active") {
+        /*
+        |--------------------------------------------------------------------------
+        | Check Username
+        |--------------------------------------------------------------------------
+        */
 
-                $error = "Your account is inactive.";
-            } else {
+        if (!$user) {
 
-                $_SESSION["user_id"] = $user["id"];
-                $_SESSION["employee_id"] = $user["employee_id"];
-                $_SESSION["role_id"] = $user["role_id"];
+            $error = "Invalid Username or Password.";
 
-                header("Location: dashboard/index.php");
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check User Status
+        |--------------------------------------------------------------------------
+        */
+
+        elseif ($user["user_status"] !== "active") {
+
+            $error = "Your account has been deactivated.";
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Employee Status
+        |--------------------------------------------------------------------------
+        */
+
+        elseif ($user["employee_status"] !== "active") {
+
+            $error = "Your employee account is inactive.";
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Password
+        |--------------------------------------------------------------------------
+        */
+
+        elseif (
+            password_verify(
+            $password,
+            $user["password_hash"]
+            )
+        ) {
+
+            $error = "Invalid Username or Password.";
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Login Success
+        |--------------------------------------------------------------------------
+        */
+
+        else {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Regenerate Session ID
+            |--------------------------------------------------------------------------
+            */
+
+            session_regenerate_id(true);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Store User Information
+            |--------------------------------------------------------------------------
+            */
+
+            $_SESSION["user_id"] =
+                $user["user_id"];
+
+            $_SESSION["username"] =
+                $user["username"];
+
+            $_SESSION["employee_id"] =
+                $user["employee_id"];
+
+            $_SESSION["employee_code"] =
+                $user["employee_code"];
+
+            $_SESSION["first_name"] =
+                $user["first_name"];
+
+            $_SESSION["last_name"] =
+                $user["last_name"];
+
+            $_SESSION["email"] =
+                $user["email"];
+
+            $_SESSION["department"] =
+                $user["department"];
+
+            $_SESSION["position"] =
+                $user["position"];
+
+            $_SESSION["role_id"] =
+                $user["role_id"];
+
+            $_SESSION["role_name"] =
+                $user["role_name"];
+
+            $_SESSION["must_change_password"] =
+                $user["must_change_password"];
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Update Last Login
+            |--------------------------------------------------------------------------
+            */
+
+            $update = $pdo->prepare("
+                UPDATE users
+
+                SET last_login = NOW()
+
+                WHERE id = :user_id
+            ");
+
+            $update->execute([
+                ":user_id" => $user["user_id"]
+            ]);
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Redirect
+            |--------------------------------------------------------------------------
+            */
+
+            if ($user["must_change_password"] == 1) {
+
+                header(
+                    "Location: change-password.php"
+                );
+
                 exit;
             }
-        } else {
 
-            $error = "Invalid Employee ID or Password.";
+
+            /*
+            |--------------------------------------------------------------------------
+            | Role-based Dashboard
+            |--------------------------------------------------------------------------
+            */
+
+            if ($user["role_name"] === "admin") {
+
+                header(
+                    "Location: admin/index.php"
+                );
+
+                exit;
+            }
+
+            elseif ($user["role_name"] === "manager") {
+
+                header(
+                    "Location: dashboard/index.php"
+                );
+
+                exit;
+            }
+
+            else {
+
+                header(
+                    "Location: dashboard/index.php"
+                );
+
+                exit;
+            }
+
         }
+
     }
+
 }
 
 ?>
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>Advance KPI System - Login</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
     <link
-        rel="stylesheet"
-        href="assets/css/login.css">
-
-</head>
-
-<body>
-
-    <div class="page-container">
-
-        <div class="login-wrapper">
-
-            <!-- LEFT SIDE -->
-            <section class="login-left">
-
-                <div class="illustration">
-
-                    <div class="dashboard-card">
-
-                        <div class="card-header">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
-
-                        <div class="chart-area">
-
-                            <div class="chart-bar bar-1"></div>
-                            <div class="chart-bar bar-2"></div>
-                            <div class="chart-bar bar-3"></div>
-                            <div class="chart-bar bar-4"></div>
-                            <div class="chart-bar bar-5"></div>
-
-                        </div>
-
-                        <div class="card-footer">
-
-                            <div></div>
-                            <div></div>
-
-                        </div>
-
-                    </div>
-
-                    <div class="target-icon">
-                        ✓
-                    </div>
-
-                    <div class="floating-card">
-                        <strong>92%</strong>
-                        <small>KPI Performance</small>
-                    </div>
-
-                </div>
-
-                <div class="left-text">
-
-                    <h2>
-                        Performance<br>
-                        starts with <span>progress.</span>
-                    </h2>
-
-                    <p>
-                        Manage employee performance,
-                        track KPI results and improve
-                        organizational efficiency.
-                    </p>
-
-                </div>
-
-            </section>
-
-
-            <!-- RIGHT SIDE -->
-            <section class="login-right">
-
-                <div class="top-link">
-
-                    <span>
-                        Don't have an account?
-                    </span>
-
-                    <a href="#">
-                        CONTACT ADMIN
-                    </a>
-
-                </div>
-
-
-                <div class="form-container">
-
-                    <div class="form-header">
-
-                        <div class="brand">
-
-                            <div class="brand-icon">
-                                <img src="assets/images/Advance-Logo.png"
-                                    alt="Advance Group Asia Logo">
-                            </div>
-
-                        </div>
-
-                        <h1>
-                            Welcome!
-                        </h1>
-
-                        <p>
-                            Sign in to your KPI Management System
-                        </p>
-
-                    </div>
-
-
-                    <?php if (!empty($error)): ?>
-
-                        <div class="error-message">
-                            <?= htmlspecialchars($error) ?>
-                        </div>
-
-                    <?php endif; ?>
-
-
-                    <form
-                        method="POST"
-                        action="">
-
-                        <!-- Employee ID -->
-
-                        <div class="form-group">
-
-                            <label for="employee_id">
-                                Employee ID
-                            </label>
-
-                            <div class="input-wrapper">
-
-                                <span class="input-icon">
-                                    ID
-                                </span>
-
-                                <input
-                                    type="text"
-                                    id="employee_id"
-                                    name="employee_id"
-                                    placeholder="Enter your Employee ID"
-                                    autocomplete="username"
-                                    required>
-
-                            </div>
-
-                        </div>
-
-
-                        <!-- Password -->
-
-                        <div class="form-group">
-
-                            <label for="password">
-                                Password
-                            </label>
-
-                            <div class="input-wrapper">
-
-                                <span class="input-icon">
-                                    •
-                                </span>
-
-                                <input
-                                    type="password"
-                                    id="password"
-                                    name="password"
-                                    placeholder="Enter your password"
-                                    autocomplete="current-password"
-                                    required>
-
-                                <button
-                                    type="button"
-                                    class="show-password"
-                                    onclick="togglePassword()">
-                                    ◉
-                                </button>
-
-                            </div>
-
-                        </div>
-
-
-                        <!-- Options -->
-
-                        <div class="form-options">
-
-                            <label class="remember">
-
-                                <input
-                                    type="checkbox"
-                                    name="remember">
-
-                                <span>
-                                    Remember me
-                                </span>
-
-                            </label>
-
-                            <a href="#">
-                                Forgot Password?
-                            </a>
-
-                        </div>
-
-
-                        <!-- Login -->
-
-                        <button
-                            type="submit"
-                            class="login-button">
-                            LOGIN
-                        </button>
-
-                    </form>
-
-
-                    <div class="login-footer">
-
-                        <p>
-                            © 2026 Advance Group Asia
-                        </p>
-
-                        <span>
-                            KPI Management System
-                        </span>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-        </div>
-
+      rel="stylesheet"
+      href="assets/css/login.css"
+    />
+    
+    <title>KPI Management System</title>
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-card">
+        <header class="login-header">
+          <img class="login-logo" src="assets/images/Advance-Logo.png" alt="Logo">
+          <h1 class="login-title">
+            KPI Management System
+          </h1>
+          <p class="login-subtitle">
+            Advance Asia Group
+          </p>
+
+        </header>
+
+        <form class="login-form">
+          <div class="input-group">
+            <label for="employee-id">
+              Employee ID
+            </label>
+            <input
+                type="text"
+                id="employee-id"> 
+          </div>
+
+          <div class="input-group">
+            <label for="password">
+              Password
+            </label>
+            <input
+                type="password"
+                id="password">
+          </div>
+          <div class="remember-me">
+
+              <div class="remember-me">
+                <input
+                    type="checkbox"
+                    id="remember-me">
+                  
+                <label for="remember-me">
+                    Remember Me
+                </label>
+              </div>
+
+              <button 
+                  type="submit"
+                  class="login-button">
+
+                  Login
+              </button>
+          </div>
+        </form>
+
+        <footer class="login-footer">
+            Version 1.0
+        </footer>
+      </div>
     </div>
-
-
-    <script>
-        function togglePassword() {
-
-            const password =
-                document.getElementById("password");
-
-            if (password.type === "password") {
-
-                password.type = "text";
-
-            } else {
-
-                password.type = "password";
-
-            }
-        }
-    </script>
-
-</body>
-
+  </body>
 </html>
