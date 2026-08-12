@@ -15,13 +15,18 @@ $error = "";
 
 if (isset($_SESSION["user_id"])) {
 
-    if ($_SESSION["must_change_password"] == 1) {
+    if (($_SESSION["must_change_password"] ?? 0) == 1) {
 
         header("Location: change-password.php");
         exit;
     }
 
-    header("Location: dashboard/index.php");
+    if (($_SESSION["role_id"] ?? 0) == 1) {
+        header("Location: admin/index.php");
+        exit;
+    }
+
+    header("Location: dashboard.php");
     exit;
 }
 
@@ -66,32 +71,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         u.employee_id,
         u.role_id,
         u.status AS user_status,
+        u.must_change_password,
 
         e.employee_code,
         e.first_name,
         e.last_name,
-        e.gender,
         e.phone,
-        e.email AS employee_email,
-        e.department_id,
-        e.position_id,
-        e.hire_date,
+        e.email,
+        e.department,
+        e.position,
         e.status AS employee_status,
 
-        r.role_name,
-
-        d.department_name
+        r.role_name
 
     FROM users u
 
     INNER JOIN employees e
-        ON u.employee_id = e.employee_id
+        ON u.employee_id = e.id
 
     INNER JOIN roles r
-        ON u.role_id = r.role_id
-
-    LEFT JOIN departments d
-        ON e.department_id = d.department_id
+        ON u.role_id = r.id
 
     WHERE u.username = :username
 
@@ -125,7 +124,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         |--------------------------------------------------------------------------
         */
 
-        elseif ($user["user_status"] !== "active") {
+        elseif (strtolower($user["user_status"]) !== "active") {
 
             $error = "Your account has been deactivated.";
 
@@ -137,7 +136,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         |--------------------------------------------------------------------------
         */
 
-        elseif ($user["employee_status"] !== "active") {
+        elseif (strtolower($user["employee_status"]) !== "active") {
 
             $error = "Your employee account is inactive.";
 
@@ -149,12 +148,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         |--------------------------------------------------------------------------
         */
 
-        elseif (
-            password_verify(
-            $password,
-            $user["password_hash"]
-            )
-        ) {
+        elseif (!password_verify($password, $user["password_hash"])) {
 
             $error = "Invalid Username or Password.";
 
@@ -231,7 +225,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 SET last_login = NOW()
 
-                WHERE id = :user_id
+                WHERE user_id = :user_id
             ");
 
             $update->execute([
@@ -261,7 +255,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             |--------------------------------------------------------------------------
             */
 
-            if ($user["role_name"] === "admin") {
+            if ((int) $user["role_id"] === 1) {
 
                 header(
                     "Location: admin/index.php"
@@ -270,19 +264,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 exit;
             }
 
-            elseif ($user["role_name"] === "manager") {
-
-                header(
-                    "Location: dashboard/index.php"
-                );
-
-                exit;
-            }
-
             else {
 
                 header(
-                    "Location: dashboard/index.php"
+                    "Location: dashboard.php"
                 );
 
                 exit;
@@ -327,14 +312,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         </header>
 
-        <form class="login-form">
+        <form class="login-form" method="POST" action="login.php">
+          <?php if ($error !== ""): ?>
+            <p class="login-error" role="alert">
+              <?= htmlspecialchars($error, ENT_QUOTES, "UTF-8") ?>
+            </p>
+          <?php endif; ?>
+
           <div class="input-group">
             <label for="employee-id">
               Employee ID
             </label>
             <input
                 type="text"
-                id="employee-id"> 
+                id="employee-id"
+                name="username"
+                autocomplete="username"
+                required>
           </div>
 
           <div class="input-group">
@@ -343,7 +337,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </label>
             <input
                 type="password"
-                id="password">
+                id="password"
+                name="password"
+                autocomplete="current-password"
+                required>
           </div>
           <div class="remember-me">
 
