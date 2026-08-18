@@ -15,13 +15,7 @@ $error = "";
 
 if (isset($_SESSION["user_id"])) {
 
-    if (($_SESSION["must_change_password"] ?? 0) == 1) {
-
-        header("Location: change-password.php");
-        exit;
-    }
-
-    if (($_SESSION["role_id"] ?? 0) == 1) {
+    if ((int) ($_SESSION["role_id"] ?? 0) === 1) {
         header("Location: admin/index.php");
         exit;
     }
@@ -49,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if (empty($username) || empty($password)) {
+    if ($username === "" || $password === "") {
 
         $error = "Please enter Username and Password.";
 
@@ -60,55 +54,83 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         |--------------------------------------------------------------------------
         | Find User
         |--------------------------------------------------------------------------
+        |
+        | users
+        |   employee_id -> employees.employee_id
+        |   role_id     -> roles.role_id
+        |
+        | employees
+        |   department_id -> departments.department_id
+        |   position_id   -> positions.position_id
+        |
         */
 
         $sql = "
-    SELECT
-        u.user_id,
-        u.username,
-        u.password_hash,
-        u.email AS user_email,
-        u.employee_id,
-        u.role_id,
-        u.status AS user_status,
-        u.must_change_password,
+            SELECT
+                u.user_id,
+                u.username,
+                u.password_hash,
+                u.email AS user_email,
+                u.employee_id,
+                u.role_id,
+                u.status AS user_status,
 
-        e.employee_code,
-        e.first_name,
-        e.last_name,
-        e.phone,
-        e.email,
-        e.department,
-        e.position,
-        e.status AS employee_status,
+                e.employee_code,
+                e.first_name,
+                e.last_name,
+                e.phone,
+                e.email AS employee_email,
+                e.department_id,
+                e.position_id,
+                e.status AS employee_status,
 
-        r.role_name
+                d.department_name,
+                p.position_name,
 
-    FROM users u
+                r.role_name
 
-    INNER JOIN employees e
-        ON u.employee_id = e.id
+            FROM users u
 
-    INNER JOIN roles r
-        ON u.role_id = r.id
+            INNER JOIN employees e
+                ON u.employee_id = e.employee_id
 
-    WHERE u.username = :username
+            LEFT JOIN departments d
+                ON e.department_id = d.department_id
 
-    LIMIT 1
+            LEFT JOIN positions p
+                ON e.position_id = p.position_id
+
+            INNER JOIN roles r
+                ON u.role_id = r.role_id
+
+            WHERE u.username = :username
+
+            LIMIT 1
         ";
 
-        $stmt = $pdo->prepare($sql);
 
-        $stmt->execute([
-            ":username" => $username
-        ]);
+        try {
 
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                ":username" => $username
+            ]);
+
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+
+        } catch (PDOException $e) {
+
+            $error = "Database error. Please try again.";
+
+            $user = false;
+        }
 
 
         /*
         |--------------------------------------------------------------------------
-        | Check Username
+        | Username Not Found
         |--------------------------------------------------------------------------
         */
 
@@ -116,7 +138,49 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $error = "Invalid Username or Password.";
 
+
+            /*
+            | Log Failed Login
+            */
+
+            try {
+
+                $log = $pdo->prepare("
+                    INSERT INTO login_logs
+                    (
+                        user_id,
+                        username,
+                        ip_address,
+                        user_agent,
+                        login_status,
+                        failure_reason
+                    )
+                    VALUES
+                    (
+                        NULL,
+                        :username,
+                        :ip_address,
+                        :user_agent,
+                        'Failed',
+                        :failure_reason
+                    )
+                ");
+
+                $log->execute([
+                    ":username" => $username,
+                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
+                    ":failure_reason" => "Username not found"
+                ]);
+
+            } catch (PDOException $e) {
+
+                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
+            }
+
+
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -128,7 +192,50 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $error = "Your account has been deactivated.";
 
+
+            /*
+            | Log Failed Login
+            */
+
+            try {
+
+                $log = $pdo->prepare("
+                    INSERT INTO login_logs
+                    (
+                        user_id,
+                        username,
+                        ip_address,
+                        user_agent,
+                        login_status,
+                        failure_reason
+                    )
+                    VALUES
+                    (
+                        :user_id,
+                        :username,
+                        :ip_address,
+                        :user_agent,
+                        'Failed',
+                        :failure_reason
+                    )
+                ");
+
+                $log->execute([
+                    ":user_id" => $user["user_id"],
+                    ":username" => $username,
+                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
+                    ":failure_reason" => "User account inactive"
+                ]);
+
+            } catch (PDOException $e) {
+
+                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
+            }
+
+
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -140,7 +247,50 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $error = "Your employee account is inactive.";
 
+
+            /*
+            | Log Failed Login
+            */
+
+            try {
+
+                $log = $pdo->prepare("
+                    INSERT INTO login_logs
+                    (
+                        user_id,
+                        username,
+                        ip_address,
+                        user_agent,
+                        login_status,
+                        failure_reason
+                    )
+                    VALUES
+                    (
+                        :user_id,
+                        :username,
+                        :ip_address,
+                        :user_agent,
+                        'Failed',
+                        :failure_reason
+                    )
+                ");
+
+                $log->execute([
+                    ":user_id" => $user["user_id"],
+                    ":username" => $username,
+                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
+                    ":failure_reason" => "Employee account inactive"
+                ]);
+
+            } catch (PDOException $e) {
+
+                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
+            }
+
+
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -152,7 +302,50 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $error = "Invalid Username or Password.";
 
+
+            /*
+            | Log Failed Login
+            */
+
+            try {
+
+                $log = $pdo->prepare("
+                    INSERT INTO login_logs
+                    (
+                        user_id,
+                        username,
+                        ip_address,
+                        user_agent,
+                        login_status,
+                        failure_reason
+                    )
+                    VALUES
+                    (
+                        :user_id,
+                        :username,
+                        :ip_address,
+                        :user_agent,
+                        'Failed',
+                        :failure_reason
+                    )
+                ");
+
+                $log->execute([
+                    ":user_id" => $user["user_id"],
+                    ":username" => $username,
+                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
+                    ":failure_reason" => "Invalid password"
+                ]);
+
+            } catch (PDOException $e) {
+
+                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
+            }
+
+
         }
+
 
         /*
         |--------------------------------------------------------------------------
@@ -161,6 +354,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         */
 
         else {
+
 
             /*
             |--------------------------------------------------------------------------
@@ -196,13 +390,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $user["last_name"];
 
             $_SESSION["email"] =
-                $user["email"];
+                $user["employee_email"] ?? $user["user_email"];
+
+            $_SESSION["department_id"] =
+                $user["department_id"];
 
             $_SESSION["department"] =
-                $user["department"];
+                $user["department_name"];
+
+            $_SESSION["position_id"] =
+                $user["position_id"];
 
             $_SESSION["position"] =
-                $user["position"];
+                $user["position_name"];
 
             $_SESSION["role_id"] =
                 $user["role_id"];
@@ -210,163 +410,247 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION["role_name"] =
                 $user["role_name"];
 
-            $_SESSION["must_change_password"] =
-                $user["must_change_password"];
-
 
             /*
             |--------------------------------------------------------------------------
-            | Update Last Login
+            | Login Log - Success
             |--------------------------------------------------------------------------
             */
 
-            $update = $pdo->prepare("
-                UPDATE users
+            try {
 
-                SET last_login = NOW()
+                $log = $pdo->prepare("
+                    INSERT INTO login_logs
+                    (
+                        user_id,
+                        username,
+                        ip_address,
+                        user_agent,
+                        login_status,
+                        failure_reason
+                    )
+                    VALUES
+                    (
+                        :user_id,
+                        :username,
+                        :ip_address,
+                        :user_agent,
+                        'Success',
+                        NULL
+                    )
+                ");
 
-                WHERE user_id = :user_id
-            ");
+                $log->execute([
+                    ":user_id" => $user["user_id"],
+                    ":username" => $user["username"],
+                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null
+                ]);
 
-            $update->execute([
-                ":user_id" => $user["user_id"]
-            ]);
+            } catch (PDOException $e) {
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | Redirect
-            |--------------------------------------------------------------------------
-            */
-
-            if ($user["must_change_password"] == 1) {
-
-                header(
-                    "Location: change-password.php"
-                );
-
-                exit;
+                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
 
 
             /*
             |--------------------------------------------------------------------------
-            | Role-based Dashboard
+            | Role-based Redirect
             |--------------------------------------------------------------------------
             */
 
             if ((int) $user["role_id"] === 1) {
 
-                header(
-                    "Location: admin/index.php"
-                );
-
+                header("Location: admin/index.php");
                 exit;
             }
 
-            else {
 
-                header(
-                    "Location: dashboard.php"
-                );
-
-                exit;
-            }
-
+            header("Location: dashboard.php");
+            exit;
         }
-
     }
-
 }
 
 ?>
 
 <!doctype html>
+
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <link
-      rel="stylesheet"
-      href="assets/css/login.css"
-    />
-    
+        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <link
+        rel="stylesheet"
+        href="assets/css/login.css"
+    >
+
     <title>KPI Management System</title>
-  </head>
-  <body>
+
+</head>
+
+
+<body>
+
     <div class="login-container">
-      <div class="login-card">
-        <header class="login-header">
-          <img class="login-logo" src="assets/images/Advance-Logo.png" alt="Logo">
-          <h1 class="login-title">
-            KPI Management System
-          </h1>
-          <p class="login-subtitle">
-            Advance Asia Group
-          </p>
 
-        </header>
+        <div class="login-card">
 
-        <form class="login-form" method="POST" action="login.php">
-          <?php if ($error !== ""): ?>
-            <p class="login-error" role="alert">
-              <?= htmlspecialchars($error, ENT_QUOTES, "UTF-8") ?>
-            </p>
-          <?php endif; ?>
 
-          <div class="input-group">
-            <label for="employee-id">
-              Employee ID
-            </label>
-            <input
-                type="text"
-                id="employee-id"
-                name="username"
-                autocomplete="username"
-                required>
-          </div>
+            <!-- =========================================================
+                 LOGIN HEADER
+            ========================================================== -->
 
-          <div class="input-group">
-            <label for="password">
-              Password
-            </label>
-            <input
-                type="password"
-                id="password"
-                name="password"
-                autocomplete="current-password"
-                required>
-          </div>
-          <div class="remember-me">
+            <header class="login-header">
 
-              <div class="remember-me">
-                <input
-                    type="checkbox"
-                    id="remember-me">
-                  
-                <label for="remember-me">
-                    Remember Me
-                </label>
-              </div>
+                <img
+                    class="login-logo"
+                    src="assets/images/Advance-Logo.png"
+                    alt="Advance Asia Group Logo"
+                >
 
-              <button 
-                  type="submit"
-                  class="login-button">
+                <h1 class="login-title">
+                    KPI Management System
+                </h1>
 
-                  Login
-              </button>
-          </div>
-        </form>
+                <p class="login-subtitle">
+                    Advance Asia Group
+                </p>
 
-        <footer class="login-footer">
-            Version 1.0
-        </footer>
-      </div>
+            </header>
+
+
+            <!-- =========================================================
+                 LOGIN FORM
+            ========================================================== -->
+
+            <form
+                class="login-form"
+                method="POST"
+                action="login.php"
+            >
+
+
+                <!-- Error Message -->
+
+                <?php if ($error !== ""): ?>
+
+                    <p
+                        class="login-error"
+                        role="alert"
+                    >
+                        <?= htmlspecialchars(
+                            $error,
+                            ENT_QUOTES,
+                            "UTF-8"
+                        ) ?>
+                    </p>
+
+                <?php endif; ?>
+
+
+                <!-- Username -->
+
+                <div class="input-group">
+
+                    <label for="employee-id">
+                        Employee ID
+                    </label>
+
+                    <input
+                        type="text"
+                        id="employee-id"
+                        name="username"
+                        autocomplete="username"
+                        placeholder="Enter Employee ID"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Password -->
+
+                <div class="input-group">
+
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        autocomplete="current-password"
+                        placeholder="Enter Password"
+                        required
+                    >
+
+                </div>
+
+
+                <!-- Remember Me + Login -->
+
+                <div class="remember-login-row">
+
+                    <label
+                        class="remember-me"
+                        for="remember-me"
+                    >
+
+                        <input
+                            type="checkbox"
+                            id="remember-me"
+                            name="remember-me"
+                        >
+
+                        <span>
+                            Remember Me
+                        </span>
+
+                    </label>
+
+
+                    <button
+                        type="submit"
+                        class="login-button"
+                    >
+                        Login
+                    </button>
+
+                </div>
+
+
+            </form>
+
+
+            <!-- =========================================================
+                 FOOTER
+            ========================================================== -->
+
+            <footer class="login-footer">
+
+                Version 1.0
+
+            </footer>
+
+
+        </div>
+
     </div>
-  </body>
+
+</body>
+
 </html>
