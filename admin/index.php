@@ -150,6 +150,20 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
+                href="kpi-categories.php"
+                class="nav-item">
+
+                <span class="nav-icon">
+                    📂
+                </span>
+
+                <span>
+                    KPI Categories
+                </span>
+
+            </a>
+            
+            <a
                 href="kpi/index.php"
                 class="nav-item">
 
@@ -162,22 +176,6 @@ $fullName = trim($firstName . " " . $lastName);
                 </span>
 
             </a>
-
-
-            <a
-                href="categories/index.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    📂
-                </span>
-
-                <span>
-                    KPI Categories
-                </span>
-
-            </a>
-
 
             <a
                 href="periods/index.php"
