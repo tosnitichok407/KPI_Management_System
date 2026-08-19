@@ -162,9 +162,9 @@ $fullName = trim($firstName . " " . $lastName);
                 </span>
 
             </a>
-            
+
             <a
-                href="kpi/index.php"
+                href="kpi-management.php"
                 class="nav-item">
 
                 <span class="nav-icon">

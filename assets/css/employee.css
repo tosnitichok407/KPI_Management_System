@@ -1,368 +1,357 @@
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    font-family: "Kanit", sans-serif;
-    background: #f5f7fa;
-    color: #1f2937;
+  margin: 0;
+  font-family: "Kanit", sans-serif;
+  background: #f5f7fa;
+  color: #1f2937;
 }
 
 .page-container {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 40px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px;
 }
-
 
 /* =========================================================
    HEADER
 ========================================================= */
 
 .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
 }
 
 .page-header h1 {
-    margin: 0;
-    font-size: 32px;
-    font-weight: 600;
+  margin: 0;
+  font-size: 32px;
+  font-weight: 600;
 }
 
 .page-header p {
-    margin: 5px 0 0;
-    color: #6b7280;
+  margin: 5px 0 0;
+  color: #6b7280;
 }
 
 .header-actions {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
-
 
 /* =========================================================
    BUTTON
 ========================================================= */
 
 .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-    padding: 10px 18px;
+  padding: 10px 18px;
 
-    border-radius: 8px;
+  border-radius: 8px;
 
-    text-decoration: none;
+  text-decoration: none;
 
-    border: none;
+  border: none;
 
-    font-family: inherit;
-    font-size: 15px;
+  font-family: inherit;
+  font-size: 15px;
 
-    cursor: pointer;
+  cursor: pointer;
 }
 
 .btn-primary {
-    background: #1f6b9c;
-    color: white;
+  background: #1f6b9c;
+  color: white;
 }
 
 .btn-primary:hover {
-    background: #18577f;
+  background: #18577f;
 }
 
 .btn-secondary {
-    background: #e5e7eb;
-    color: #374151;
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .btn-secondary:hover {
-    background: #d1d5db;
+  background: #d1d5db;
 }
-
 
 /* =========================================================
    FILTER
 ========================================================= */
 
 .filter-card {
-    background: white;
+  background: white;
 
-    border-radius: 12px;
+  border-radius: 12px;
 
-    padding: 22px;
+  padding: 22px;
 
-    margin-bottom: 25px;
+  margin-bottom: 25px;
 
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .filter-form {
-    display: flex;
-    align-items: end;
-    gap: 15px;
+  display: flex;
+  align-items: end;
+  gap: 15px;
 }
 
 .form-group {
-    flex: 1;
+  flex: 1;
 }
 
 .form-group label {
-    display: block;
+  display: block;
 
-    margin-bottom: 6px;
+  margin-bottom: 6px;
 
-    font-size: 14px;
+  font-size: 14px;
 
-    font-weight: 500;
+  font-weight: 500;
 }
 
 .form-group input,
 .form-group select {
-    width: 100%;
+  width: 100%;
 
-    height: 42px;
+  height: 42px;
 
-    padding: 0 12px;
+  padding: 0 12px;
 
-    border: 1px solid #d1d5db;
+  border: 1px solid #d1d5db;
 
-    border-radius: 7px;
+  border-radius: 7px;
 
-    font-family: inherit;
+  font-family: inherit;
 
-    font-size: 14px;
+  font-size: 14px;
 
-    outline: none;
+  outline: none;
 }
 
 .form-group input:focus,
 .form-group select:focus {
-    border-color: #1f6b9c;
+  border-color: #1f6b9c;
 }
 
 .filter-buttons {
-    display: flex;
-    gap: 8px;
+  display: flex;
+  gap: 8px;
 }
-
 
 /* =========================================================
    TABLE
 ========================================================= */
 
 .table-card {
-    background: white;
+  background: white;
 
-    border-radius: 12px;
+  border-radius: 12px;
 
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 
-    overflow: hidden;
+  overflow: hidden;
 }
 
 .table-header {
-    display: flex;
+  display: flex;
 
-    justify-content: space-between;
+  justify-content: space-between;
 
-    align-items: center;
+  align-items: center;
 
-    padding: 20px 22px;
+  padding: 20px 22px;
 
-    border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .table-header h2 {
-    margin: 0;
+  margin: 0;
 
-    font-size: 20px;
+  font-size: 20px;
 
-    font-weight: 600;
+  font-weight: 600;
 }
 
 .table-header span {
-    color: #6b7280;
+  color: #6b7280;
 
-    font-size: 14px;
+  font-size: 14px;
 }
 
 .table-wrapper {
-    overflow-x: auto;
+  overflow-x: auto;
 }
 
 table {
-    width: 100%;
+  width: 100%;
 
-    border-collapse: collapse;
+  border-collapse: collapse;
 
-    min-width: 1000px;
+  min-width: 1000px;
 }
 
 thead {
-    background: #f8fafc;
+  background: #f8fafc;
 }
 
 th {
-    padding: 14px 16px;
+  padding: 14px 16px;
 
-    text-align: left;
+  text-align: left;
 
-    font-size: 14px;
+  font-size: 14px;
 
-    font-weight: 600;
+  font-weight: 600;
 
-    color: #374151;
+  color: #374151;
 
-    border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 td {
-    padding: 15px 16px;
+  padding: 15px 16px;
 
-    font-size: 14px;
+  font-size: 14px;
 
-    border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 tbody tr:hover {
-    background: #f9fafb;
+  background: #f9fafb;
 }
-
 
 /* =========================================================
    STATUS
 ========================================================= */
 
 .status {
-    display: inline-block;
+  display: inline-block;
 
-    padding: 4px 10px;
+  padding: 4px 10px;
 
-    border-radius: 20px;
+  border-radius: 20px;
 
-    font-size: 12px;
+  font-size: 12px;
 
-    font-weight: 500;
+  font-weight: 500;
 }
 
 .status.active {
-    background: #dcfce7;
-    color: #166534;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .status.inactive {
-    background: #fee2e2;
-    color: #991b1b;
+  background: #fee2e2;
+  color: #991b1b;
 }
-
 
 /* =========================================================
    ACTION
 ========================================================= */
 
 .action-buttons {
-    display: flex;
+  display: flex;
 
-    gap: 6px;
+  gap: 6px;
 }
 
 .btn-small {
-    display: inline-block;
+  display: inline-block;
 
-    padding: 5px 10px;
+  padding: 5px 10px;
 
-    border-radius: 6px;
+  border-radius: 6px;
 
-    text-decoration: none;
+  text-decoration: none;
 
-    font-size: 12px;
+  font-size: 12px;
 }
 
 .btn-small.edit {
-    background: #dbeafe;
-    color: #1d4ed8;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .btn-small.danger {
-    background: #fee2e2;
-    color: #b91c1c;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .btn-small.activate {
-    background: #dcfce7;
-    color: #166534;
+  background: #dcfce7;
+  color: #166534;
 }
-
 
 /* =========================================================
    EMPTY
 ========================================================= */
 
 .empty-state {
-    text-align: center;
+  text-align: center;
 
-    padding: 50px;
+  padding: 50px;
 
-    color: #9ca3af;
+  color: #9ca3af;
 }
-
 
 /* =========================================================
    ALERT
 ========================================================= */
 
 .alert {
-    margin: 20px;
+  margin: 20px;
 
-    padding: 12px 15px;
+  padding: 12px 15px;
 
-    border-radius: 8px;
+  border-radius: 8px;
 }
 
 .alert-error {
-    background: #fee2e2;
+  background: #fee2e2;
 
-    color: #991b1b;
+  color: #991b1b;
 }
-
 
 /* =========================================================
    RESPONSIVE
 ========================================================= */
 
 @media (max-width: 768px) {
+  .page-container {
+    padding: 20px;
+  }
 
-    .page-container {
-        padding: 20px;
-    }
+  .page-header {
+    flex-direction: column;
 
-    .page-header {
-        flex-direction: column;
+    align-items: flex-start;
 
-        align-items: flex-start;
+    gap: 15px;
+  }
 
-        gap: 15px;
-    }
+  .filter-form {
+    flex-direction: column;
 
-    .filter-form {
-        flex-direction: column;
+    align-items: stretch;
+  }
 
-        align-items: stretch;
-    }
+  .filter-buttons {
+    width: 100%;
+  }
 
-    .filter-buttons {
-        width: 100%;
-    }
-
-    .filter-buttons .btn {
-        flex: 1;
-    }
-
+  .filter-buttons .btn {
+    flex: 1;
+  }
 }

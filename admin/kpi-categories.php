@@ -58,7 +58,6 @@ if (isset($_GET["delete"])) {
 
                 $_SESSION["category_error"] =
                     "ไม่สามารถลบ Category นี้ได้ เนื่องจากมี KPI Indicator ใช้งานอยู่";
-
             } else {
 
                 $delete = $pdo->prepare("
@@ -73,7 +72,6 @@ if (isset($_GET["delete"])) {
                 $_SESSION["category_success"] =
                     "ลบ KPI Category เรียบร้อยแล้ว";
             }
-
         } catch (PDOException $e) {
 
             $_SESSION["category_error"] =
@@ -115,7 +113,6 @@ try {
     ");
 
     $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 } catch (PDOException $e) {
 
     $categories = [];
@@ -149,28 +146,23 @@ unset($_SESSION["category_error"]);
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+        content="width=device-width, initial-scale=1.0">
 
     <title>KPI Category Management</title>
 
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-    >
+        rel="stylesheet">
 
     <link
         rel="stylesheet"
-        href="../assets/css/variables.css"
-    >
+        href="../assets/css/variables.css">
 
     <link
         rel="stylesheet"
-        href="../assets/css/responsive.css"
-    >
+        href="../assets/css/responsive.css">
 
     <style>
-
         * {
             box-sizing: border-box;
         }
@@ -183,44 +175,80 @@ unset($_SESSION["category_error"]);
         }
 
         .page-container {
-            padding: 30px;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
         }
+
+
+        /* =========================================================
+   HEADER
+========================================================= */
 
         .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }
 
-        .page-title h1 {
+        .page-header h1 {
             margin: 0;
-            font-size: 30px;
+            font-size: 32px;
+            font-weight: 600;
         }
 
-        .page-title p {
+        .page-header p {
             margin: 5px 0 0;
             color: #6b7280;
         }
 
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+
+        /* =========================================================
+   BUTTON
+========================================================= */
+
         .btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
             padding: 10px 18px;
+
             border-radius: 8px;
+
             text-decoration: none;
-            font-size: 15px;
-            font-weight: 500;
+
             border: none;
+
+            font-family: inherit;
+            font-size: 15px;
+
             cursor: pointer;
         }
 
         .btn-primary {
-            background: #243f8f;
+            background: #1f6b9c;
             color: white;
         }
 
         .btn-primary:hover {
-            background: #1d3477;
+            background: #18577f;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
         }
 
         .btn-edit {
@@ -252,7 +280,7 @@ unset($_SESSION["category_error"]);
         .card {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             overflow: hidden;
         }
 
@@ -325,7 +353,6 @@ unset($_SESSION["category_error"]);
             }
 
         }
-
     </style>
 
 </head>
@@ -334,237 +361,240 @@ unset($_SESSION["category_error"]);
 <body>
 
 
-<div class="page-container">
+    <div class="page-container">
 
 
-    <!-- =========================================================
+        <!-- =========================================================
          PAGE HEADER
     ========================================================== -->
 
-    <div class="page-header">
+        <div class="page-header">
 
-        <div class="page-title">
+            <div class="page-title">
 
-            <h1>
-                KPI Category Management
-            </h1>
+                <h1>
+                    KPI Category Management
+                </h1>
 
-            <p>
-                จัดการหมวดหมู่ของตัวชี้วัด KPI
-            </p>
+                <p>
+                    จัดการหมวดหมู่ของตัวชี้วัด KPI
+                </p>
+
+            </div>
+            <div class="header-actions">
+
+                <a
+                    href="index.php"
+                    class="btn btn-secondary">
+                    Dashboard
+                </a>
+
+                <a
+                    href="employee-add.php"
+                    class="btn btn-primary">
+                    + Add Employee
+                </a>
+
+            </div>
 
         </div>
 
 
-        <a
-            href="kpi-categories-add.php"
-            class="btn btn-primary"
-        >
-            + Add KPI Category
-        </a>
-
-    </div>
-
-
-    <!-- =========================================================
+        <!-- =========================================================
          SUCCESS MESSAGE
     ========================================================== -->
 
-    <?php if ($success !== ""): ?>
+        <?php if ($success !== ""): ?>
 
-        <div class="alert alert-success">
+            <div class="alert alert-success">
 
-            <?= htmlspecialchars(
-                $success,
-                ENT_QUOTES,
-                "UTF-8"
-            ) ?>
+                <?= htmlspecialchars(
+                    $success,
+                    ENT_QUOTES,
+                    "UTF-8"
+                ) ?>
 
-        </div>
+            </div>
 
-    <?php endif; ?>
+        <?php endif; ?>
 
 
-    <!-- =========================================================
+        <!-- =========================================================
          ERROR MESSAGE
     ========================================================== -->
 
-    <?php if ($error !== ""): ?>
+        <?php if ($error !== ""): ?>
 
-        <div class="alert alert-error">
+            <div class="alert alert-error">
 
-            <?= htmlspecialchars(
-                $error,
-                ENT_QUOTES,
-                "UTF-8"
-            ) ?>
+                <?= htmlspecialchars(
+                    $error,
+                    ENT_QUOTES,
+                    "UTF-8"
+                ) ?>
 
-        </div>
+            </div>
 
-    <?php endif; ?>
+        <?php endif; ?>
 
 
-    <!-- =========================================================
+        <!-- =========================================================
          CATEGORY TABLE
     ========================================================== -->
 
-    <div class="card">
+        <div class="card">
 
-        <div class="table-wrapper">
+            <div class="table-wrapper">
 
-            <table>
+                <table>
 
-                <thead>
+                    <thead>
 
-                    <tr>
+                        <tr>
 
-                        <th>
-                            ID
-                        </th>
+                            <th>
+                                ID
+                            </th>
 
-                        <th>
-                            Category Name
-                        </th>
+                            <th>
+                                Category Name
+                            </th>
 
-                        <th>
-                            Description
-                        </th>
+                            <th>
+                                Description
+                            </th>
 
-                        <th>
-                            KPI Indicators
-                        </th>
+                            <th>
+                                KPI Indicators
+                            </th>
 
-                        <th>
-                            Actions
-                        </th>
+                            <th>
+                                Actions
+                            </th>
 
-                    </tr>
+                        </tr>
 
-                </thead>
+                    </thead>
 
 
-                <tbody>
+                    <tbody>
 
-                    <?php if (count($categories) > 0): ?>
+                        <?php if (count($categories) > 0): ?>
 
-                        <?php foreach ($categories as $category): ?>
+                            <?php foreach ($categories as $category): ?>
+
+                                <tr>
+
+                                    <td class="category-id">
+
+                                        #<?= (int) $category["category_id"] ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?= htmlspecialchars(
+                                            $category["category_name"],
+                                            ENT_QUOTES,
+                                            "UTF-8"
+                                        ) ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <?php
+
+                                        $description =
+                                            $category["description"];
+
+                                        if (
+                                            $description === null ||
+                                            trim($description) === ""
+                                        ) {
+
+                                            echo "-";
+                                        } else {
+
+                                            echo htmlspecialchars(
+                                                $description,
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            );
+                                        }
+
+                                        ?>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span class="kpi-count">
+
+                                            <?= (int) $category["kpi_count"] ?>
+
+                                            KPI
+
+                                        </span>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <div class="actions">
+
+                                            <a
+                                                href="kpi-categories-edit.php?id=<?= (int) $category["category_id"] ?>"
+                                                class="btn btn-edit">
+                                                Edit
+                                            </a>
+
+
+                                            <a
+                                                href="kpi-categories.php?delete=<?= (int) $category["category_id"] ?>"
+                                                class="btn btn-delete"
+                                                onclick="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');">
+                                                Delete
+                                            </a>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            <?php endforeach; ?>
+
+                        <?php else: ?>
 
                             <tr>
 
-                                <td class="category-id">
+                                <td
+                                    colspan="5"
+                                    class="empty">
 
-                                    #<?= (int) $category["category_id"] ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?= htmlspecialchars(
-                                        $category["category_name"],
-                                        ENT_QUOTES,
-                                        "UTF-8"
-                                    ) ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <?php
-
-                                    $description =
-                                        $category["description"];
-
-                                    if (
-                                        $description === null ||
-                                        trim($description) === ""
-                                    ) {
-
-                                        echo "-";
-
-                                    } else {
-
-                                        echo htmlspecialchars(
-                                            $description,
-                                            ENT_QUOTES,
-                                            "UTF-8"
-                                        );
-                                    }
-
-                                    ?>
-
-                                </td>
-
-
-                                <td>
-
-                                    <span class="kpi-count">
-
-                                        <?= (int) $category["kpi_count"] ?>
-
-                                        KPI
-
-                                    </span>
-
-                                </td>
-
-
-                                <td>
-
-                                    <div class="actions">
-
-                                        <a
-                                            href="kpi-categories-edit.php?id=<?= (int) $category["category_id"] ?>"
-                                            class="btn btn-edit"
-                                        >
-                                            Edit
-                                        </a>
-
-
-                                        <a
-                                            href="kpi-categories.php?delete=<?= (int) $category["category_id"] ?>"
-                                            class="btn btn-delete"
-                                            onclick="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');"
-                                        >
-                                            Delete
-                                        </a>
-
-                                    </div>
+                                    ยังไม่มี KPI Category
 
                                 </td>
 
                             </tr>
 
-                        <?php endforeach; ?>
+                        <?php endif; ?>
 
-                    <?php else: ?>
+                    </tbody>
 
-                        <tr>
+                </table>
 
-                            <td
-                                colspan="5"
-                                class="empty"
-                            >
-
-                                ยังไม่มี KPI Category
-
-                            </td>
-
-                        </tr>
-
-                    <?php endif; ?>
-
-                </tbody>
-
-            </table>
+            </div>
 
         </div>
 
+
     </div>
-
-
-</div>
 
 
 </body>
