@@ -345,6 +345,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
     >
 
+    <link
+        rel="stylesheet"
+        href="../assets/css/user-account.css"
+    >
+
     <style>
 
         * {

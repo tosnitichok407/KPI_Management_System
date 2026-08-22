@@ -162,6 +162,10 @@ unset($_SESSION["category_error"]);
         rel="stylesheet"
         href="../assets/css/responsive.css">
 
+    <link
+        rel="stylesheet"
+        href="../assets/css/kpi.css">
+
     <style>
         * {
             box-sizing: border-box;

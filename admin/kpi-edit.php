@@ -195,6 +195,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link
+        rel="stylesheet"
+        href="../assets/css/kpi.css">
+
     <style>
         body {
             margin: 0;

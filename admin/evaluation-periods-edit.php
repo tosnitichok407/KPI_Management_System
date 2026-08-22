@@ -246,34 +246,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee.css"
+        href="../assets/css/evaluation.css"
     >
 
     <title>Edit Evaluation Period</title>
 
 </head>
-
-<style>
-    .btn-primary {
-        background: #1f6b9c;
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #18577f;
-    }
-
-    .btn-secondary {
-        background: #e5e7eb;
-        color: #374151;
-        margin-top: 10px;
-        margin-right: 5px;
-    }
-
-    .btn-secondary:hover {
-        background: #d1d5db;
-    }
-</style>
 
 <body>
 

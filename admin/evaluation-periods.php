@@ -68,32 +68,10 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee.css"
+        href="../assets/css/evaluation.css"
     >
 
     <title>Evaluation Period Management</title>
-
-    <style>
-
-        .status-open {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            background: #dcfce7;
-            color: #166534;
-            font-size: 13px;
-        }
-
-        .status-closed {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            background: #fee2e2;
-            color: #991b1b;
-            font-size: 13px;
-        }
-
-    </style>
 
 </head>
 

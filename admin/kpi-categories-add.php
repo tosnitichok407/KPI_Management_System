@@ -216,6 +216,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="../assets/css/responsive.css"
     >
 
+    <link
+        rel="stylesheet"
+        href="../assets/css/kpi.css"
+    >
+
 
     <style>
 

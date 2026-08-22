@@ -1,7 +1,5 @@
 <?php
-
 session_start();
-
 /*
 |--------------------------------------------------------------------------
 | Authentication Check
@@ -13,7 +11,6 @@ if (!isset($_SESSION["user_id"])) {
     exit;
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Admin Access Check
@@ -24,7 +21,6 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
     header("Location: ../dashboard.php");
     exit;
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -43,17 +39,12 @@ $fullName = trim($firstName . " " . $lastName);
 ?>
 
 <!DOCTYPE html>
-
 <html lang="th">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0">
-
     <title>
         Admin Dashboard | KPI Management System
     </title>
@@ -70,13 +61,15 @@ $fullName = trim($firstName . " " . $lastName);
 
 </head>
 
-
 <body>
+    <!-- Mobile Menu Overlay -->
 
+    <div
+        class="mobile-menu-overlay"
+        id="mobileMenuOverlay">
+    </div>
 
-    <!-- =========================================================
-     SIDEBAR
-========================================================== -->
+    <!-- === SIDEBAR === -->
 
     <aside class="sidebar">
 
@@ -102,12 +95,8 @@ $fullName = trim($firstName . " " . $lastName);
 
         </div>
 
-
         <!-- Navigation -->
-
         <nav class="sidebar-nav">
-
-
             <a
                 href="index.php"
                 class="nav-item active">
@@ -119,9 +108,7 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     Dashboard
                 </span>
-
             </a>
-
 
             <a
                 href="employees.php"
@@ -134,7 +121,6 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     Employee Management
                 </span>
-
             </a>
 
             <a
@@ -160,7 +146,6 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     KPI Categories
                 </span>
-
             </a>
 
             <a
@@ -174,7 +159,6 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     KPI Management
                 </span>
-
             </a>
 
             <a
@@ -188,7 +172,6 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     Evaluation Periods
                 </span>
-
             </a>
 
 
@@ -203,7 +186,6 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     KPI Assignments
                 </span>
-
             </a>
 
 
@@ -235,12 +217,9 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     Login Logs
                 </span>
-
             </a>
 
-
         </nav>
-
 
         <!-- Sidebar Bottom -->
 
@@ -253,86 +232,63 @@ $fullName = trim($firstName . " " . $lastName);
                 <span>
                     🚪
                 </span>
-
                 Logout
-
             </a>
-
         </div>
-
     </aside>
 
 
-    <!-- =========================================================
-     MAIN CONTENT
-========================================================== -->
+    <!-- === MAIN CONTENT === -->
 
     <main class="main-content">
-
-
-        <!-- =====================================================
-         TOP BAR
-    ====================================================== -->
-
+        <!-- === TOP BAR === -->
         <header class="topbar">
+            <!-- Mobile Menu Button -->
+            <button
+                type="button"
+                class="mobile-menu-button"
+                id="mobileMenuButton"
+                aria-label="Open navigation menu"
+                aria-expanded="false">
+                ☰
+            </button>
 
             <div>
-
                 <h1>
                     Admin Dashboard
                 </h1>
-
-                <p>
-                    KPI Management System
-                </p>
-
-            </div>
-
-
-            <div class="user-info">
-
-                <div class="user-avatar">
-                    <?= htmlspecialchars(
-                        strtoupper(substr($firstName, 0, 1)),
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>
-                </div>
-
-
-                <div class="user-detail">
-
-                    <strong>
+                <div class="user-info">
+                    <div class="user-avatar">
                         <?= htmlspecialchars(
-                            $fullName,
+                            strtoupper(substr($firstName, 0, 1)),
                             ENT_QUOTES,
                             "UTF-8"
                         ) ?>
-                    </strong>
+                    </div>
 
-                    <span>
-                        <?= htmlspecialchars(
-                            $employeeCode,
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-                    </span>
+                    <div class="user-detail">
+                        <strong>
+                            <?= htmlspecialchars(
+                                $fullName,
+                                ENT_QUOTES,
+                                "UTF-8"
+                            ) ?>
+                        </strong>
 
+                        <span>
+                            <?= htmlspecialchars(
+                                $employeeCode,
+                                ENT_QUOTES,
+                                "UTF-8"
+                            ) ?>
+                        </span>
+                    </div>
                 </div>
-
-            </div>
-
         </header>
 
-
-        <!-- =====================================================
-         WELCOME
-    ====================================================== -->
-
+        <!-- === WELCOME === -->
         <section class="welcome-section">
-
             <div>
-
                 <h2>
                     Welcome, <?= htmlspecialchars(
                                     $firstName,
@@ -344,20 +300,14 @@ $fullName = trim($firstName . " " . $lastName);
                 <p>
                     ยินดีต้อนรับเข้าสู่ระบบบริหารและติดตาม KPI
                 </p>
-
             </div>
 
         </section>
 
-
-        <!-- =====================================================
-         USER INFORMATION
-    ====================================================== -->
+        <!-- === USER INFORMATION === -->
 
         <section class="user-card">
-
             <div class="user-card-item">
-
                 <span>
                     Employee ID
                 </span>
@@ -369,12 +319,9 @@ $fullName = trim($firstName . " " . $lastName);
                         "UTF-8"
                     ) ?>
                 </strong>
-
             </div>
 
-
             <div class="user-card-item">
-
                 <span>
                     Department
                 </span>
@@ -386,9 +333,7 @@ $fullName = trim($firstName . " " . $lastName);
                         "UTF-8"
                     ) ?>
                 </strong>
-
             </div>
-
 
             <div class="user-card-item">
 
@@ -403,22 +348,14 @@ $fullName = trim($firstName . " " . $lastName);
                         "UTF-8"
                     ) ?>
                 </strong>
-
             </div>
-
         </section>
 
-
-        <!-- =====================================================
-         MANAGEMENT MENU
-    ====================================================== -->
+        <!-- === MANAGEMENT MENU === -->
 
         <section class="dashboard-section">
-
             <div class="section-header">
-
                 <div>
-
                     <h2>
                         System Management
                     </h2>
@@ -426,17 +363,12 @@ $fullName = trim($firstName . " " . $lastName);
                     <p>
                         จัดการข้อมูลหลักของระบบ KPI
                     </p>
-
                 </div>
-
             </div>
-
 
             <div class="dashboard-grid">
 
-
                 <!-- Employee -->
-
                 <a
                     href="employees/index.php"
                     class="dashboard-card">
@@ -446,7 +378,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             Employee Management
                         </h3>
@@ -454,14 +385,10 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             จัดการข้อมูลพนักงาน
                         </p>
-
                     </div>
-
                 </a>
 
-
                 <!-- KPI -->
-
                 <a
                     href="kpi/index.php"
                     class="dashboard-card">
@@ -471,7 +398,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             KPI Management
                         </h3>
@@ -479,14 +405,10 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             จัดการตัวชี้วัด KPI
                         </p>
-
                     </div>
-
                 </a>
 
-
                 <!-- Category -->
-
                 <a
                     href="categories/index.php"
                     class="dashboard-card">
@@ -496,7 +418,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             KPI Categories
                         </h3>
@@ -504,14 +425,10 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             จัดการหมวดหมู่ KPI
                         </p>
-
                     </div>
-
                 </a>
 
-
                 <!-- Evaluation Period -->
-
                 <a
                     href="periods/index.php"
                     class="dashboard-card">
@@ -521,7 +438,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             Evaluation Periods
                         </h3>
@@ -529,14 +445,11 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             จัดการรอบการประเมิน
                         </p>
-
                     </div>
 
                 </a>
 
-
                 <!-- Assignment -->
-
                 <a
                     href="assignments/index.php"
                     class="dashboard-card">
@@ -546,7 +459,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             KPI Assignments
                         </h3>
@@ -554,11 +466,9 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             กำหนด KPI ให้พนักงาน
                         </p>
-
                     </div>
 
                 </a>
-
 
                 <!-- Performance -->
 
@@ -571,7 +481,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             Performance Summary
                         </h3>
@@ -579,14 +488,10 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             สรุปผลการปฏิบัติงาน
                         </p>
-
                     </div>
-
                 </a>
 
-
                 <!-- Users -->
-
                 <a
                     href="users/index.php"
                     class="dashboard-card">
@@ -596,7 +501,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             User Management
                         </h3>
@@ -604,14 +508,11 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             จัดการบัญชีผู้ใช้งาน
                         </p>
-
                     </div>
 
                 </a>
 
-
                 <!-- Login Logs -->
-
                 <a
                     href="login-logs/index.php"
                     class="dashboard-card">
@@ -621,7 +522,6 @@ $fullName = trim($firstName . " " . $lastName);
                     </div>
 
                     <div>
-
                         <h3>
                             Login Logs
                         </h3>
@@ -629,23 +529,13 @@ $fullName = trim($firstName . " " . $lastName);
                         <p>
                             ตรวจสอบประวัติการเข้าสู่ระบบ
                         </p>
-
                     </div>
-
                 </a>
-
-
             </div>
-
         </section>
 
-
-        <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
+        <!-- === FOOTER === -->
         <footer class="dashboard-footer">
-
             <span>
                 KPI Management System
             </span>
@@ -653,13 +543,8 @@ $fullName = trim($firstName . " " . $lastName);
             <span>
                 Version 1.0
             </span>
-
         </footer>
-
-
     </main>
-
-
 </body>
 
 </html>

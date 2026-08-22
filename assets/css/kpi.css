@@ -1,4 +1,4 @@
-/* Employee Management: shared dependencies only. */
+/* KPI Management: shared dependencies. Page-specific rules stay scoped here. */
 @import url("variables.css");
 @import url("global.css");
 @import url("components.css");

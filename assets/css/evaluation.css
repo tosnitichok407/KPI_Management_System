@@ -1,0 +1,30 @@
+/* Evaluation Period: shared dependencies and period statuses. */
+@import url("variables.css");
+@import url("global.css");
+@import url("components.css");
+@import url("forms.css");
+@import url("tables.css");
+@import url("admin.css");
+
+.status-open {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 13px;
+}
+
+.status-closed {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.btn-secondary {
+  margin-top: 10px;
+  margin-right: 5px;
+}
