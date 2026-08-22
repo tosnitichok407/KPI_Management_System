@@ -178,7 +178,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="periods/index.php"
+                href="evaluation-periods.php"
                 class="nav-item">
 
                 <span class="nav-icon">
