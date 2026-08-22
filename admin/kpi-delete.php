@@ -22,7 +22,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 }
 
 
-$id = (int) ($_GET["id"] ?? 0);
+$id = (int) ($_GET["kpi_id"] ?? 0);
 
 if ($id <= 0) {
     header("Location: kpi-management.php");
@@ -40,11 +40,11 @@ try {
 
     $stmt = $pdo->prepare("
         DELETE FROM kpi_indicators
-        WHERE kpi_id = :id
+        WHERE kpi_id = :kpi_id
     ");
 
     $stmt->execute([
-        ":id" => $id
+        ":kpi_id" => $id
     ]);
 } catch (PDOException $e) {
 

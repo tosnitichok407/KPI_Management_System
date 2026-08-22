@@ -226,7 +226,7 @@ try {
             </a>
 
             <a
-                href="user-accounts-add.php"
+                href="user-account-add.php"
                 class="btn btn-primary"
             >
                 + Create Account
@@ -589,7 +589,7 @@ try {
 
 
                                         <a
-                                            href="user-accounts-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
+                                            href="user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
                                             class="btn-small activate"
                                         >
                                             Create Account
@@ -600,7 +600,7 @@ try {
 
 
                                         <a
-                                            href="user-accounts-edit.php?id=<?= (int) $employee["employee_id"] ?>"
+                                            href="user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
                                             Edit
@@ -613,7 +613,7 @@ try {
                                         ): ?>
 
                                             <a
-                                                href="user-accounts-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
+                                                href="user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
                                                 class="btn-small danger"
                                                 onclick="return confirm('Deactivate this account?');"
                                             >
@@ -623,7 +623,7 @@ try {
                                         <?php else: ?>
 
                                             <a
-                                                href="user-accounts-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
+                                                href="user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
                                                 class="btn-small activate"
                                                 onclick="return confirm('Activate this account?');"
                                             >

@@ -480,7 +480,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <form
             method="POST"
-            action="user-accounts-add.php"
+            action="user-account-add.php"
         >
 
 
@@ -506,7 +506,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                     <?php foreach ($employees as $employee): ?>
-
                         <option
                             value="<?= (int) $employee["employee_id"] ?>"
                             <?= $selected_employee_id
@@ -560,7 +559,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- =================================================
                  EMAIL
             ================================================== -->
@@ -585,7 +583,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 >
 
             </div>
-
 
             <!-- =================================================
                  ROLE
@@ -632,7 +629,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- =================================================
                  PASSWORD
             ================================================== -->
@@ -678,7 +674,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- =================================================
                  BUTTONS
             ================================================== -->
@@ -690,7 +685,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     gap: 10px;
                 "
             >
-
                 <button
                     type="submit"
                     class="btn btn-primary"
