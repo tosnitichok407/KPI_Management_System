@@ -7,11 +7,7 @@ require_once "config/database.php";
 $error = "";
 
 
-/*
-|--------------------------------------------------------------------------
-| Redirect if already logged in
-|--------------------------------------------------------------------------
-*/
+/* ---Redirect if already logged in ---*/
 
 if (isset($_SESSION["user_id"])) {
 
@@ -25,46 +21,22 @@ if (isset($_SESSION["user_id"])) {
 }
 
 
-/*
-|--------------------------------------------------------------------------
-| Login
-|--------------------------------------------------------------------------
-*/
-
+/* --- Login ---*/
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $username = trim($_POST["username"] ?? "");
     $password = $_POST["password"] ?? "";
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Input
-    |--------------------------------------------------------------------------
-    */
+    /* --- Validate Input ---*/
 
     if ($username === "" || $password === "") {
 
-        $error = "Please enter Username and Password.";
-
+        $error = "Please enter Employee ID and Password.";
     } else {
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Find User
-        |--------------------------------------------------------------------------
-        |
-        | users
-        |   employee_id -> employees.employee_id
-        |   role_id     -> roles.role_id
-        |
-        | employees
-        |   department_id -> departments.department_id
-        |   position_id   -> positions.position_id
-        |
-        */
-
+        /* --- Find User ---*/
         $sql = "
             SELECT
                 u.user_id,
@@ -118,8 +90,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             ]);
 
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-
         } catch (PDOException $e) {
 
             $error = "Database error. Please try again.";
@@ -128,23 +98,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Username Not Found
-        |--------------------------------------------------------------------------
-        */
-
+        /* --- Username Not Found --- */
         if (!$user) {
 
-            $error = "Invalid Username or Password.";
+            $error = "Invalid Employee ID or Password.";
 
 
-            /*
-            | Log Failed Login
-            */
-
+            /* --- Failed Login Log --- */
             try {
-
                 $log = $pdo->prepare("
                     INSERT INTO login_logs
                     (
@@ -172,30 +133,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
                     ":failure_reason" => "Username not found"
                 ]);
-
             } catch (PDOException $e) {
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
-
-
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Check User Status
-        |--------------------------------------------------------------------------
-        */
-
-        elseif (strtolower($user["user_status"]) !== "active") {
+        /* --- Check User Status ---*/ elseif (strtolower($user["user_status"]) !== "active") {
 
             $error = "Your account has been deactivated.";
-
-
-            /*
-            | Log Failed Login
-            */
 
             try {
 
@@ -227,30 +173,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
                     ":failure_reason" => "User account inactive"
                 ]);
-
             } catch (PDOException $e) {
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
-
-
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Check Employee Status
-        |--------------------------------------------------------------------------
-        */
-
-        elseif (strtolower($user["employee_status"]) !== "active") {
+        /* --- Check Employee Status --- */ elseif (strtolower($user["employee_status"]) !== "active") {
 
             $error = "Your employee account is inactive.";
 
-
-            /*
-            | Log Failed Login
-            */
 
             try {
 
@@ -282,30 +214,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
                     ":failure_reason" => "Employee account inactive"
                 ]);
-
             } catch (PDOException $e) {
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
-
-
         }
 
+        /* --- Check Password --- */ elseif (!password_verify($password, $user["password_hash"])) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Check Password
-        |--------------------------------------------------------------------------
-        */
+            $error = "Invalid Employee ID or Password.";
 
-        elseif (!password_verify($password, $user["password_hash"])) {
-
-            $error = "Invalid Username or Password.";
-
-
-            /*
-            | Log Failed Login
-            */
 
             try {
 
@@ -337,39 +255,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
                     ":failure_reason" => "Invalid password"
                 ]);
-
             } catch (PDOException $e) {
-
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
-
-
         }
 
-
-        /*
-        |--------------------------------------------------------------------------
-        | Login Success
-        |--------------------------------------------------------------------------
-        */
-
-        else {
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | Regenerate Session ID
-            |--------------------------------------------------------------------------
-            */
-
+        /* --- Login Success --- */ else {
+            /* --- Regenerate Session ID --- */
             session_regenerate_id(true);
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | Store User Information
-            |--------------------------------------------------------------------------
-            */
+            /* --- Store User Information --- */
 
             $_SESSION["user_id"] =
                 $user["user_id"];
@@ -411,11 +306,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $user["role_name"];
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | Login Log - Success
-            |--------------------------------------------------------------------------
-            */
+            /* --- Login Log - Success --- */
 
             try {
 
@@ -446,25 +337,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null
                 ]);
-
             } catch (PDOException $e) {
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
 
-
-            /*
-            |--------------------------------------------------------------------------
-            | Role-based Redirect
-            |--------------------------------------------------------------------------
-            */
+            /* --- Role-based Redirect --- */
 
             if ((int) $user["role_id"] === 1) {
 
                 header("Location: admin/index.php");
                 exit;
             }
-
 
             header("Location: dashboard.php");
             exit;
@@ -474,183 +358,240 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 ?>
 
-<!doctype html>
-
-<html lang="th">
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+        content="width=device-width, initial-scale=1.0">
 
+    <title>
+        KPI Management System
+    </title>
+
+    <!-- Google Font -->
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-    >
+        rel="stylesheet">
 
+    <!-- Login CSS -->
     <link
         rel="stylesheet"
-        href="assets/css/login.css"
-    >
-
-    <title>KPI Management System</title>
-
+        href="assets/css/login.css">
 </head>
-
 
 <body>
 
-    <div class="login-container">
+    <div class="page-container">
+        <div class="login-wrapper">
 
-        <div class="login-card">
-
-
-            <!-- =========================================================
-                 LOGIN HEADER
-            ========================================================== -->
-
-            <header class="login-header">
-
+            <!-- === LEFT SIDE === -->
+            <section class="login-left">
                 <img
-                    class="login-logo"
-                    src="assets/images/Advance-Logo.png"
-                    alt="Advance Asia Group Logo"
-                >
+                    src="assets/images/analytics_login.png"
+                    alt="KPI Performance Analytics"
+                    class="analytics_login">
+            </section>
 
-                <h1 class="login-title">
-                    KPI Management System
-                </h1>
+            <!-- === RIGHT SIDE === -->
+            <section class="login-right">
 
-                <p class="login-subtitle">
-                    Advance Asia Group
-                </p>
-
-            </header>
-
-
-            <!-- =========================================================
-                 LOGIN FORM
-            ========================================================== -->
-
-            <form
-                class="login-form"
-                method="POST"
-                action="login.php"
-            >
-
-
-                <!-- Error Message -->
-
-                <?php if ($error !== ""): ?>
-
-                    <p
-                        class="login-error"
-                        role="alert"
-                    >
-                        <?= htmlspecialchars(
-                            $error,
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-                    </p>
-
-                <?php endif; ?>
-
-
-                <!-- Username -->
-
-                <div class="input-group">
-
-                    <label for="employee-id">
-                        Employee ID
-                    </label>
-
-                    <input
-                        type="text"
-                        id="employee-id"
-                        name="username"
-                        autocomplete="username"
-                        placeholder="Enter Employee ID"
-                        required
-                    >
-
+                <!-- Top Link -->
+                <div class="top-link">
+                    <span>
+                        Advance Asia Group
+                    </span>
                 </div>
 
+                <!-- Form -->
+                <div class="form-container">
 
-                <!-- Password -->
+                    <!-- Header -->
+                    <div class="form-header">
+                        <div class="brand">
+                            <div class="brand-icon">
+                                <img
+                                    src="assets/images/Advance-Logo.png"
+                                    alt="Advance Asia Group Logo">
+                            </div>
+                        </div>
 
-                <div class="input-group">
+                        <h1>
+                            Welcome Back
+                        </h1>
 
-                    <label for="password">
-                        Password
-                    </label>
+                        <p>
+                            Sign in to your KPI Management System
+                        </p>
 
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        autocomplete="current-password"
-                        placeholder="Enter Password"
-                        required
-                    >
+                    </div>
 
-                </div>
+                    <!-- Error -->
+                    <?php if ($error !== ""): ?>
 
+                        <div
+                            class="error-message"
+                            role="alert">
 
-                <!-- Remember Me + Login -->
+                            <?= htmlspecialchars(
+                                $error,
+                                ENT_QUOTES,
+                                "UTF-8"
+                            ) ?>
 
-                <div class="remember-login-row">
+                        </div>
 
-                    <label
-                        class="remember-me"
-                        for="remember-me"
-                    >
+                    <?php endif; ?>
 
-                        <input
-                            type="checkbox"
-                            id="remember-me"
-                            name="remember-me"
-                        >
+                    <!-- Login Form -->
+                    <form
+                        method="POST"
+                        action="login.php">
+
+                        <!-- Employee ID -->
+                        <div class="form-group">
+
+                            <label for="username">
+                                Employee ID
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    ID
+                                </span>
+
+                                <input
+                                    type="text"
+                                    id="username"
+                                    name="username"
+                                    placeholder="Enter Employee ID"
+                                    autocomplete="username"
+                                    value="<?= htmlspecialchars(
+                                                $_POST["username"] ?? "",
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            ) ?>"
+                                    required>
+                            </div>
+                        </div>
+
+                        <!-- Password -->
+                        <div class="form-group">
+
+                            <label for="password">
+                                Password
+                            </label>
+
+                            <div class="input-wrapper">
+
+                                <span class="input-icon">
+                                    •••
+                                </span>
+
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    placeholder="Enter Password"
+                                    autocomplete="current-password"
+                                    required>
+
+                                <button
+                                    type="button"
+                                    class="show-password"
+                                    id="togglePassword"
+                                    aria-label="Show password">
+                                    👁
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Options -->
+                        <div class="form-options">
+
+                            <label class="remember">
+
+                                <input
+                                    type="checkbox"
+                                    name="remember-me"
+                                    id="remember-me">
+
+                                <span>
+                                    Remember Me
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- Login -->
+                        <button
+                            type="submit"
+                            class="login-button">
+
+                            Login
+
+                        </button>
+
+                    </form>
+
+                    <!-- Footer -->
+                    <div class="login-footer">
+
+                        KPI Management System
 
                         <span>
-                            Remember Me
+                            Version 1.0
                         </span>
 
-                    </label>
-
-
-                    <button
-                        type="submit"
-                        class="login-button"
-                    >
-                        Login
-                    </button>
-
+                    </div>
                 </div>
-
-
-            </form>
-
-
-            <!-- =========================================================
-                 FOOTER
-            ========================================================== -->
-
-            <footer class="login-footer">
-
-                Version 1.0
-
-            </footer>
-
-
+            </section>
         </div>
-
     </div>
 
+    <!===SHOW / HIDE PASSWORD===>
+
+        <script>
+            const passwordInput =
+                document.getElementById("password");
+
+            const togglePassword =
+                document.getElementById("togglePassword");
+
+            togglePassword.addEventListener(
+                "click",
+                function() {
+
+                    if (
+                        passwordInput.type === "password"
+                    ) {
+
+                        passwordInput.type = "text";
+
+                        togglePassword.textContent = "🙈";
+
+                        togglePassword.setAttribute(
+                            "aria-label",
+                            "Hide password"
+                        );
+
+                    } else {
+
+                        passwordInput.type = "password";
+
+                        togglePassword.textContent = "👁";
+
+                        togglePassword.setAttribute(
+                            "aria-label",
+                            "Show password"
+                        );
+                    }
+
+                }
+            );
+        </script>
 </body>
 
 </html>

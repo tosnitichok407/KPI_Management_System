@@ -40,6 +40,7 @@ $fullName = trim($firstName . " " . $lastName);
 
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta
@@ -63,26 +64,21 @@ $fullName = trim($firstName . " " . $lastName);
 
 <body>
     <!-- Mobile Menu Overlay -->
-
     <div
         class="mobile-menu-overlay"
         id="mobileMenuOverlay">
     </div>
 
     <!-- === SIDEBAR === -->
-
     <aside class="sidebar">
 
         <!-- Logo -->
-
         <div class="sidebar-logo">
-
             <img
                 src="../assets/images/Advance-Logo.png"
                 alt="Advance Asia Group Logo">
 
             <div>
-
                 <h2>
                     KPI System
                 </h2>
@@ -92,7 +88,6 @@ $fullName = trim($firstName . " " . $lastName);
                 </span>
 
             </div>
-
         </div>
 
         <!-- Navigation -->
@@ -237,12 +232,12 @@ $fullName = trim($firstName . " " . $lastName);
         </div>
     </aside>
 
-
     <!-- === MAIN CONTENT === -->
-
     <main class="main-content">
+
         <!-- === TOP BAR === -->
         <header class="topbar">
+            
             <!-- Mobile Menu Button -->
             <button
                 type="button"
@@ -305,7 +300,6 @@ $fullName = trim($firstName . " " . $lastName);
         </section>
 
         <!-- === USER INFORMATION === -->
-
         <section class="user-card">
             <div class="user-card-item">
                 <span>
@@ -352,7 +346,6 @@ $fullName = trim($firstName . " " . $lastName);
         </section>
 
         <!-- === MANAGEMENT MENU === -->
-
         <section class="dashboard-section">
             <div class="section-header">
                 <div>
@@ -367,7 +360,6 @@ $fullName = trim($firstName . " " . $lastName);
             </div>
 
             <div class="dashboard-grid">
-
                 <!-- Employee -->
                 <a
                     href="employees/employees.php"
@@ -545,6 +537,90 @@ $fullName = trim($firstName . " " . $lastName);
             </span>
         </footer>
     </main>
+    <script>
+        const mobileMenuButton =
+            document.getElementById("mobileMenuButton");
+
+        const sidebar =
+            document.querySelector(".sidebar");
+
+        const mobileMenuOverlay =
+            document.getElementById("mobileMenuOverlay");
+
+
+        function openMobileMenu() {
+
+            sidebar.classList.add("mobile-open");
+
+            mobileMenuOverlay.classList.add("active");
+
+            mobileMenuButton.setAttribute(
+                "aria-expanded",
+                "true"
+            );
+
+            mobileMenuButton.textContent = "✕";
+
+        }
+
+
+        function closeMobileMenu() {
+
+            sidebar.classList.remove("mobile-open");
+
+            mobileMenuOverlay.classList.remove("active");
+
+            mobileMenuButton.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+
+            mobileMenuButton.textContent = "☰";
+
+        }
+
+
+        mobileMenuButton.addEventListener(
+            "click",
+            function() {
+
+                if (
+                    sidebar.classList.contains(
+                        "mobile-open"
+                    )
+                ) {
+
+                    closeMobileMenu();
+
+                } else {
+
+                    openMobileMenu();
+
+                }
+
+            }
+        );
+
+
+        mobileMenuOverlay.addEventListener(
+            "click",
+            closeMobileMenu
+        );
+
+
+        window.addEventListener(
+            "resize",
+            function() {
+
+                if (window.innerWidth > 650) {
+
+                    closeMobileMenu();
+
+                }
+
+            }
+        );
+    </script>
 </body>
 
 </html>
