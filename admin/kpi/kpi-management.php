@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -11,12 +11,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -75,7 +75,7 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <link
         rel="stylesheet"
-        href="../assets/css/kpi.css">
+        href="../../assets/css/kpi.css">
 
     <style>
         * {
@@ -228,11 +228,8 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
 
     <div class="page-container">
-
         <div class="page-header">
-
             <div>
-
                 <h1>
                     KPI Management
                 </h1>
@@ -240,13 +237,12 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <p>
                     จัดการตัวชี้วัดผลการปฏิบัติงาน
                 </p>
-
             </div>
 
             <div class="header-actions">
 
                 <a
-                    href="index.php"
+                    href="../index.php"
                     class="btn btn-secondary">
                     Dashboard
                 </a>
@@ -364,7 +360,7 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <a
                                         href="kpi-criteria.php?kpi_id=<?= $kpi["kpi_id"] ?>"
                                         class="btn btn-criteria">
-                                        เกณฑ์ 5–1
+                                        เกณฑ์ 1 - 5
                                     </a>
 
                                     <a

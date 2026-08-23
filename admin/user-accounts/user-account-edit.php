@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 
 /*
@@ -12,12 +12,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -347,7 +347,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../assets/css/user-account.css"
+        href="../../assets/css/user-account.css"
     >
 
     <style>
@@ -491,35 +491,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     </div>
 
-
     <div class="card">
-
 
         <?php if ($error !== ""): ?>
 
             <div class="error">
-
                 <?= htmlspecialchars(
                     $error,
                     ENT_QUOTES,
                     "UTF-8"
                 ) ?>
-
             </div>
 
         <?php endif; ?>
-
 
         <form
             method="POST"
             action=""
         >
 
-
             <!-- Username -->
-
             <div class="form-group">
-
                 <label for="username">
                     Username
                 </label>
@@ -535,9 +527,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ) ?>"
                     required
                 >
-
             </div>
-
 
             <!-- Email -->
 
@@ -560,7 +550,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 >
 
             </div>
-
 
             <!-- Employee -->
 
@@ -615,7 +604,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- Role -->
 
             <div class="form-group">
@@ -660,7 +648,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- Password -->
 
             <div class="form-group">
@@ -682,7 +669,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
 
             </div>
-
 
             <!-- Status -->
 
@@ -722,13 +708,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             </div>
 
-
             <!-- Buttons -->
 
             <div class="actions">
 
                 <a
-                    href="user-accounts.php"
+                    href="/user-accounts/user-accounts.php"
                     class="btn btn-secondary"
                 >
                     ยกเลิก
@@ -740,16 +725,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 >
                     บันทึกการแก้ไข
                 </button>
-
             </div>
-
-
         </form>
-
     </div>
-
 </div>
-
 </body>
-
 </html>

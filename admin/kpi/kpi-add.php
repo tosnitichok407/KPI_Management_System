@@ -2,15 +2,15 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -140,8 +140,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":criteria" => $text
                 ]);
             }
-
-
             header(
                 "Location: kpi-management.php"
             );
@@ -176,7 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../assets/css/kpi.css">
+        href="../../assets/css/kpi.css">
 
     <style>
         body {

@@ -111,7 +111,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="employees.php"
+                href="employees/employees.php"
                 class="nav-item">
 
                 <span class="nav-icon">
@@ -124,7 +124,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="user-accounts.php"
+                href="user-accounts/user-accounts.php"
                 class="nav-item">
                 <span class="nav-icon">
                     🔐
@@ -136,7 +136,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="kpi-categories.php"
+                href="kpi-categories/kpi-categories.php"
                 class="nav-item">
 
                 <span class="nav-icon">
@@ -149,7 +149,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="kpi-management.php"
+                href="kpi/kpi-management.php"
                 class="nav-item">
 
                 <span class="nav-icon">
@@ -162,7 +162,7 @@ $fullName = trim($firstName . " " . $lastName);
             </a>
 
             <a
-                href="evaluation-periods.php"
+                href="evaluation/evaluation-periods.php"
                 class="nav-item">
 
                 <span class="nav-icon">
@@ -370,7 +370,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- Employee -->
                 <a
-                    href="employees/index.php"
+                    href="employees/employees.php"
                     class="dashboard-card">
 
                     <div class="card-icon">
@@ -390,7 +390,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- KPI -->
                 <a
-                    href="kpi/index.php"
+                    href="kpi/kpi-management.php"
                     class="dashboard-card">
 
                     <div class="card-icon">
@@ -410,7 +410,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- Category -->
                 <a
-                    href="categories/index.php"
+                    href="kpi-categories/kpi-categories.php"
                     class="dashboard-card">
 
                     <div class="card-icon">
@@ -430,7 +430,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- Evaluation Period -->
                 <a
-                    href="periods/index.php"
+                    href="evaluation/evaluation-periods.php"
                     class="dashboard-card">
 
                     <div class="card-icon">
@@ -493,7 +493,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- Users -->
                 <a
-                    href="users/index.php"
+                    href="user-accounts/user-accounts.php"
                     class="dashboard-card">
 
                     <div class="card-icon">

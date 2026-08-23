@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 
 /*
@@ -12,12 +12,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -68,7 +68,7 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <link
         rel="stylesheet"
-        href="../assets/css/evaluation.css"
+        href="../../assets/css/evaluation.css"
     >
 
     <title>Evaluation Period Management</title>
@@ -103,7 +103,7 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="header-actions">
 
             <a
-                href="index.php"
+                href="../index.php"
                 class="btn btn-secondary"
             >
                 Dashboard
@@ -299,9 +299,7 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <?php endforeach; ?>
 
-
                 <?php endif; ?>
-
 
                 </tbody>
 
@@ -310,7 +308,6 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
     </section>
-
 
 </div>
 

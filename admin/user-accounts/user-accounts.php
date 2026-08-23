@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 
 /*
@@ -12,12 +12,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -165,13 +165,10 @@ try {
 ?>
 
 <!DOCTYPE html>
-
 <html lang="th">
-
 <head>
 
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
@@ -184,13 +181,12 @@ try {
 
     <link
         rel="stylesheet"
-        href="../assets/css/user-account.css"
+        href="../../assets/css/user-account.css"
     >
 
     <title>User Account Management</title>
 
 </head>
-
 
 <body>
 
@@ -219,7 +215,7 @@ try {
         <div class="header-actions">
 
             <a
-                href="index.php"
+                href="../index.php"
                 class="btn btn-secondary"
             >
                 Dashboard
@@ -327,7 +323,7 @@ try {
                 </button>
 
                 <a
-                    href="user-accounts.php"
+                    href="/user-accounts/user-accounts.php"
                     class="btn btn-secondary"
                 >
                     Reset
@@ -339,13 +335,11 @@ try {
 
     </section>
 
-
     <!-- =========================================================
          ACCOUNT TABLE
     ========================================================== -->
 
     <section class="table-card">
-
 
         <div class="table-header">
 
@@ -373,7 +367,6 @@ try {
             </div>
 
         <?php endif; ?>
-
 
         <div class="table-wrapper">
 
@@ -415,9 +408,7 @@ try {
 
                 </thead>
 
-
                 <tbody>
-
 
                 <?php if (empty($employees)): ?>
 
@@ -434,14 +425,11 @@ try {
 
                 <?php else: ?>
 
-
                     <?php foreach ($employees as $employee): ?>
 
                         <tr>
 
-
                             <!-- Employee ID -->
-
                             <td>
 
                                 <strong>
@@ -456,9 +444,7 @@ try {
 
                             </td>
 
-
                             <!-- Employee Name -->
-
                             <td>
 
                                 <?= htmlspecialchars(
@@ -589,7 +575,7 @@ try {
 
 
                                         <a
-                                            href="user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
+                                            href="/user-accounts/user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
                                             class="btn-small activate"
                                         >
                                             Create Account
@@ -600,7 +586,7 @@ try {
 
 
                                         <a
-                                            href="user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
+                                            href="/user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
                                             Edit
@@ -613,7 +599,7 @@ try {
                                         ): ?>
 
                                             <a
-                                                href="user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
+                                                href="/user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
                                                 class="btn-small danger"
                                                 onclick="return confirm('Deactivate this account?');"
                                             >
@@ -623,7 +609,7 @@ try {
                                         <?php else: ?>
 
                                             <a
-                                                href="user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
+                                                href="/user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
                                                 class="btn-small activate"
                                                 onclick="return confirm('Activate this account?');"
                                             >

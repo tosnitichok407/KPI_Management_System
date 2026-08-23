@@ -1,9 +1,6 @@
 <?php
-
 session_start();
-
-require_once "../config/database.php";
-
+require_once "../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -12,15 +9,14 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -31,20 +27,16 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $user_id = (int) ($_GET["id"] ?? 0);
 
 if ($user_id <= 0) {
-    header("Location: user-accounts.php");
+    header("Location: ../../user-accounts/user-accounts.php");
     exit;
 }
 
-
 try {
-
-
     /*
     |--------------------------------------------------------------------------
     | Get Current Status
     |--------------------------------------------------------------------------
     */
-
     $stmt = $pdo->prepare("
         SELECT
         
@@ -67,10 +59,9 @@ try {
         $_SESSION["user_error"] =
             "ไม่พบ Account ที่ต้องการ";
 
-        header("Location: user-accounts.php");
+        header("Location: /user-accounts/user-accounts.php");
         exit;
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -86,7 +77,6 @@ try {
 
         $new_status = "Active";
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -137,5 +127,5 @@ try {
 |--------------------------------------------------------------------------
 */
 
-header("Location: user-accounts.php");
+header("Location: /user-accounts/user-accounts.php");
 exit;

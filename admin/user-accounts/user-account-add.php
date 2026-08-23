@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 
 /*
@@ -12,12 +12,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -371,7 +371,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             */
 
                             header(
-                                "Location: user-accounts.php"
+                                "Location: /user-accounts/user-accounts.php"
                             );
 
                             exit;
@@ -411,7 +411,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../assets/css/user-account.css"
+        href="../../assets/css/user-account.css"
     >
 
     <title>Create User Account</title>
@@ -444,7 +444,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
         <a
-            href="user-accounts.php"
+            href="/user-accounts/user-accounts.php"
             class="btn btn-secondary"
         >
             Back
@@ -480,7 +480,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <form
             method="POST"
-            action="user-account-add.php"
+            action="/user-accounts/user-account-add.php"
         >
 
 
@@ -694,7 +694,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                 <a
-                    href="user-accounts.php"
+                    href="/user-accounts/user-accounts.php"
                     class="btn btn-secondary"
                 >
                     Cancel

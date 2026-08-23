@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 
 /*
@@ -12,12 +12,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -302,7 +302,7 @@ if (!$employee) {
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee.css"
+        href="../../assets/css/employee.css"
     >
 
     <title>Edit Employee</title>

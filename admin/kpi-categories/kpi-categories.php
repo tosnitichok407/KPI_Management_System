@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once "../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -11,12 +11,12 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../dashboard.php");
+    header("Location: ../../dashboard.php");
     exit;
 }
 
@@ -156,15 +156,15 @@ unset($_SESSION["category_error"]);
 
     <link
         rel="stylesheet"
-        href="../assets/css/variables.css">
+        href="../../assets/css/variables.css">
 
     <link
         rel="stylesheet"
-        href="../assets/css/responsive.css">
+        href="../../assets/css/responsive.css">
 
     <link
         rel="stylesheet"
-        href="../assets/css/kpi.css">
+        href="../../assets/css/kpi.css">
 
     <style>
         * {
@@ -361,19 +361,13 @@ unset($_SESSION["category_error"]);
 
 </head>
 
-
 <body>
-
 
     <div class="page-container">
 
-
-        <!-- =========================================================
-         PAGE HEADER
-    ========================================================== -->
+        <!-- === PAGE HEADER === -->
 
         <div class="page-header">
-
             <div class="page-title">
 
                 <h1>
@@ -388,15 +382,15 @@ unset($_SESSION["category_error"]);
             <div class="header-actions">
 
                 <a
-                    href="index.php"
+                    href="../index.php"
                     class="btn btn-secondary">
                     Dashboard
                 </a>
 
                 <a
-                    href="employee-add.php"
+                    href="kpi-category-add.php"
                     class="btn btn-primary">
-                    + Add Employee
+                    + Add Category
                 </a>
 
             </div>
@@ -552,7 +546,7 @@ unset($_SESSION["category_error"]);
                                         <div class="actions">
 
                                             <a
-                                                href="kpi-categories-edit.php?id=<?= (int) $category["category_id"] ?>"
+                                                href="kpi-category-edit.php?id=<?= (int) $category["category_id"] ?>"
                                                 class="btn btn-edit">
                                                 Edit
                                             </a>
