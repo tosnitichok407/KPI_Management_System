@@ -171,7 +171,7 @@ $fullName = trim($firstName . " " . $lastName);
 
 
             <a
-                href="assignments/index.php"
+                href="kpi-assignment/kpi-assignment.php"
                 class="nav-item">
 
                 <span class="nav-icon">
@@ -237,7 +237,7 @@ $fullName = trim($firstName . " " . $lastName);
 
         <!-- === TOP BAR === -->
         <header class="topbar">
-            
+
             <!-- Mobile Menu Button -->
             <button
                 type="button"
@@ -443,7 +443,7 @@ $fullName = trim($firstName . " " . $lastName);
 
                 <!-- Assignment -->
                 <a
-                    href="assignments/index.php"
+                    href="kpi-assignment/kpi-assignment.php"
                     class="dashboard-card">
 
                     <div class="card-icon">

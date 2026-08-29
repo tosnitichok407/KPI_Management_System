@@ -177,7 +177,8 @@ try {
                 </button>
 
             </div>
-            <div>
+
+            <div class="page-title-block">
                 <h1>
                     Employee Management
                 </h1>

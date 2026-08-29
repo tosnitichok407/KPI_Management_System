@@ -362,11 +362,9 @@ unset($_SESSION["category_error"]);
 </head>
 
 <body>
-
     <div class="page-container">
 
         <!-- === PAGE HEADER === -->
-
         <div class="page-header">
             <div class="page-title">
 
@@ -377,10 +375,8 @@ unset($_SESSION["category_error"]);
                 <p>
                     จัดการหมวดหมู่ของตัวชี้วัด KPI
                 </p>
-
             </div>
             <div class="header-actions">
-
                 <a
                     href="../index.php"
                     class="btn btn-secondary">
@@ -392,11 +388,9 @@ unset($_SESSION["category_error"]);
                     class="btn btn-primary">
                     + Add Category
                 </a>
-
             </div>
 
         </div>
-
 
         <!-- =========================================================
          SUCCESS MESSAGE
@@ -415,7 +409,6 @@ unset($_SESSION["category_error"]);
             </div>
 
         <?php endif; ?>
-
 
         <!-- =========================================================
          ERROR MESSAGE
