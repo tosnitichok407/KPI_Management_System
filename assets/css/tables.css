@@ -38,6 +38,7 @@ th {
   font-size: 14px;
   font-weight: 600;
   text-align: left;
+  white-space: nowrap;
 }
 
 td {
@@ -53,6 +54,7 @@ tbody tr:hover {
 .action-buttons {
   display: flex;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .btn-small {

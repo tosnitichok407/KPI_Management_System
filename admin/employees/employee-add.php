@@ -182,21 +182,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div>
 
             <h1>
-                Add Employee
+                เพิ่มพนักงานใหม่
             </h1>
 
             <p>
-                Create a new employee
+                เพิ่มข้อมูลพนักงานใหม่ในระบบ
             </p>
 
         </div>
-
-        <a
-            href="employees.php"
-            class="btn btn-secondary"
-        >
-            Back
-        </a>
 
     </header>
 
@@ -217,7 +210,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Employee ID *
+                     รหัสพนักงาน *
                 </label>
 
                 <input
@@ -233,12 +226,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    First Name *
+                    ชื่อ *
                 </label>
 
                 <input
                     type="text"
                     name="first_name"
+                    placeholder="กรอกชื่อ"
                     required
                 >
 
@@ -248,12 +242,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Last Name *
+                    นามสกุล *
                 </label>
 
                 <input
                     type="text"
                     name="last_name"
+                    placeholder="กรอกนามสกุล"
                     required
                 >
 
@@ -263,25 +258,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Gender
+                    เพศ *
                 </label>
 
                 <select name="gender">
 
                     <option value="">
-                        Select Gender
+                        เลือกเพศ
                     </option>
 
                     <option value="Male">
-                        Male
+                        ชาย
                     </option>
 
                     <option value="Female">
-                        Female
+                        หญิง
                     </option>
 
                     <option value="Other">
-                        Other
+                        อื่น ๆ
                     </option>
 
                 </select>
@@ -292,7 +287,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Phone
+                    เบอร์โทรศัพท์
                 </label>
 
                 <input
@@ -306,7 +301,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Email
+                    อีเมล
                 </label>
 
                 <input
@@ -320,13 +315,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Department
+                    แผนก
                 </label>
 
                 <select name="department_id">
 
                     <option value="">
-                        Select Department
+                        เลือกแผนก
                     </option>
 
                     <?php foreach ($departments as $department): ?>
@@ -349,13 +344,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Position
+                    ตำแหน่ง
                 </label>
 
                 <select name="position_id">
 
                     <option value="">
-                        Select Position
+                        เลือกตำแหน่ง
                     </option>
 
                     <?php foreach ($positions as $position): ?>
@@ -378,7 +373,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    Hire Date
+                    วันที่จ้างงาน
                 </label>
 
                 <input
@@ -395,10 +390,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Save Employee
+                    บันทึกข้อมูลพนักงาน
                 </button>
 
+                 <a
+                href="employees.php"
+                class="btn btn-secondary"
+                style="margin-left: 5px;"
+            >
+                ยกเลิก
+            </a>
+
             </div>
+
 
         </form>
 

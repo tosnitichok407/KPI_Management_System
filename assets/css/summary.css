@@ -1,8 +1,6 @@
-/* KPI Management: shared dependencies. Page-specific rules stay scoped here. */
 @import url("variables.css");
 @import url("global.css");
 @import url("components.css");
 @import url("forms.css");
 @import url("tables.css");
 @import url("admin.css");
-

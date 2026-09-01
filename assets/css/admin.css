@@ -261,20 +261,16 @@ body {
 
 .topbar p {
   margin: 3px 0 0;
-
   color: #6b7280;
-
   font-size: 14px;
 }
 
 /* User */
-
 .user-info {
   display: flex;
-
   align-items: center;
-
   gap: 10px;
+  margin-top: 10px;
 }
 
 .user-avatar {
@@ -644,6 +640,7 @@ body {
     align-items: center;
     flex-direction: row;
     gap: 15px;
+    margin-bottom: 10px;
   }
 
   .topbar > div:first-child {
@@ -658,11 +655,11 @@ body {
   .user-info {
     flex-shrink: 0;
   }
-  
+
   .user-detail {
     display: none;
   }
-  
+
   /* Dashboard */
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -671,7 +668,7 @@ body {
   .user-card {
     grid-template-columns: 1fr;
   }
-  
+
   .dashboard-footer {
     flex-direction: column;
     gap: 5px;

@@ -442,14 +442,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         </div>
 
-
-        <a
-            href="/user-accounts/user-accounts.php"
-            class="btn btn-secondary"
-        >
-            Back
-        </a>
-
     </header>
 
 
@@ -491,7 +483,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="employee_id">
-                    Employee *
+                    พนักงาน *
                 </label>
 
                 <select
@@ -501,7 +493,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 >
 
                     <option value="">
-                        Select Employee
+                        เลือกพนักงาน
                     </option>
 
 
@@ -540,7 +532,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="username">
-                    Username *
+                    ชื่อผู้ใช้ *
                 </label>
 
                 <input
@@ -552,7 +544,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ENT_QUOTES,
                         "UTF-8"
                     ) ?>"
-                    placeholder="Enter username"
+                    placeholder="กรอกชื่อผู้ใช้"
                     maxlength="50"
                     required
                 >
@@ -566,7 +558,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="email">
-                    Email
+                    อีเมล
                 </label>
 
                 <input
@@ -578,7 +570,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ENT_QUOTES,
                         "UTF-8"
                     ) ?>"
-                    placeholder="Enter email"
+                    placeholder="กรอกอีเมล"
                     maxlength="150"
                 >
 
@@ -591,7 +583,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="role_id">
-                    Role *
+                    บทบาท *
                 </label>
 
                 <select
@@ -601,7 +593,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 >
 
                     <option value="">
-                        Select Role
+                        เลือกบทบาท
                     </option>
 
 
@@ -636,19 +628,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="password">
-                    Password *
+                    รหัสผ่าน *
                 </label>
 
                 <input
                     type="password"
                     id="password"
                     name="password"
-                    placeholder="Enter password"
+                    placeholder="กรอกรหัสผ่าน"
                     required
                 >
 
                 <small>
-                    Password must be at least 6 characters.
+                    รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร
                 </small>
 
             </div>
@@ -661,14 +653,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label for="confirm_password">
-                    Confirm Password *
+                    ยืนยันรหัสผ่าน *
                 </label>
 
                 <input
                     type="password"
                     id="confirm_password"
                     name="confirm_password"
-                    placeholder="Confirm password"
+                    placeholder="ยืนยันรหัสผ่าน"
                     required
                 >
 
@@ -689,12 +681,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Create Account
+                    สร้างบัญชี
                 </button>
 
 
                 <a
-                    href="/user-accounts/user-accounts.php"
+                    href="../user-accounts/user-accounts.php"
                     class="btn btn-secondary"
                 >
                     Cancel

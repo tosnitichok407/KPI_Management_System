@@ -193,20 +193,16 @@ try {
 <div class="page-container">
 
 
-    <!-- =========================================================
-         HEADER
-    ========================================================== -->
+    <!-- === HEADER === -->
 
     <header class="page-header">
-
         <div>
-
             <h1>
                 User Account Management
             </h1>
 
             <p>
-                Manage employee login accounts
+                จัดการบัญชีผู้ใช้ของพนักงาน
             </p>
 
         </div>
@@ -225,17 +221,14 @@ try {
                 href="user-account-add.php"
                 class="btn btn-primary"
             >
-                + Create Account
+                + สร้างบัญชีผู้ใช้
             </a>
 
         </div>
 
     </header>
 
-
-    <!-- =========================================================
-         FILTER
-    ========================================================== -->
+    <!-- === FILTER === -->
 
     <section class="filter-card">
 
@@ -248,7 +241,7 @@ try {
             <div class="form-group">
 
                 <label for="search">
-                    Search
+                    ค้นหา
                 </label>
 
                 <input
@@ -265,11 +258,10 @@ try {
 
             </div>
 
-
             <div class="form-group">
 
                 <label for="status">
-                    Account Status
+                    สถานะบัญชีผู้ใช้
                 </label>
 
                 <select
@@ -278,7 +270,7 @@ try {
                 >
 
                     <option value="">
-                        All
+                        ทั้งหมด
                     </option>
 
                     <option
@@ -305,46 +297,37 @@ try {
                             ? "selected"
                             : "" ?>
                     >
-                        No Account
+                        ไม่มีบัญชีผู้ใช้
                     </option>
-
                 </select>
-
             </div>
 
-
             <div class="filter-buttons">
-
                 <button
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Search
+                ค้นหา
                 </button>
 
                 <a
                     href="/user-accounts/user-accounts.php"
                     class="btn btn-secondary"
                 >
-                    Reset
+                    ล้าง
                 </a>
-
             </div>
-
         </form>
-
     </section>
 
-    <!-- =========================================================
-         ACCOUNT TABLE
-    ========================================================== -->
+    <!-- === ACCOUNT TABLE === -->
 
     <section class="table-card">
 
         <div class="table-header">
 
             <h2>
-                Employee Accounts
+                จัดการบัญชีผู้ใช้
             </h2>
 
             <span>
@@ -369,43 +352,37 @@ try {
         <?php endif; ?>
 
         <div class="table-wrapper">
-
             <table>
-
                 <thead>
-
                     <tr>
-
                         <th>
-                            Employee ID
+                            รหัสพนักงาน
                         </th>
 
                         <th>
-                            Employee Name
+                            ชื่อ-นามสกุล
                         </th>
 
                         <th>
-                            Username
+                            ชื่อผู้ใช้
                         </th>
 
                         <th>
-                            Role
+                            บทบาท
                         </th>
 
                         <th>
-                            Employee Status
+                            สถานะพนักงาน
                         </th>
 
                         <th>
-                            Account Status
+                            สถานะบัญชีผู้ใช้
                         </th>
 
                         <th>
-                            Action
+                            จัดการ
                         </th>
-
                     </tr>
-
                 </thead>
 
                 <tbody>
@@ -418,7 +395,7 @@ try {
                             colspan="7"
                             class="empty-state"
                         >
-                            No employee found.
+                            ไม่พบข้อมูลบัญชีผู้ใช้
                         </td>
 
                     </tr>
@@ -503,9 +480,7 @@ try {
 
                             </td>
 
-
                             <!-- Employee Status -->
-
                             <td>
 
                                 <?php if (
@@ -527,9 +502,7 @@ try {
 
                             </td>
 
-
                             <!-- Account Status -->
-
                             <td>
 
                                 <?php if (!$employee["employee_id"]): ?>
@@ -541,7 +514,7 @@ try {
                                             color:#6b7280;
                                         "
                                     >
-                                        No Account
+                                        ไม่มีบัญชีผู้ใช้
                                     </span>
 
                                 <?php elseif (
@@ -578,7 +551,7 @@ try {
                                             href="/user-accounts/user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
                                             class="btn-small activate"
                                         >
-                                            Create Account
+                                            เพิ่มบัญชีผู้ใช้
                                         </a>
 
 
@@ -589,7 +562,7 @@ try {
                                             href="/user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
-                                            Edit
+                                            แก้ไข
                                         </a>
 
 

@@ -184,7 +184,7 @@ try {
                 </h1>
 
                 <p>
-                    Manage employee information
+                    จัดการข้อมูลพนักงานทั้งหมดในระบบ
                 </p>
 
             </div>
@@ -200,7 +200,7 @@ try {
                 <a
                     href="employee-add.php"
                     class="btn btn-primary">
-                    + Add Employee
+                    + เพิ่มพนักงาน
                 </a>
 
             </div>
@@ -234,7 +234,7 @@ try {
                 <div class="form-group">
 
                     <label for="status">
-                        Status
+                        สถานะ
                     </label>
 
                     <select
@@ -242,7 +242,7 @@ try {
                         name="status">
 
                         <option value="">
-                            All Status
+                            สถานะทั้งหมด
                         </option>
 
                         <option
@@ -267,13 +267,13 @@ try {
                     <button
                         type="submit"
                         class="btn btn-primary">
-                        Search
+                        ค้นหา
                     </button>
 
                     <a
                         href="employees.php"
                         class="btn btn-secondary">
-                        Reset
+                        ล้าง
                     </a>
 
                 </div>
@@ -283,31 +283,35 @@ try {
         </section>
 
 
-        <!-- =========================================================
-         EMPLOYEE TABLE
-    ========================================================== -->
-
+        <!-- === EMPLOYEE TABLE === -->
         <section class="table-card">
 
             <div class="table-header">
 
                 <h2>
-                    Employee List
+                    รายชื่อพนักงาน
                 </h2>
 
                 <span>
-                    <?= count($employees) ?> employees
+                    <?= count($employees) ?> พนักงาน
                 </span>
 
             </div>
 
 
-            <?php if (isset($error)): ?>
+            <?php if (isset($_GET["delete"]) && $_GET["deleted"] === "1"): ?>
+
+                <div class="alert alert-success">
+                    ลบพนักงานเรียบร้อยแล้ว
+                </div>
+
+            <?php endif; ?>
+
+
+            <?php if (isset($_GET["error"]) && $_GET["error"] === "delete"): ?>
 
                 <div class="alert alert-error">
-
-                    <?= htmlspecialchars($error) ?>
-
+                    ไม่สามารถลบพนักงานได้ เนื่องจากพนักงานคนนี้มีข้อมูลที่เกี่ยวข้องกับระบบอื่น
                 </div>
 
             <?php endif; ?>
@@ -322,35 +326,35 @@ try {
                         <tr>
 
                             <th>
-                                Employee ID
+                                รหัสพนักงาน
                             </th>
 
                             <th>
-                                Name
+                                ชื่อ-นามสกุล
                             </th>
 
                             <th>
-                                Department
+                                แผนก
                             </th>
 
                             <th>
-                                Position
+                                ตำแหน่ง
                             </th>
 
                             <th>
-                                Email
+                                อีเมล
                             </th>
 
                             <th>
-                                Hire Date
+                                วันเริ่มงาน
                             </th>
 
                             <th>
-                                Status
+                                สถานะ
                             </th>
 
                             <th>
-                                Action
+                                จัดการ
                             </th>
 
                         </tr>
@@ -359,7 +363,6 @@ try {
 
 
                     <tbody>
-
                         <?php if (empty($employees)): ?>
 
                             <tr>
@@ -367,18 +370,16 @@ try {
                                 <td
                                     colspan="8"
                                     class="empty-state">
-                                    No employee found.
+                                    ไม่พบข้อมูลพนักงาน
                                 </td>
 
                             </tr>
 
                         <?php else: ?>
 
-
                             <?php foreach ($employees as $employee): ?>
 
                                 <tr>
-
                                     <td>
 
                                         <strong>
@@ -389,7 +390,6 @@ try {
 
                                     </td>
 
-
                                     <td>
 
                                         <?= htmlspecialchars(
@@ -399,7 +399,6 @@ try {
                                         ) ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -420,7 +419,6 @@ try {
 
                                     </td>
 
-
                                     <td>
 
                                         <?= htmlspecialchars(
@@ -429,7 +427,6 @@ try {
                                         ) ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -441,7 +438,6 @@ try {
                                         ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -464,12 +460,15 @@ try {
                                     <td>
                                         <div class="action-buttons">
 
+                                            <!-- Edit -->
                                             <a
                                                 href="employee-edit.php?id=<?= (int) $employee["employee_id"] ?>"
                                                 class="btn-small edit">
-                                                Edit
+                                                แก้ไข
                                             </a>
 
+
+                                            <!-- Activate / Deactivate -->
                                             <?php if ($employee["status"] === "Active"): ?>
 
                                                 <a
@@ -489,6 +488,16 @@ try {
                                                 </a>
 
                                             <?php endif; ?>
+
+
+                                            <!-- Delete -->
+                                            <a
+                                                href="employee-delete.php?id=<?= (int) $employee["employee_id"] ?>"
+                                                class="btn-small danger"
+                                                onclick="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้? ข้อมูลจะถูกลบถาวร');">
+                                                ลบ
+                                            </a>
+
                                         </div>
                                     </td>
                                 </tr>

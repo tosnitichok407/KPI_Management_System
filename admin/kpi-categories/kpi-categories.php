@@ -166,199 +166,6 @@ unset($_SESSION["category_error"]);
         rel="stylesheet"
         href="../../assets/css/kpi.css">
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: "Kanit", sans-serif;
-            background: #f5f7fb;
-            color: #1f2937;
-        }
-
-        .page-container {
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 40px;
-        }
-
-
-        /* =========================================================
-   HEADER
-========================================================= */
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .page-header h1 {
-            margin: 0;
-            font-size: 32px;
-            font-weight: 600;
-        }
-
-        .page-header p {
-            margin: 5px 0 0;
-            color: #6b7280;
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-
-        /* =========================================================
-   BUTTON
-========================================================= */
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            padding: 10px 18px;
-
-            border-radius: 8px;
-
-            text-decoration: none;
-
-            border: none;
-
-            font-family: inherit;
-            font-size: 15px;
-
-            cursor: pointer;
-        }
-
-        .btn-primary {
-            background: #1f6b9c;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #18577f;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .btn-secondary:hover {
-            background: #d1d5db;
-        }
-
-        .btn-edit {
-            background: #e8eefc;
-            color: #243f8f;
-        }
-
-        .btn-delete {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-
-        .alert {
-            padding: 14px 18px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            overflow: hidden;
-        }
-
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            padding: 15px 18px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        th {
-            background: #f8fafc;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        tr:hover {
-            background: #f9fafb;
-        }
-
-        .category-id {
-            font-weight: 600;
-            color: #243f8f;
-        }
-
-        .kpi-count {
-            display: inline-block;
-            padding: 4px 10px;
-            background: #eef2ff;
-            color: #3730a3;
-            border-radius: 20px;
-            font-size: 13px;
-        }
-
-        .actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .empty {
-            text-align: center;
-            padding: 50px;
-            color: #6b7280;
-        }
-
-        @media (max-width: 768px) {
-
-            .page-container {
-                padding: 15px;
-            }
-
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .actions {
-                flex-direction: column;
-            }
-
-        }
-    </style>
-
 </head>
 
 <body>
@@ -386,15 +193,13 @@ unset($_SESSION["category_error"]);
                 <a
                     href="kpi-category-add.php"
                     class="btn btn-primary">
-                    + Add Category
+                    + เพิ่มหมวดหมู่ KPI
                 </a>
             </div>
 
         </div>
 
-        <!-- =========================================================
-         SUCCESS MESSAGE
-    ========================================================== -->
+        <!-- === SUCCESS MESSAGE === -->
 
         <?php if ($success !== ""): ?>
 
@@ -410,10 +215,7 @@ unset($_SESSION["category_error"]);
 
         <?php endif; ?>
 
-        <!-- =========================================================
-         ERROR MESSAGE
-    ========================================================== -->
-
+        <!-- === ERROR MESSAGE === -->
         <?php if ($error !== ""): ?>
 
             <div class="alert alert-error">
@@ -428,46 +230,34 @@ unset($_SESSION["category_error"]);
 
         <?php endif; ?>
 
+        <!-- === CATEGORY TABLE === -->
 
-        <!-- =========================================================
-         CATEGORY TABLE
-    ========================================================== -->
-
-        <div class="card">
-
+        <div class="table-card">
             <div class="table-wrapper">
-
                 <table>
-
                     <thead>
-
                         <tr>
-
                             <th>
                                 ID
                             </th>
 
                             <th>
-                                Category Name
+                                หมวดหมู่
                             </th>
 
                             <th>
-                                Description
+                                รายละเอียด
                             </th>
 
                             <th>
-                                KPI Indicators
+                                จำนวน KPI
                             </th>
 
                             <th>
-                                Actions
+                                จัดการ
                             </th>
-
                         </tr>
-
                     </thead>
-
-
                     <tbody>
 
                         <?php if (count($categories) > 0): ?>
@@ -482,7 +272,6 @@ unset($_SESSION["category_error"]);
 
                                     </td>
 
-
                                     <td>
 
                                         <?= htmlspecialchars(
@@ -492,7 +281,6 @@ unset($_SESSION["category_error"]);
                                         ) ?>
 
                                     </td>
-
 
                                     <td>
 
@@ -520,7 +308,6 @@ unset($_SESSION["category_error"]);
 
                                     </td>
 
-
                                     <td>
 
                                         <span class="kpi-count">
@@ -533,23 +320,21 @@ unset($_SESSION["category_error"]);
 
                                     </td>
 
-
                                     <td>
 
                                         <div class="actions">
 
                                             <a
                                                 href="kpi-category-edit.php?id=<?= (int) $category["category_id"] ?>"
-                                                class="btn btn-edit">
-                                                Edit
+                                                class="btn-small edit">
+                                                แก้ไข
                                             </a>
-
 
                                             <a
                                                 href="kpi-categories.php?delete=<?= (int) $category["category_id"] ?>"
-                                                class="btn btn-delete"
+                                                class="btn-small danger"
                                                 onclick="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');">
-                                                Delete
+                                                ลบ
                                             </a>
 
                                         </div>
@@ -577,17 +362,10 @@ unset($_SESSION["category_error"]);
                         <?php endif; ?>
 
                     </tbody>
-
                 </table>
-
             </div>
-
         </div>
-
-
     </div>
-
-
 </body>
 
 </html>
