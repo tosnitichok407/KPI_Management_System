@@ -370,9 +370,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             |--------------------------------------------------------------------------
                             */
 
-                            header(
-                                "Location: /user-accounts/user-accounts.php"
-                            );
+                            header("Location: user-accounts.php");
 
                             exit;
 
@@ -472,7 +470,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <form
             method="POST"
-            action="/user-accounts/user-account-add.php"
+            action="user-account-add.php"
         >
 
 

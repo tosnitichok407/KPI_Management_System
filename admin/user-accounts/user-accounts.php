@@ -559,7 +559,7 @@ try {
 
 
                                         <a
-                                            href="/user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
+                                            href="../user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
                                             แก้ไข

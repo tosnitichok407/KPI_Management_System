@@ -16,6 +16,11 @@ if (isset($_SESSION["user_id"])) {
         exit;
     }
 
+    if ((int) ($_SESSION["role_id"] ?? 0) === 2) {
+        header("Location: manager/index.php");
+        exit;
+    }
+
     header("Location: dashboard.php");
     exit;
 }
@@ -350,7 +355,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 exit;
             }
 
-            header("Location: dashboard.php");
+            if ((int) $user["role_id"] === 2) {
+
+                header("Location: manager/index.php");
+                exit;
+            }
+
+            header("Location: employee/index.php");
             exit;
         }
     }
