@@ -909,21 +909,14 @@ if ($selectedPeriod > 0) {
 
     </div>
 
-
 </aside>
 
-
-<!-- =========================================================
-     MAIN
-========================================================= -->
+<!-- === MAIN === -->
 
 <main class="main-content">
 
-
     <!-- TOPBAR -->
-
     <header class="topbar">
-
 
         <button
             type="button"
@@ -936,7 +929,6 @@ if ($selectedPeriod > 0) {
 
         </button>
 
-
         <div>
 
             <div class="user-info">
@@ -944,19 +936,12 @@ if ($selectedPeriod > 0) {
                 <div class="user-avatar">
 
                     <?= htmlspecialchars(
-                        strtoupper(
-                            substr(
-                                $firstName,
-                                0,
-                                1
-                            )
-                        ),
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>
+                            mb_substr($firstName, 0, 1, 'UTF-8'),
+                            ENT_QUOTES,
+                            "UTF-8"
+                        ) ?>
 
                 </div>
-
 
                 <div class="user-detail">
 
@@ -987,21 +972,14 @@ if ($selectedPeriod > 0) {
 
         </div>
 
-
     </header>
 
-
-    <!-- =====================================================
-         DASHBOARD CONTENT
-    ===================================================== -->
+    <!-- === DASHBOARD CONTENT === -->
 
     <div class="dashboard-content">
 
-
         <!-- Header -->
-
         <div class="dashboard-header">
-
 
             <div>
 
@@ -1015,24 +993,19 @@ if ($selectedPeriod > 0) {
 
             </div>
 
-
             <!-- Period -->
-
             <form
                 method="GET"
                 class="period-filter">
-
 
                 <label for="period_id">
                     รอบประเมิน
                 </label>
 
-
                 <select
                     name="period_id"
                     id="period_id"
                     onchange="this.form.submit()">
-
 
                     <?php if (empty($periods)): ?>
 

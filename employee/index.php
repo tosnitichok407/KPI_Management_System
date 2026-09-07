@@ -660,6 +660,7 @@ $avatar =
             font-size: 28px;
             font-weight: 700;
         }
+
         .profile-name {
             font-size: 23px;
             font-weight: 600;
@@ -969,6 +970,7 @@ $avatar =
             color: #9ca3af;
 
         }
+
         @media (max-width: 1100px) {
 
             .stats-grid {
@@ -1210,6 +1212,23 @@ $avatar =
     <!-- === MAIN === -->
 
     <main class="main-content">
+        <section id="overview">
+
+            <!-- เนื้อหาภาพรวม -->
+
+        </section>
+
+        <section id="departments">
+
+            <!-- ผลรายแผนก -->
+
+        </section>
+
+        <section id="employees">
+
+            <!-- ผลงานพนักงาน -->
+
+        </section>
 
         <!-- TOPBAR -->
 
@@ -1225,280 +1244,275 @@ $avatar =
 
         </header>
 
-            <!-- PAGE HEADER -->
+        <!-- PAGE HEADER -->
 
-            <div class="page-header">
+        <div class="page-header">
 
-                <div>
+            <div>
 
-                    <h1>
-                        ภาพรวม KPI
-                    </h1>
+                <h1>
+                    ภาพรวม KPI
+                </h1>
 
-                    <p>
-                        ภาพรวมผลการปฏิบัติงานของคุณ
-                    </p>
+                <p>
+                    ภาพรวมผลการปฏิบัติงานของคุณ
+                </p>
+
+            </div>
+
+            <!-- Period -->
+
+            <form
+                method="GET"
+                class="period-form">
+
+                <select
+                    name="period_id"
+                    onchange="this.form.submit()">
+
+
+                    <?php foreach (
+                        $periods
+                        as $period
+                    ): ?>
+
+                        <option
+                            value="<?= (int) $period["period_id"] ?>"
+                            <?= (
+                                (int) $period["period_id"]
+                                === $selectedPeriod
+                            )
+                                ? "selected"
+                                : ""
+                            ?>>
+
+                            <?= htmlspecialchars(
+                                $period["period_name"],
+                                ENT_QUOTES,
+                                "UTF-8"
+                            ) ?>
+
+                        </option>
+
+                    <?php endforeach; ?>
+                </select>
+            </form>
+        </div>
+
+        <!-- === PROFILE === -->
+
+        <section class="profile-card">
+
+            <div class="profile-left">
+
+                <div class="profile-avatar">
+
+                    <?= htmlspecialchars(
+                        mb_substr($firstName, 0, 1, 'UTF-8'),
+                        ENT_QUOTES,
+                        "UTF-8"
+                    ) ?>
 
                 </div>
 
-                <!-- Period -->
 
-                <form
-                    method="GET"
-                    class="period-form">
+                <div>
 
-                    <select
-                        name="period_id"
-                        onchange="this.form.submit()">
-
-
-                        <?php foreach (
-                            $periods
-                            as $period
-                        ): ?>
-
-                            <option
-                                value="<?= (int) $period["period_id"] ?>"
-                                <?= (
-                                    (int) $period["period_id"]
-                                    === $selectedPeriod
-                                )
-                                    ? "selected"
-                                    : ""
-                                ?>>
-
-                                <?= htmlspecialchars(
-                                    $period["period_name"],
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>
-
-                            </option>
-
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-            </div>
-
-            <!-- === PROFILE === -->
-
-            <section class="profile-card">
-
-                <div class="profile-left">
-
-                    <div class="profile-avatar">
+                    <div class="profile-name">
 
                         <?= htmlspecialchars(
-                            $avatar,
+                            $employee["first_name"]
+                                . " "
+                                . $employee["last_name"],
                             ENT_QUOTES,
                             "UTF-8"
                         ) ?>
 
                     </div>
 
+                    <div class="profile-code">
 
-                    <div>
-
-                        <div class="profile-name">
-
-                            <?= htmlspecialchars(
-                                $employee["first_name"]
-                                    . " "
-                                    . $employee["last_name"],
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
-
-                        </div>
-
-
-                        <div class="profile-code">
-
-                            <?= htmlspecialchars(
-                                $employee["employee_code"],
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <div class="profile-meta">
-
-                    <div>
-
-                        <span>
-                            แผนก
-                        </span>
-
-                        <strong>
-
-                            <?= htmlspecialchars(
-                                $employee["department_name"] ?? "-",
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
-
-                        </strong>
-
-                    </div>
-
-
-                    <div>
-
-                        <span>
-                            ตำแหน่ง
-                        </span>
-
-                        <strong>
-
-                            <?= htmlspecialchars(
-                                $employee["position_name"] ?? "-",
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
-
-                        </strong>
-
-                    </div>
-
-
-                </div>
-
-
-            </section>
-
-
-            <!-- === STATS === -->
-
-            <section class="stats-grid">
-
-                <!-- Total KPI -->
-
-                <div class="stat-card">
-
-                    <div class="stat-title">
-                        KPI ที่ได้รับ
-                    </div>
-
-                    <div class="stat-value">
-
-                        <?= number_format(
-                            $totalKpi
+                        <?= htmlspecialchars(
+                            $employee["employee_code"],
+                            ENT_QUOTES,
+                            "UTF-8"
                         ) ?>
 
                     </div>
 
                 </div>
 
-                <!-- Evaluated -->
+            </div>
 
-                <div class="stat-card">
+            <div class="profile-meta">
 
-                    <div class="stat-title">
-                        ประเมินแล้ว
-                    </div>
+                <div>
 
-                    <div class="stat-value">
+                    <span>
+                        แผนก
+                    </span>
 
-                        <?= number_format(
-                            $evaluatedKpi
+                    <strong>
+
+                        <?= htmlspecialchars(
+                            $employee["department_name"] ?? "-",
+                            ENT_QUOTES,
+                            "UTF-8"
                         ) ?>
 
-                        <small>
-                            / <?= number_format(
-                                    $totalKpi
-                                ) ?>
-                        </small>
-
-                    </div>
+                    </strong>
 
                 </div>
 
 
-                <!-- Pending -->
+                <div>
 
-                <div class="stat-card">
+                    <span>
+                        ตำแหน่ง
+                    </span>
 
-                    <div class="stat-title">
-                        รอประเมิน
-                    </div>
+                    <strong>
 
-                    <div class="stat-value">
-
-                        <?= number_format(
-                            $pendingKpi
+                        <?= htmlspecialchars(
+                            $employee["position_name"] ?? "-",
+                            ENT_QUOTES,
+                            "UTF-8"
                         ) ?>
 
-                    </div>
+                    </strong>
 
                 </div>
 
 
-                <!-- Score -->
+            </div>
 
-                <div class="stat-card">
 
-                    <div class="stat-title">
-                        คะแนนเฉลี่ย
-                    </div>
+        </section>
 
-                    <div class="stat-value">
 
-                        <?= number_format(
-                            $averageScore,
-                            2
-                        ) ?>
+        <!-- === STATS === -->
 
-                        <small>
-                            / 5
-                        </small>
+        <section class="stats-grid">
 
-                    </div>
+            <!-- Total KPI -->
+
+            <div class="stat-card">
+
+                <div class="stat-title">
+                    KPI ที่ได้รับ
+                </div>
+
+                <div class="stat-value">
+
+                    <?= number_format(
+                        $totalKpi
+                    ) ?>
 
                 </div>
 
+            </div>
 
-            </section>
+            <!-- Evaluated -->
+
+            <div class="stat-card">
+
+                <div class="stat-title">
+                    ประเมินแล้ว
+                </div>
+
+                <div class="stat-value">
+
+                    <?= number_format(
+                        $evaluatedKpi
+                    ) ?>
+
+                    <small>
+                        / <?= number_format(
+                                $totalKpi
+                            ) ?>
+                    </small>
+
+                </div>
+
+            </div>
 
 
-            <!-- === CHARTS === -->
+            <!-- Pending -->
 
-            <section class="chart-grid">
+            <div class="stat-card">
 
+                <div class="stat-title">
+                    รอประเมิน
+                </div>
 
-                <!-- KPI Score -->
+                <div class="stat-value">
 
-                <div class="chart-card">
+                    <?= number_format(
+                        $pendingKpi
+                    ) ?>
 
+                </div>
 
-                    <h3>
-                        คะแนน KPI ของฉัน
-                    </h3>
-
-                    <p>
-                        คะแนนของ KPI แต่ละตัวในรอบประเมิน
-                    </p>
-
-
-                    <div class="chart-container">
+            </div>
 
 
-                        <?php if (
-                            !empty($chartLabels)
-                        ): ?>
+            <!-- Score -->
 
-                            <canvas
-                                id="kpiChart">
-                            </canvas>
+            <div class="stat-card">
 
-                        <?php else: ?>
+                <div class="stat-title">
+                    คะแนนเฉลี่ย
+                </div>
 
-                            <div
-                                style="
+                <div class="stat-value">
+
+                    <?= number_format(
+                        $averageScore,
+                        2
+                    ) ?>
+
+                    <small>
+                        / 5
+                    </small>
+
+                </div>
+
+            </div>
+
+
+        </section>
+
+
+        <!-- === CHARTS === -->
+
+        <section class="chart-grid">
+
+            <!-- KPI Score -->
+
+            <div class="chart-card">
+
+                <h3>
+                    คะแนน KPI ของฉัน
+                </h3>
+
+                <p>
+                    คะแนนของ KPI แต่ละตัวในรอบประเมิน
+                </p>
+
+                <div class="chart-container">
+
+                    <?php if (
+                        !empty($chartLabels)
+                    ): ?>
+
+                        <canvas
+                            id="kpiChart">
+                        </canvas>
+
+                    <?php else: ?>
+
+                        <div
+                            style="
                                 display:flex;
                                 align-items:center;
                                 justify-content:center;
@@ -1506,46 +1520,46 @@ $avatar =
                                 color:#9ca3af;
                             ">
 
-                                ยังไม่มีข้อมูล KPI
+                            ยังไม่มีข้อมูล KPI
 
-                            </div>
+                        </div>
 
-                        <?php endif; ?>
-
-
-                    </div>
+                    <?php endif; ?>
 
 
                 </div>
 
 
-                <!-- KPI Type -->
-
-                <div class="chart-card">
+            </div>
 
 
-                    <h3>
-                        คะแนนตามประเภท KPI
-                    </h3>
+            <!-- KPI Type -->
 
-                    <p>
-                        Performance / Competency
-                    </p>
+            <div class="chart-card">
 
-                    <div class="chart-container">
 
-                        <?php if (
-                            !empty($typeLabels)
-                        ): ?>
+                <h3>
+                    คะแนนตามประเภท KPI
+                </h3>
 
-                            <canvas
-                                id="typeChart">
-                            </canvas>
+                <p>
+                    Performance / Competency
+                </p>
 
-                        <?php else: ?>
+                <div class="chart-container">
 
-                            <div
-                                style="
+                    <?php if (
+                        !empty($typeLabels)
+                    ): ?>
+
+                        <canvas
+                            id="typeChart">
+                        </canvas>
+
+                    <?php else: ?>
+
+                        <div
+                            style="
                                 display:flex;
                                 align-items:center;
                                 justify-content:center;
@@ -1553,332 +1567,329 @@ $avatar =
                                 color:#9ca3af;
                             ">
 
-                                ยังไม่มีข้อมูล
+                            ยังไม่มีข้อมูล
 
-                            </div>
+                        </div>
 
-                        <?php endif; ?>
-
-                    </div>
+                    <?php endif; ?>
 
                 </div>
 
-            </section>
+            </div>
 
-            <!-- === KPI TABLE === -->
+        </section>
 
-            <section class="table-card">
+        <!-- === KPI TABLE === -->
 
-
-                <div class="table-header">
-
-                    <h3>
-                        KPI ที่ได้รับมอบหมาย
-                    </h3>
-
-                </div>
+        <section class="table-card">
 
 
-                <div class="table-wrapper">
+            <div class="table-header">
+
+                <h3>
+                    KPI ที่ได้รับมอบหมาย
+                </h3>
+
+            </div>
 
 
-                    <table>
+            <div class="table-wrapper">
 
 
-                        <thead>
+                <table>
+
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                KPI
+                            </th>
+
+                            <th>
+                                ประเภท
+                            </th>
+
+                            <th>
+                                Weight
+                            </th>
+
+                            <th>
+                                Target
+                            </th>
+
+                            <th>
+                                Actual
+                            </th>
+
+                            <th>
+                                Score
+                            </th>
+
+                            <th>
+                                สถานะ
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+
+                        <?php if (
+                            empty($kpiData)
+                        ): ?>
+
 
                             <tr>
 
-                                <th>
-                                    KPI
-                                </th>
-
-                                <th>
-                                    ประเภท
-                                </th>
-
-                                <th>
-                                    Weight
-                                </th>
-
-                                <th>
-                                    Target
-                                </th>
-
-                                <th>
-                                    Actual
-                                </th>
-
-                                <th>
-                                    Score
-                                </th>
-
-                                <th>
-                                    สถานะ
-                                </th>
-
-                            </tr>
-
-                        </thead>
-
-
-                        <tbody>
-
-
-                            <?php if (
-                                empty($kpiData)
-                            ): ?>
-
-
-                                <tr>
-
-                                    <td
-                                        colspan="7"
-                                        style="
+                                <td
+                                    colspan="7"
+                                    style="
                                         text-align:center;
                                         padding:35px;
                                         color:#9ca3af;
                                     ">
 
-                                        ยังไม่มี KPI ที่ได้รับมอบหมาย
+                                    ยังไม่มี KPI ที่ได้รับมอบหมาย
+
+                                </td>
+
+                            </tr>
+
+                        <?php else: ?>
+
+                            <?php foreach (
+                                $kpiData
+                                as $kpi
+                            ): ?>
+
+                                <tr>
+
+
+                                    <!-- KPI -->
+
+                                    <td>
+
+                                        <strong>
+
+                                            <?= htmlspecialchars(
+                                                $kpi["kpi_name"],
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            ) ?>
+
+                                        </strong>
 
                                     </td>
+
+
+                                    <!-- Type -->
+
+                                    <td>
+
+
+                                        <?php if (
+                                            $kpi["kpi_type"]
+                                            ===
+                                            "Performance"
+                                        ): ?>
+
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-performance
+                                                ">
+
+                                                Performance
+
+                                            </span>
+
+
+                                        <?php else: ?>
+
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-competency
+                                                ">
+
+                                                Competency
+
+                                            </span>
+
+
+                                        <?php endif; ?>
+
+
+                                    </td>
+
+
+                                    <!-- Weight -->
+
+                                    <td>
+
+                                        <?= number_format(
+                                            (float)
+                                            $kpi["assignment_weight"],
+                                            2
+                                        ) ?>
+
+                                        %
+
+                                    </td>
+
+
+                                    <!-- Target -->
+
+                                    <td>
+
+                                        <?= $kpi["assignment_target"] !== null
+
+                                            ? htmlspecialchars(
+                                                $kpi["assignment_target"],
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            )
+                                            : "-"
+                                        ?>
+
+
+                                        <?php if (
+                                            !empty($kpi["unit"])
+                                        ): ?>
+
+                                            <?= htmlspecialchars(
+                                                $kpi["unit"],
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            ) ?>
+
+                                        <?php endif; ?>
+
+
+                                    </td>
+
+
+                                    <!-- Actual -->
+
+                                    <td>
+
+                                        <?= $kpi["actual_value"] !== null
+
+                                            ? htmlspecialchars(
+                                                $kpi["actual_value"],
+                                                ENT_QUOTES,
+                                                "UTF-8"
+                                            )
+                                            : "-"
+                                        ?>
+
+
+                                    </td>
+
+
+                                    <!-- Score -->
+
+                                    <td>
+
+
+                                        <?php if (
+                                            $kpi["score"] !== null
+                                        ): ?>
+
+
+                                            <span
+                                                class="score">
+
+                                                <?= number_format(
+                                                    (float)
+                                                    $kpi["score"],
+                                                    2
+                                                ) ?>
+
+                                                / 5
+
+                                            </span>
+
+
+                                        <?php else: ?>
+
+
+                                            <span
+                                                class="
+                                                    score-empty
+                                                ">
+
+                                                ยังไม่มีคะแนน
+
+                                            </span>
+
+
+                                        <?php endif; ?>
+
+
+                                    </td>
+
+
+                                    <!-- Status -->
+
+                                    <td>
+
+
+                                        <?php if (
+                                            $kpi["score"] !== null
+                                        ): ?>
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-performance
+                                                ">
+
+                                                ประเมินแล้ว
+
+                                            </span>
+
+                                        <?php else: ?>
+
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-competency
+                                                ">
+
+                                                รอดำเนินการ
+
+                                            </span>
+
+                                        <?php endif; ?>
+
+
+                                    </td>
+
 
                                 </tr>
 
 
-                            <?php else: ?>
+                            <?php endforeach; ?>
 
 
-                                <?php foreach (
-                                    $kpiData
-                                    as $kpi
-                                ): ?>
+                        <?php endif; ?>
 
 
-                                    <tr>
+                    </tbody>
 
+                </table>
 
-                                        <!-- KPI -->
+            </div>
 
-                                        <td>
-
-                                            <strong>
-
-                                                <?= htmlspecialchars(
-                                                    $kpi["kpi_name"],
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                ) ?>
-
-                                            </strong>
-
-                                        </td>
-
-
-                                        <!-- Type -->
-
-                                        <td>
-
-
-                                            <?php if (
-                                                $kpi["kpi_type"]
-                                                ===
-                                                "Performance"
-                                            ): ?>
-
-
-                                                <span
-                                                    class="
-                                                    badge
-                                                    badge-performance
-                                                ">
-
-                                                    Performance
-
-                                                </span>
-
-
-                                            <?php else: ?>
-
-
-                                                <span
-                                                    class="
-                                                    badge
-                                                    badge-competency
-                                                ">
-
-                                                    Competency
-
-                                                </span>
-
-
-                                            <?php endif; ?>
-
-
-                                        </td>
-
-
-                                        <!-- Weight -->
-
-                                        <td>
-
-                                            <?= number_format(
-                                                (float)
-                                                $kpi["assignment_weight"],
-                                                2
-                                            ) ?>
-
-                                            %
-
-                                        </td>
-
-
-                                        <!-- Target -->
-
-                                        <td>
-
-                                            <?= $kpi["assignment_target"] !== null
-
-                                                ? htmlspecialchars(
-                                                    $kpi["assignment_target"],
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                )
-                                                : "-"
-                                            ?>
-
-
-                                            <?php if (
-                                                !empty($kpi["unit"])
-                                            ): ?>
-
-                                                <?= htmlspecialchars(
-                                                    $kpi["unit"],
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                ) ?>
-
-                                            <?php endif; ?>
-
-
-                                        </td>
-
-
-                                        <!-- Actual -->
-
-                                        <td>
-
-                                            <?= $kpi["actual_value"] !== null
-
-                                                ? htmlspecialchars(
-                                                    $kpi["actual_value"],
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                )
-                                                : "-"
-                                            ?>
-
-
-                                        </td>
-
-
-                                        <!-- Score -->
-
-                                        <td>
-
-
-                                            <?php if (
-                                                $kpi["score"] !== null
-                                            ): ?>
-
-
-                                                <span
-                                                    class="score">
-
-                                                    <?= number_format(
-                                                        (float)
-                                                        $kpi["score"],
-                                                        2
-                                                    ) ?>
-
-                                                    / 5
-
-                                                </span>
-
-
-                                            <?php else: ?>
-
-
-                                                <span
-                                                    class="
-                                                    score-empty
-                                                ">
-
-                                                    ยังไม่มีคะแนน
-
-                                                </span>
-
-
-                                            <?php endif; ?>
-
-
-                                        </td>
-
-
-                                        <!-- Status -->
-
-                                        <td>
-
-
-                                            <?php if (
-                                                $kpi["score"] !== null
-                                            ): ?>
-
-                                                <span
-                                                    class="
-                                                    badge
-                                                    badge-performance
-                                                ">
-
-                                                    ประเมินแล้ว
-
-                                                </span>
-
-                                            <?php else: ?>
-
-                                                <span
-                                                    class="
-                                                    badge
-                                                    badge-competency
-                                                ">
-
-                                                    รอดำเนินการ
-
-                                                </span>
-
-                                            <?php endif; ?>
-
-
-                                        </td>
-
-
-                                    </tr>
-
-
-                                <?php endforeach; ?>
-
-
-                            <?php endif; ?>
-
-
-                        </tbody>
-
-                    </table>
-
-                </div>
-
-            </section>
+        </section>
 
     </main>
 
@@ -2153,6 +2164,24 @@ $avatar =
 
             }
         );
+
+        const navItems = document.querySelectorAll(".nav-item");
+
+        navItems.forEach(item => {
+
+            item.addEventListener("click", function() {
+
+                // เอา active ออกจากเมนูเดิม
+                navItems.forEach(nav => {
+                    nav.classList.remove("active");
+                });
+
+                // เพิ่ม active ให้เมนูที่กด
+                this.classList.add("active");
+
+            });
+
+        });
     </script>
 
 
