@@ -33,7 +33,7 @@ $assignment_id = intval($_GET["id"] ?? 0);
 
 if ($assignment_id <= 0) {
 
-    header("Location: kpi-assignment.php");
+    header("Location: ../index.php?page=kpi-assignment");
     exit;
 
 }
@@ -66,7 +66,7 @@ $assignment = $check_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$assignment) {
 
     header(
-        "Location: kpi-assignment.php?error=not_found"
+        "Location: ../index.php?page=kpi-assignment&error=not_found"
     );
 
     exit;
@@ -97,7 +97,7 @@ try {
     ========================= */
 
     header(
-        "Location: kpi-assignment.php?success=deleted"
+        "Location: ../index.php?page=kpi-assignment&success=deleted"
     );
 
     exit;
@@ -110,7 +110,7 @@ try {
     ========================= */
 
     header(
-        "Location: kpi-assignment.php?error=delete_failed"
+        "Location: ../index.php?page=kpi-assignment&error=delete_failed"
     );
 
     exit;

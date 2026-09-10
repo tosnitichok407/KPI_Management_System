@@ -31,7 +31,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $employee_id = (int) ($_GET["id"] ?? $_POST["employee_id"] ?? 0);
 
 if ($employee_id <= 0) {
-    header("Location: employees.php");
+    header("Location: ../index.php?page=employees");
     exit;
 }
 
@@ -219,7 +219,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 |--------------------------------------------------------------------------
                 */
 
-                header("Location: employees.php");
+                header("Location: ../index.php?page=employees");
                 exit;
             }
 
@@ -275,7 +275,7 @@ $employee = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$employee) {
 
-    header("Location: employees.php");
+    header("Location: ../index.php?page=employees");
     exit;
 
 }
@@ -335,7 +335,7 @@ if (!$employee) {
 
 
         <a
-            href="employees.php"
+            href="../index.php?page=employees"
             class="btn btn-secondary"
         >
             Back
@@ -706,7 +706,7 @@ if (!$employee) {
 
 
                 <a
-                    href="employees.php"
+                    href="../index.php?page=employees"
                     class="btn btn-secondary"
                 >
                     Cancel
@@ -720,6 +720,8 @@ if (!$employee) {
 
 
 </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

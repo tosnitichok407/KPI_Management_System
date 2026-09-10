@@ -36,7 +36,7 @@ $employee_id = (int) ($_GET["id"] ?? 0);
 
 if ($employee_id <= 0) {
 
-    header("Location: employees.php");
+    header("Location: ../index.php?page=employees");
     exit;
 
 }
@@ -77,7 +77,7 @@ try {
 
         $pdo->rollBack();
 
-        header("Location: employees.php");
+        header("Location: ../index.php?page=employees");
         exit;
 
     }
@@ -146,7 +146,7 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    header("Location: employees.php?deleted=1");
+    header("Location: ../index.php?page=employees&deleted=1");
     exit;
 
 

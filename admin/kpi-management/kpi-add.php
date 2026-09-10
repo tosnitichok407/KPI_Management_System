@@ -141,7 +141,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 ]);
             }
             header(
-                "Location: kpi-management.php"
+                "Location: ../index.php?page=kpi-management"
             );
 
             exit;
@@ -180,7 +180,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         body {
             margin: 0;
             background: #f5f7fb;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
         }
 
         .container {
@@ -398,7 +398,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                 <a
-                    href="kpi-management.php"
+                    href="../index.php?page=kpi-management"
                     class="btn btn-secondary">
                     ยกเลิก
                 </a>
@@ -408,6 +408,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </div>
 
     </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

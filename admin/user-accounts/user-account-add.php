@@ -370,7 +370,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             |--------------------------------------------------------------------------
                             */
 
-                            header("Location: user-accounts.php");
+                            header("Location: ../index.php?page=accounts");
 
                             exit;
 
@@ -699,6 +699,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
 </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

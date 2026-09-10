@@ -162,7 +162,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 */
 
                 header(
-                    "Location: kpi-categories.php"
+                    "Location: ../index.php?page=kpi-categories"
                 );
 
                 exit;
@@ -233,7 +233,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             margin: 0;
 
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
 
             background: #f5f7fb;
 
@@ -360,7 +360,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             border-radius: 8px;
 
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
 
             font-size: 15px;
 
@@ -431,7 +431,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             text-decoration: none;
 
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
 
             font-size: 15px;
 
@@ -660,7 +660,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-actions">
 
                 <a
-                    href="kpi-categories.php"
+                    href="../index.php?page=kpi-categories"
                     class="btn btn-secondary"
                 >
                     Cancel
@@ -686,6 +686,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 </div>
 
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

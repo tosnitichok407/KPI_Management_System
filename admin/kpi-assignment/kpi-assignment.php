@@ -1,23 +1,30 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
-/* =========================
+
+/* =========================================================
    CHECK LOGIN
-========================= */
+========================================================= */
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: ../login.php");
     exit;
 }
 
-/* =========================
-   CHECK ADMIN
-========================= */
 
-if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
+/* =========================================================
+   CHECK ADMIN
+========================================================= */
+
+if (
+    !isset($_SESSION["role_id"]) ||
+    $_SESSION["role_id"] != 1
+){
     header("Location: ../dashboard.php");
     exit;
 }
@@ -28,27 +35,108 @@ $error = "";
 
 /* =========================================================
    ADD KPI ASSIGNMENT
+   Assign KPI ให้พนักงานหลายคน
 ========================================================= */
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $kpi_id       = intval($_POST["kpi_id"] ?? 0);
-    $employee_id  = intval($_POST["employee_id"] ?? 0);
-    $period_id    = intval($_POST["period_id"] ?? 0);
-    $target_value = trim($_POST["target_value"] ?? "");
-    $weight       = trim($_POST["weight"] ?? "");
-    $start_date   = $_POST["start_date"] ?? "";
-    $end_date     = $_POST["end_date"] ?? "";
-    $status       = $_POST["status"] ?? "Active";
+    $kpi_id = intval(
+        $_POST["kpi_id"] ?? 0
+    );
+
+    $employee_ids =
+        $_POST["employee_ids"] ?? [];
+
+    $assignment_year = intval(
+        $_POST["assignment_year"]
+        ?? date("Y")
+    );
+
+    $assignment_month = intval(
+        $_POST["assignment_month"] ?? 0
+    );
+
+    $period_id = intval(
+        $_POST["period_id"] ?? 0
+    );
+
+    $target_value = trim(
+        $_POST["target_value"] ?? ""
+    );
+
+    $weight = trim(
+        $_POST["weight"] ?? ""
+    );
+
+    $status =
+        $_POST["status"] ?? "Active";
 
 
-    /* =========================
+    /* =====================================================
+       CALCULATE START / END DATE FROM YEAR + MONTH
+       วันที่เริ่ม = วันที่ 1
+       วันที่สิ้นสุด = วันสุดท้ายของเดือน
+    ===================================================== */
+
+    $start_date = "";
+    $end_date = "";
+
+    if (
+        $assignment_year >= 2000 &&
+        $assignment_year <= 2100 &&
+        $assignment_month >= 1 &&
+        $assignment_month <= 12
+    ) {
+
+        $start_date = sprintf(
+            "%04d-%02d-01",
+            $assignment_year,
+            $assignment_month
+        );
+
+        $end_date = date(
+            "Y-m-t",
+            strtotime($start_date)
+        );
+    }
+
+
+    /* =====================================================
+       CLEAN EMPLOYEE IDS
+    ===================================================== */
+
+    if (!is_array($employee_ids)) {
+        $employee_ids = [];
+    }
+
+    $employee_ids = array_map(
+        "intval",
+        $employee_ids
+    );
+
+    $employee_ids = array_filter(
+        $employee_ids,
+        function ($id) {
+            return $id > 0;
+        }
+    );
+
+    $employee_ids = array_values(
+        array_unique($employee_ids)
+    );
+
+
+    /* =====================================================
        VALIDATION
-    ========================= */
+    ===================================================== */
 
     if (
         $kpi_id <= 0 ||
-        $employee_id <= 0 ||
+        empty($employee_ids) ||
+        $assignment_year < 2000 ||
+        $assignment_year > 2100 ||
+        $assignment_month < 1 ||
+        $assignment_month > 12 ||
         $period_id <= 0 ||
         $target_value === "" ||
         $weight === "" ||
@@ -56,136 +144,169 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $end_date === ""
     ) {
 
-        $error = "กรุณากรอกข้อมูลให้ครบถ้วน";
+        $error =
+            "กรุณากรอกข้อมูลให้ครบถ้วน";
 
-    } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
+    } elseif (
+        !is_numeric($weight) ||
+        $weight < 0 ||
+        $weight > 100
+    ) {
 
-        $error = "Weight ต้องอยู่ระหว่าง 0 - 100%";
+        $error =
+            "Weight ต้องอยู่ระหว่าง 0 - 100%";
 
-    } elseif (!is_numeric($target_value) || $target_value < 0) {
+    } elseif (
+        !is_numeric($target_value) ||
+        $target_value < 0
+    ) {
 
-        $error = "Target Value ต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0";
+        $error =
+            "Target Value ต้องเป็นตัวเลขที่มากกว่าหรือเท่ากับ 0";
 
     } elseif ($start_date > $end_date) {
 
-        $error = "วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด";
+        $error =
+            "วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด";
 
     } else {
 
 
         /* =====================================================
-           GET KPI TYPE
+           CHECK PERIOD
         ===================================================== */
 
-        $kpi_type_sql = "
-            SELECT kpi_type
-            FROM kpi_indicators
-            WHERE kpi_id = ?
+        $period_check_sql = "
+            SELECT
+                period_id,
+                start_date,
+                end_date
+            FROM evaluation_periods
+            WHERE period_id = ?
             LIMIT 1
         ";
 
-        $kpi_type_stmt = $pdo->prepare($kpi_type_sql);
+        $period_check_stmt =
+            $pdo->prepare(
+                $period_check_sql
+            );
 
-        $kpi_type_stmt->execute([
-            $kpi_id
+        $period_check_stmt->execute([
+            $period_id
         ]);
 
-        $kpi_type = $kpi_type_stmt->fetchColumn();
+        $period_data =
+            $period_check_stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
 
 
-        if (!$kpi_type) {
+        if (!$period_data) {
 
-            $error = "ไม่พบประเภทของ KPI";
+            $error =
+                "ไม่พบรอบการประเมินที่เลือก";
 
         } else {
 
 
-            /* =================================================
-               CHECK DUPLICATE
-            ================================================= */
+            /* =====================================================
+               CHECK KPI TYPE
+            ===================================================== */
 
-            $check_sql = "
-                SELECT assignment_id
-                FROM kpi_assignments
+            $kpi_type_sql = "
+                SELECT
+                    kpi_type
+                FROM kpi_indicators
                 WHERE kpi_id = ?
-                AND employee_id = ?
-                AND period_id = ?
                 LIMIT 1
             ";
 
-            $check_stmt = $pdo->prepare($check_sql);
+            $kpi_type_stmt =
+                $pdo->prepare(
+                    $kpi_type_sql
+                );
 
-            $check_stmt->execute([
-                $kpi_id,
-                $employee_id,
-                $period_id
+            $kpi_type_stmt->execute([
+                $kpi_id
             ]);
 
-            $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
+            $kpi_type =
+                $kpi_type_stmt->fetchColumn();
 
 
-            if ($existing) {
+            if (!$kpi_type) {
 
                 $error =
-                    "พนักงานคนนี้ถูก Assign KPI นี้ในรอบการประเมินนี้แล้ว";
+                    "ไม่พบประเภทของ KPI";
 
             } else {
 
 
                 /* =================================================
-                   CHECK TOTAL WEIGHT BY KPI TYPE
-                   
-                   Competency แยกจาก Performance
+                   START TRANSACTION
                 ================================================= */
 
-                $weight_sql = "
-                    SELECT COALESCE(SUM(a.weight), 0)
-                    FROM kpi_assignments a
-
-                    INNER JOIN kpi_indicators k
-                        ON a.kpi_id = k.kpi_id
-
-                    WHERE a.employee_id = ?
-                    AND a.period_id = ?
-                    AND k.kpi_type = ?
-                    AND a.status = 'Active'
-                ";
-
-                $weight_stmt = $pdo->prepare($weight_sql);
-
-                $weight_stmt->execute([
-                    $employee_id,
-                    $period_id,
-                    $kpi_type
-                ]);
-
-                $current_weight = floatval(
-                    $weight_stmt->fetchColumn()
-                );
+                $pdo->beginTransaction();
 
 
-                $new_total_weight =
-                    $current_weight + floatval($weight);
+                try {
 
-
-                /* =================================================
-                   CHECK MAX 100% PER KPI TYPE
-                ================================================= */
-
-                if ($new_total_weight > 100) {
-
-                    $error =
-                        "ไม่สามารถ Assign ได้ เพราะ Weight รวมของ "
-                        . htmlspecialchars($kpi_type)
-                        . " จะเป็น "
-                        . number_format($new_total_weight, 2)
-                        . "% ซึ่งเกิน 100%";
-
-                } else {
+                    $success_count = 0;
+                    $skip_count = 0;
 
 
                     /* =================================================
-                       INSERT KPI ASSIGNMENT
+                       CHECK DUPLICATE
+                    ================================================= */
+
+                    $check_sql = "
+                        SELECT
+                            assignment_id
+                        FROM kpi_assignments
+                        WHERE kpi_id = ?
+                        AND employee_id = ?
+                        AND assignment_year = ?
+                        AND period_id = ?
+                        LIMIT 1
+                    ";
+
+                    $check_stmt =
+                        $pdo->prepare(
+                            $check_sql
+                        );
+
+
+                    /* =================================================
+                       CHECK WEIGHT
+                    ================================================= */
+
+                    $weight_sql = "
+                        SELECT
+                            COALESCE(
+                                SUM(a.weight),
+                                0
+                            )
+
+                        FROM kpi_assignments a
+
+                        INNER JOIN kpi_indicators k
+                            ON a.kpi_id = k.kpi_id
+
+                        WHERE a.employee_id = ?
+                        AND a.assignment_year = ?
+                        AND a.period_id = ?
+                        AND k.kpi_type = ?
+                        AND a.status = 'Active'
+                    ";
+
+                    $weight_stmt =
+                        $pdo->prepare(
+                            $weight_sql
+                        );
+
+
+                    /* =================================================
+                       INSERT
                     ================================================= */
 
                     $insert_sql = "
@@ -193,6 +314,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         (
                             kpi_id,
                             employee_id,
+                            assignment_year,
                             period_id,
                             target_value,
                             weight,
@@ -200,31 +322,221 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             end_date,
                             status
                         )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+
+                        VALUES
+                        (
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?,
+                            ?
+                        )
                     ";
 
                     $insert_stmt =
-                        $pdo->prepare($insert_sql);
-
-                    $insert_stmt->execute([
-                        $kpi_id,
-                        $employee_id,
-                        $period_id,
-                        $target_value,
-                        $weight,
-                        $start_date,
-                        $end_date,
-                        $status
-                    ]);
+                        $pdo->prepare(
+                            $insert_sql
+                        );
 
 
-                    $message =
-                        "เพิ่ม KPI Assignment เรียบร้อยแล้ว";
+                    /* =================================================
+                       LOOP EMPLOYEES
+                    ================================================= */
+
+                    foreach (
+                        $employee_ids
+                        as $employee_id
+                    ) {
+
+
+                        /* =============================================
+                           CHECK EMPLOYEE EXISTS
+                        ============================================= */
+
+                        $employee_check_stmt =
+                            $pdo->prepare("
+                                SELECT employee_id
+                                FROM employees
+                                WHERE employee_id = ?
+                                AND status = 'Active'
+                                LIMIT 1
+                            ");
+
+                        $employee_check_stmt->execute([
+                            $employee_id
+                        ]);
+
+                        if (
+                            !$employee_check_stmt->fetchColumn()
+                        ) {
+                            $skip_count++;
+                            continue;
+                        }
+
+
+                        /* =============================================
+                           CHECK DUPLICATE
+                        ============================================= */
+
+                        $check_stmt->execute([
+                            $kpi_id,
+                            $employee_id,
+                            $assignment_year,
+                            $period_id
+                        ]);
+
+                        $existing =
+                            $check_stmt->fetch(
+                                PDO::FETCH_ASSOC
+                            );
+
+
+                        if ($existing) {
+
+                            $skip_count++;
+
+                            continue;
+                        }
+
+
+                        /* =============================================
+                           CHECK TOTAL WEIGHT
+                        ============================================= */
+
+                        $weight_stmt->execute([
+                            $employee_id,
+                            $assignment_year,
+                            $period_id,
+                            $kpi_type
+                        ]);
+
+                        $current_weight =
+                            floatval(
+                                $weight_stmt->fetchColumn()
+                            );
+
+
+                        $new_total_weight =
+                            $current_weight
+                            + floatval($weight);
+
+
+                        /* =============================================
+                           CHECK MAX 100%
+                        ============================================= */
+
+                        if (
+                            $new_total_weight > 100
+                        ) {
+
+                            throw new Exception(
+                                "Weight ของพนักงาน ID "
+                                . $employee_id
+                                . " ในประเภท "
+                                . $kpi_type
+                                . " จะเกิน 100%"
+                            );
+                        }
+
+
+                        /* =============================================
+                           INSERT
+                        ============================================= */
+
+                        $insert_stmt->execute([
+                            $kpi_id,
+                            $employee_id,
+                            $assignment_year,
+                            $period_id,
+                            $target_value,
+                            $weight,
+                            $start_date,
+                            $end_date,
+                            $status
+                        ]);
+
+
+                        $success_count++;
+                    }
+
+
+                    /* =================================================
+                       COMMIT
+                    ================================================= */
+
+                    $pdo->commit();
+
+
+                    /* =================================================
+                       RESULT MESSAGE
+                    ================================================= */
+
+                    if ($success_count > 0) {
+
+                        $message =
+                            "Assign KPI ให้พนักงาน "
+                            . $success_count
+                            . " คนเรียบร้อยแล้ว";
+
+                        if ($skip_count > 0) {
+
+                            $message .=
+                                " (ข้าม "
+                                . $skip_count
+                                . " คน เนื่องจากมี KPI นี้อยู่แล้ว)";
+                        }
+
+                    } else {
+
+                        $error =
+                            "ไม่สามารถ Assign ได้ เนื่องจากพนักงานที่เลือกมี KPI นี้อยู่แล้วทั้งหมด";
+                    }
+
+
+                } catch (Exception $e) {
+
+                    if (
+                        $pdo->inTransaction()
+                    ) {
+
+                        $pdo->rollBack();
+                    }
+
+                    $error =
+                        "เกิดข้อผิดพลาด: "
+                        . $e->getMessage();
                 }
             }
         }
     }
 }
+
+
+/* =========================================================
+   GET DEPARTMENTS
+========================================================= */
+
+$departments_sql = "
+    SELECT
+        department_id,
+        department_name
+    FROM departments
+    ORDER BY department_name ASC
+";
+
+$departments_result =
+    $pdo->query(
+        $departments_sql
+    );
+
+$departments =
+    $departments_result->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /* =========================================================
@@ -236,17 +548,27 @@ $employees_sql = "
         employee_id,
         employee_code,
         first_name,
-        last_name
+        last_name,
+        department_id
 
     FROM employees
 
     WHERE status = 'Active'
 
-    ORDER BY first_name ASC
+    ORDER BY
+        first_name ASC,
+        last_name ASC
 ";
 
 $employees_result =
-    $pdo->query($employees_sql);
+    $pdo->query(
+        $employees_sql
+    );
+
+$employees =
+    $employees_result->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /* =========================================================
@@ -272,7 +594,14 @@ $kpis_sql = "
 ";
 
 $kpis_result =
-    $pdo->query($kpis_sql);
+    $pdo->query(
+        $kpis_sql
+    );
+
+$kpis =
+    $kpis_result->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /* =========================================================
@@ -289,22 +618,39 @@ $periods_sql = "
 
     FROM evaluation_periods
 
-    ORDER BY start_date DESC
+    ORDER BY
+        start_date DESC
 ";
 
 $periods_result =
-    $pdo->query($periods_sql);
+    $pdo->query(
+        $periods_sql
+    );
+
+$periods =
+    $periods_result->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /* =========================================================
    FILTER
 ========================================================= */
 
-$filter_period =
-    intval($_GET["period_id"] ?? 0);
+$filter_year =
+    intval(
+        $_GET["year"] ?? 0
+    );
+
+$filter_department =
+    intval(
+        $_GET["department_id"] ?? 0
+    );
 
 $filter_employee =
-    intval($_GET["employee_id"] ?? 0);
+    intval(
+        $_GET["employee_id"] ?? 0
+    );
 
 $filter_status =
     $_GET["status"] ?? "";
@@ -316,9 +662,11 @@ $filter_status =
 
 $assignment_sql = "
     SELECT
+
         a.assignment_id,
         a.kpi_id,
         a.employee_id,
+        a.assignment_year,
         a.period_id,
         a.target_value,
         a.weight,
@@ -330,6 +678,9 @@ $assignment_sql = "
         e.first_name,
         e.last_name,
 
+        d.department_id,
+        d.department_name,
+
         k.kpi_name,
         k.kpi_type,
         k.unit,
@@ -340,6 +691,9 @@ $assignment_sql = "
 
     INNER JOIN employees e
         ON a.employee_id = e.employee_id
+
+    LEFT JOIN departments d
+        ON e.department_id = d.department_id
 
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
@@ -354,23 +708,39 @@ $assignment_sql = "
 $params = [];
 
 
-/* =========================
-   FILTER PERIOD
-========================= */
+/* =========================================================
+   FILTER YEAR
+========================================================= */
 
-if ($filter_period > 0) {
+if ($filter_year > 0) {
 
     $assignment_sql .= "
-        AND a.period_id = ?
+        AND a.assignment_year = ?
     ";
 
-    $params[] = $filter_period;
+    $params[] =
+        $filter_year;
 }
 
 
-/* =========================
+/* =========================================================
+   FILTER DEPARTMENT
+========================================================= */
+
+if ($filter_department > 0) {
+
+    $assignment_sql .= "
+        AND e.department_id = ?
+    ";
+
+    $params[] =
+        $filter_department;
+}
+
+
+/* =========================================================
    FILTER EMPLOYEE
-========================= */
+========================================================= */
 
 if ($filter_employee > 0) {
 
@@ -378,13 +748,14 @@ if ($filter_employee > 0) {
         AND a.employee_id = ?
     ";
 
-    $params[] = $filter_employee;
+    $params[] =
+        $filter_employee;
 }
 
 
-/* =========================
+/* =========================================================
    FILTER STATUS
-========================= */
+========================================================= */
 
 if (
     $filter_status === "Active" ||
@@ -395,7 +766,8 @@ if (
         AND a.status = ?
     ";
 
-    $params[] = $filter_status;
+    $params[] =
+        $filter_status;
 }
 
 
@@ -406,24 +778,32 @@ $assignment_sql .= "
 
 
 $assignment_stmt =
-    $pdo->prepare($assignment_sql);
+    $pdo->prepare(
+        $assignment_sql
+    );
 
-$assignment_stmt->execute($params);
+$assignment_stmt->execute(
+    $params
+);
 
 $assignments_result =
-    $assignment_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $assignment_stmt->fetchAll(
+        PDO::FETCH_ASSOC
+    );
 
 
 /* =========================================================
    TOTAL WEIGHT
-   แยกตาม Employee + Period + KPI Type
 ========================================================= */
 
-$weight_sql = "
+$weight_total_sql = "
     SELECT
+
         a.employee_id,
+        a.assignment_year,
         a.period_id,
         k.kpi_type,
+
         SUM(a.weight) AS total_weight
 
     FROM kpi_assignments a
@@ -435,12 +815,15 @@ $weight_sql = "
 
     GROUP BY
         a.employee_id,
+        a.assignment_year,
         a.period_id,
         k.kpi_type
 ";
 
 $weight_result =
-    $pdo->query($weight_sql);
+    $pdo->query(
+        $weight_total_sql
+    );
 
 
 $weights = [];
@@ -448,11 +831,15 @@ $weights = [];
 
 while (
     $row =
-    $weight_result->fetch(PDO::FETCH_ASSOC)
+    $weight_result->fetch(
+        PDO::FETCH_ASSOC
+    )
 ) {
 
     $key =
         $row["employee_id"]
+        . "_"
+        . $row["assignment_year"]
         . "_"
         . $row["period_id"]
         . "_"
@@ -460,45 +847,31 @@ while (
 
 
     $weights[$key] =
-        floatval($row["total_weight"]);
+        floatval(
+            $row["total_weight"]
+        );
 }
+
+
+/* =========================================================
+   DEFAULT FORM VALUES
+========================================================= */
+
+$form_year =
+    intval(
+        $_POST["assignment_year"]
+        ?? date("Y")
+    );
+
+$form_month =
+    intval(
+        $_POST["assignment_month"]
+        ?? date("n")
+    );
 
 ?>
 
-<!DOCTYPE html>
-
-<html lang="th">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>KPI Assignment</title>
-
-
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
-
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap"
-        rel="stylesheet"
-    >
-
-
-    <style>
+<style>
 
         * {
             box-sizing: border-box;
@@ -507,7 +880,7 @@ while (
 
         body {
             margin: 0;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             background: #f5f7fb;
             color: #333;
         }
@@ -601,7 +974,7 @@ while (
             padding: 11px 13px;
             border: 1px solid #d8dce5;
             border-radius: 7px;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             font-size: 14px;
             outline: none;
             background: #fff;
@@ -611,6 +984,31 @@ while (
         input:focus,
         select:focus {
             border-color: #244397;
+        }
+
+
+        .employee-select {
+            min-height: 220px;
+        }
+
+
+        .department-select {
+            margin-bottom: 8px;
+        }
+
+
+        .select-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #777;
+        }
+
+
+        .selected-count {
+            margin-top: 7px;
+            font-size: 13px;
+            color: #244397;
+            font-weight: 500;
         }
 
 
@@ -626,7 +1024,7 @@ while (
             border: none;
             padding: 10px 22px;
             border-radius: 7px;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             font-size: 14px;
             cursor: pointer;
             text-decoration: none;
@@ -636,6 +1034,11 @@ while (
         .btn-primary {
             background: #244397;
             color: #fff;
+        }
+
+
+        .btn-primary:hover {
+            background: #244397;
         }
 
 
@@ -667,7 +1070,13 @@ while (
 
         .filter-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr auto;
+            grid-template-columns:
+                1fr
+                1fr
+                1fr
+                1fr
+                auto;
+
             gap: 15px;
             align-items: end;
         }
@@ -681,7 +1090,7 @@ while (
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1050px;
+            min-width: 1200px;
         }
 
 
@@ -741,6 +1150,12 @@ while (
         }
 
 
+        .badge-department {
+            background: #f0f4ff;
+            color: #244397;
+        }
+
+
         .action-buttons {
             display: flex;
             gap: 7px;
@@ -781,19 +1196,33 @@ while (
         }
 
 
+        @media (max-width: 1100px) {
+
+            .filter-grid {
+                grid-template-columns:
+                    1fr
+                    1fr;
+            }
+
+        }
+
+
         @media (max-width: 900px) {
 
             .page-container {
                 padding: 20px;
             }
 
+
             .form-grid {
                 grid-template-columns: 1fr;
             }
 
+
             .form-group.full {
                 grid-column: span 1;
             }
+
 
             .filter-grid {
                 grid-template-columns: 1fr;
@@ -808,9 +1237,11 @@ while (
                 padding: 15px;
             }
 
+
             .card {
                 padding: 18px;
             }
+
 
             .page-header {
                 flex-direction: column;
@@ -818,9 +1249,11 @@ while (
                 gap: 15px;
             }
 
+
             .button-row {
                 flex-direction: column;
             }
+
 
             .button-row .btn {
                 width: 100%;
@@ -830,10 +1263,6 @@ while (
 
     </style>
 
-</head>
-
-
-<body>
 
 <div class="page-container">
 
@@ -851,22 +1280,11 @@ while (
             </h1>
 
             <p>
-                กำหนด KPI ให้กับพนักงานตามรอบการประเมิน
+                กำหนด KPI ประจำปีให้กับพนักงาน
             </p>
 
         </div>
 
-
-        <div class="header-actions">
-
-            <a
-                href="../index.php"
-                class="btn btn-secondary"
-            >
-                Dashboard
-            </a>
-
-        </div>
 
     </div>
 
@@ -879,7 +1297,9 @@ while (
 
         <div class="alert alert-success">
 
-            <?= htmlspecialchars($message) ?>
+            <?= htmlspecialchars(
+                $message
+            ) ?>
 
         </div>
 
@@ -890,7 +1310,9 @@ while (
 
         <div class="alert alert-error">
 
-            <?= htmlspecialchars($error) ?>
+            <?= htmlspecialchars(
+                $error
+            ) ?>
 
         </div>
 
@@ -904,17 +1326,107 @@ while (
     <div class="card">
 
         <h2 class="card-title">
-            Assign KPI
+            Assign KPI ประจำปี
         </h2>
 
 
-        <form method="POST">
+        <form
+            method="POST"
+            id="assignmentForm">
 
 
             <div class="form-grid">
 
 
-                <!-- PERIOD -->
+                <!-- =================================================
+                     YEAR
+                ================================================= -->
+
+                <div class="form-group">
+
+                    <label>
+                        ปี <span>*</span>
+                    </label>
+
+
+                    <input
+                        type="number"
+                        name="assignment_year"
+                        id="assignment_year"
+                        value="<?= $form_year ?>"
+                        min="2000"
+                        max="2100"
+                        required>
+
+                </div>
+
+
+                <!-- =================================================
+                     MONTH
+                ================================================= -->
+
+                <div class="form-group">
+
+                    <label>
+                        เดือนที่ประเมิน <span>*</span>
+                    </label>
+
+
+                    <select
+                        name="assignment_month"
+                        id="assignment_month"
+                        required>
+
+                        <option value="">
+                            -- เลือกเดือน --
+                        </option>
+
+
+                        <?php
+
+                        $months = [
+                            1  => "มกราคม",
+                            2  => "กุมภาพันธ์",
+                            3  => "มีนาคม",
+                            4  => "เมษายน",
+                            5  => "พฤษภาคม",
+                            6  => "มิถุนายน",
+                            7  => "กรกฎาคม",
+                            8  => "สิงหาคม",
+                            9  => "กันยายน",
+                            10 => "ตุลาคม",
+                            11 => "พฤศจิกายน",
+                            12 => "ธันวาคม"
+                        ];
+
+                        foreach (
+                            $months
+                            as $month_number =>
+                            $month_name
+                        ):
+
+                        ?>
+
+                            <option
+                                value="<?= $month_number ?>"
+                                <?= $form_month == $month_number
+                                    ? "selected"
+                                    : "" ?>>
+
+                                <?= $month_name ?>
+
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+                </div>
+
+
+                <!-- =================================================
+                     PERIOD
+                ================================================= -->
 
                 <div class="form-group">
 
@@ -925,24 +1437,21 @@ while (
 
                     <select
                         name="period_id"
-                        required
-                    >
+                        id="period_id"
+                        required>
 
                         <option value="">
                             -- เลือกรอบการประเมิน --
                         </option>
 
 
-                        <?php while (
-                            $period =
-                            $periods_result->fetch(
-                                PDO::FETCH_ASSOC
-                            )
+                        <?php foreach (
+                            $periods
+                            as $period
                         ): ?>
 
                             <option
-                                value="<?= $period["period_id"] ?>"
-                            >
+                                value="<?= $period["period_id"] ?>">
 
                                 <?= htmlspecialchars(
                                     $period["period_name"]
@@ -964,19 +1473,69 @@ while (
                                         $period["end_date"]
                                     )
                                 ) ?>
+
                                 )
 
                             </option>
 
-                        <?php endwhile; ?>
-
+                        <?php endforeach; ?>
 
                     </select>
 
                 </div>
 
 
-                <!-- EMPLOYEE -->
+                <!-- =================================================
+                     DEPARTMENT
+                ================================================= -->
+
+                <div class="form-group">
+
+                    <label>
+                        แผนก <span>*</span>
+                    </label>
+
+
+                    <select
+                        id="department_select"
+                        class="department-select">
+
+                        <option value="">
+                            -- เลือกแผนก --
+                        </option>
+
+
+                        <?php foreach (
+                            $departments
+                            as $department
+                        ): ?>
+
+                            <option
+                                value="<?= $department["department_id"] ?>">
+
+                                <?= htmlspecialchars(
+                                    $department["department_name"]
+                                ) ?>
+
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+
+                    <div class="select-hint">
+
+                        เลือกแผนกเพื่อแสดงรายชื่อพนักงานในแผนกนั้น
+
+                    </div>
+
+                </div>
+
+
+                <!-- =================================================
+                     EMPLOYEES
+                ================================================= -->
 
                 <div class="form-group">
 
@@ -986,25 +1545,21 @@ while (
 
 
                     <select
-                        name="employee_id"
-                        required
-                    >
-
-                        <option value="">
-                            -- เลือกพนักงาน --
-                        </option>
+                        name="employee_ids[]"
+                        id="employee_select"
+                        class="employee-select"
+                        multiple
+                        required>
 
 
-                        <?php while (
-                            $employee =
-                            $employees_result->fetch(
-                                PDO::FETCH_ASSOC
-                            )
+                        <?php foreach (
+                            $employees
+                            as $employee
                         ): ?>
 
                             <option
                                 value="<?= $employee["employee_id"] ?>"
-                            >
+                                data-department="<?= $employee["department_id"] ?>">
 
                                 <?= htmlspecialchars(
                                     $employee["employee_code"]
@@ -1022,15 +1577,34 @@ while (
 
                             </option>
 
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
 
 
                     </select>
 
+
+                    <div
+                        class="selected-count"
+                        id="selected_count">
+
+                        เลือกพนักงานแล้ว 0 คน
+
+                    </div>
+
+
+                    <div class="select-hint">
+
+                        กด Ctrl (Windows) หรือ Command (Mac)
+                        เพื่อเลือกหลายคน
+
+                    </div>
+
                 </div>
 
 
-                <!-- KPI -->
+                <!-- =================================================
+                     KPI
+                ================================================= -->
 
                 <div class="form-group full">
 
@@ -1041,24 +1615,20 @@ while (
 
                     <select
                         name="kpi_id"
-                        required
-                    >
+                        required>
 
                         <option value="">
                             -- เลือก KPI --
                         </option>
 
 
-                        <?php while (
-                            $kpi =
-                            $kpis_result->fetch(
-                                PDO::FETCH_ASSOC
-                            )
+                        <?php foreach (
+                            $kpis
+                            as $kpi
                         ): ?>
 
                             <option
-                                value="<?= $kpi["kpi_id"] ?>"
-                            >
+                                value="<?= $kpi["kpi_id"] ?>">
 
                                 [<?= htmlspecialchars(
                                     $kpi["kpi_type"]
@@ -1071,99 +1641,116 @@ while (
                                 -
 
                                 <?= htmlspecialchars(
-                                    $kpi["category_name"] ?? ""
+                                    $kpi["category_name"]
+                                    ?? ""
                                 ) ?>
 
                             </option>
 
-                        <?php endwhile; ?>
-
+                        <?php endforeach; ?>
 
                     </select>
 
                 </div>
 
 
-                <!-- TARGET -->
+                <!-- =================================================
+                     TARGET
+                ================================================= -->
 
                 <div class="form-group">
 
                     <label>
-                        Target Value <span>*</span>
+                        เป้าหมาย (%) <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="target_value"
-                        step="0.01"
+                        step="1"
                         min="0"
+                        max="100"
                         placeholder="เช่น 100"
-                        required
-                    >
+                        required>
 
                 </div>
 
 
-                <!-- WEIGHT -->
+                <!-- =================================================
+                     WEIGHT
+                ================================================= -->
 
                 <div class="form-group">
 
                     <label>
-                        Weight (%) <span>*</span>
+                        น้ำหนัก (%) <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="weight"
-                        step="0.01"
+                        step="1"
                         min="0"
                         max="100"
                         placeholder="เช่น 20"
-                        required
-                    >
+                        required>
 
                 </div>
 
 
-                <!-- START DATE -->
+                <!-- =================================================
+                     START DATE
+                ================================================= -->
 
                 <div class="form-group">
 
                     <label>
-                        วันที่เริ่มต้น <span>*</span>
+                        วันที่เริ่มต้น
                     </label>
 
 
                     <input
                         type="date"
                         name="start_date"
-                        required
-                    >
+                        id="start_date"
+                        readonly>
+
+                    <div class="select-hint">
+                        ระบบกำหนดเป็นวันที่ 1 ของเดือนอัตโนมัติ
+                    </div>
 
                 </div>
 
 
-                <!-- END DATE -->
+                <!-- =================================================
+                     END DATE
+                ================================================= -->
 
                 <div class="form-group">
 
                     <label>
-                        วันที่สิ้นสุด <span>*</span>
+                        วันที่สิ้นสุด
                     </label>
 
 
                     <input
                         type="date"
                         name="end_date"
-                        required
-                    >
+                        id="end_date"
+                        readonly>
+
+                    <div class="select-hint">
+                        ระบบกำหนดเป็นวันสุดท้ายของเดือนอัตโนมัติ
+                    </div>
 
                 </div>
 
 
-                <!-- STATUS -->
+                <!-- =================================================
+                     STATUS
+                ================================================= -->
 
                 <div class="form-group">
 
@@ -1190,26 +1777,36 @@ while (
             </div>
 
 
+            <!-- =================================================
+                 BUTTON
+            ================================================= -->
+
             <div class="button-row">
 
                 <button
                     type="reset"
-                    class="btn btn-secondary"
-                >
+                    class="btn btn-secondary">
+
                     ล้างข้อมูล
+
                 </button>
 
 
                 <button
                     type="submit"
-                    class="btn btn-primary"
-                >
+                    class="btn btn-primary">
+
                     + Assign KPI
+
                 </button>
 
             </div>
+
+
         </form>
+
     </div>
+
 
     <!-- =====================================================
          FILTER
@@ -1224,20 +1821,17 @@ while (
 
         <form method="GET">
 
-
             <div class="filter-grid">
 
-
-                <!-- PERIOD FILTER -->
 
                 <div class="form-group">
 
                     <label>
-                        รอบการประเมิน
+                        ปี
                     </label>
 
 
-                    <select name="period_id">
+                    <select name="year">
 
                         <option value="0">
                             ทั้งหมด
@@ -1246,50 +1840,80 @@ while (
 
                         <?php
 
-                        $filter_period_result =
-                            $pdo->query("
-                                SELECT
-                                    period_id,
-                                    period_name
+                        $current_year =
+                            intval(date("Y"));
 
-                                FROM evaluation_periods
+                        for (
+                            $year =
+                                $current_year + 2;
 
-                                ORDER BY start_date DESC
-                            ");
+                            $year >=
+                                $current_year - 5;
 
-                        while (
-                            $period =
-                            $filter_period_result->fetch(
-                                PDO::FETCH_ASSOC
-                            )
+                            $year--
                         ):
 
                         ?>
 
                             <option
-                                value="<?= $period["period_id"] ?>"
+                                value="<?= $year ?>"
 
-                                <?= $filter_period ==
-                                    $period["period_id"]
+                                <?= $filter_year ==
+                                    $year
                                     ? "selected"
-                                    : "" ?>
-                            >
+                                    : "" ?>>
 
-                                <?= htmlspecialchars(
-                                    $period["period_name"]
-                                ) ?>
+                                <?= $year ?>
 
                             </option>
 
-                        <?php endwhile; ?>
-
+                        <?php endfor; ?>
 
                     </select>
 
                 </div>
 
 
-                <!-- EMPLOYEE FILTER -->
+                <div class="form-group">
+
+                    <label>
+                        แผนก
+                    </label>
+
+                    <select
+                        name="department_id"
+                        id="filter_department">
+
+                        <option value="0">
+                            ทั้งหมด
+                        </option>
+
+
+                        <?php foreach (
+                            $departments
+                            as $department
+                        ): ?>
+
+                            <option
+                                value="<?= $department["department_id"] ?>"
+
+                                <?= $filter_department ==
+                                    $department["department_id"]
+                                    ? "selected"
+                                    : "" ?>>
+
+                                <?= htmlspecialchars(
+                                    $department["department_name"]
+                                ) ?>
+
+                            </option>
+
+                        <?php endforeach; ?>
+
+                    </select>
+
+                </div>
+
 
                 <div class="form-group">
 
@@ -1298,47 +1922,29 @@ while (
                     </label>
 
 
-                    <select name="employee_id">
+                    <select
+                        name="employee_id"
+                        id="filter_employee">
 
                         <option value="0">
                             ทั้งหมด
                         </option>
 
 
-                        <?php
-
-                        $filter_employee_result =
-                            $pdo->query("
-                                SELECT
-                                    employee_id,
-                                    employee_code,
-                                    first_name,
-                                    last_name
-
-                                FROM employees
-
-                                WHERE status = 'Active'
-
-                                ORDER BY first_name
-                            ");
-
-                        while (
-                            $employee =
-                            $filter_employee_result->fetch(
-                                PDO::FETCH_ASSOC
-                            )
-                        ):
-
-                        ?>
+                        <?php foreach (
+                            $employees
+                            as $employee
+                        ): ?>
 
                             <option
                                 value="<?= $employee["employee_id"] ?>"
 
+                                data-department="<?= $employee["department_id"] ?>"
+
                                 <?= $filter_employee ==
                                     $employee["employee_id"]
                                     ? "selected"
-                                    : "" ?>
-                            >
+                                    : "" ?>>
 
                                 <?= htmlspecialchars(
                                     $employee["employee_code"]
@@ -1356,15 +1962,12 @@ while (
 
                             </option>
 
-                        <?php endwhile; ?>
-
+                        <?php endforeach; ?>
 
                     </select>
 
                 </div>
 
-
-                <!-- STATUS FILTER -->
 
                 <div class="form-group">
 
@@ -1372,35 +1975,31 @@ while (
                         สถานะ
                     </label>
 
-
                     <select name="status">
 
                         <option value="">
                             ทั้งหมด
                         </option>
 
-
                         <option
                             value="Active"
-
                             <?= $filter_status === "Active"
                                 ? "selected"
-                                : "" ?>
-                        >
-                            Active
-                        </option>
+                                : "" ?>>
 
+                            Active
+
+                        </option>
 
                         <option
                             value="Inactive"
-
                             <?= $filter_status === "Inactive"
                                 ? "selected"
-                                : "" ?>
-                        >
-                            Inactive
-                        </option>
+                                : "" ?>>
 
+                            Inactive
+
+                        </option>
 
                     </select>
 
@@ -1409,11 +2008,11 @@ while (
 
                 <button
                     type="submit"
-                    class="btn btn-primary"
-                >
-                    ค้นหา
-                </button>
+                    class="btn btn-primary">
 
+                    ค้นหา
+
+                </button>
 
             </div>
 
@@ -1437,42 +2036,17 @@ while (
                     <tr>
 
                         <th>#</th>
-
-                        <th>
-                            พนักงาน
-                        </th>
-
-                        <th>
-                            KPI
-                        </th>
-
-                        <th>
-                            ประเภท
-                        </th>
-
-                        <th>
-                            รอบประเมิน
-                        </th>
-
-                        <th>
-                            Target
-                        </th>
-
-                        <th>
-                            Weight
-                        </th>
-
-                        <th>
-                            ช่วงเวลา
-                        </th>
-
-                        <th>
-                            สถานะ
-                        </th>
-
-                        <th>
-                            จัดการ
-                        </th>
+                        <th>พนักงาน</th>
+                        <th>แผนก</th>
+                        <th>KPI</th>
+                        <th>ประเภท</th>
+                        <th>รอบประเมิน</th>
+                        <th>ปี</th>
+                        <th>Target</th>
+                        <th>Weight</th>
+                        <th>ช่วงเวลา</th>
+                        <th>สถานะ</th>
+                        <th>จัดการ</th>
 
                     </tr>
 
@@ -1481,27 +2055,25 @@ while (
 
                 <tbody>
 
-
-                <?php if (!empty($assignments_result)): ?>
-
+                <?php if (
+                    !empty(
+                        $assignments_result
+                    )
+                ): ?>
 
                     <?php $no = 1; ?>
-
 
                     <?php foreach (
                         $assignments_result
                         as $assignment
                     ): ?>
 
-
                         <?php
-
-                        /* =====================================
-                           KEY = EMPLOYEE + PERIOD + KPI TYPE
-                        ===================================== */
 
                         $weight_key =
                             $assignment["employee_id"]
+                            . "_"
+                            . $assignment["assignment_year"]
                             . "_"
                             . $assignment["period_id"]
                             . "_"
@@ -1509,29 +2081,27 @@ while (
 
 
                         $total_weight =
-                            $weights[$weight_key] ?? 0;
+                            $weights[
+                                $weight_key
+                            ] ?? 0;
 
                         ?>
 
-
                         <tr>
-
-
-                            <!-- NUMBER -->
 
                             <td>
                                 <?= $no++ ?>
                             </td>
 
 
-                            <!-- EMPLOYEE -->
-
                             <td>
 
                                 <strong>
 
                                     <?= htmlspecialchars(
-                                        $assignment["employee_code"]
+                                        $assignment[
+                                            "employee_code"
+                                        ]
                                     ) ?>
 
                                 </strong>
@@ -1539,67 +2109,29 @@ while (
                                 <br>
 
                                 <?= htmlspecialchars(
-                                    $assignment["first_name"]
+                                    $assignment[
+                                        "first_name"
+                                    ]
                                 ) ?>
 
                                 <?= htmlspecialchars(
-                                    $assignment["last_name"]
+                                    $assignment[
+                                        "last_name"
+                                    ]
                                 ) ?>
 
                             </td>
 
 
-                            <!-- KPI -->
-
                             <td>
-
-                                <strong>
-
-                                    <?= htmlspecialchars(
-                                        $assignment["kpi_name"]
-                                    ) ?>
-
-                                </strong>
-
-
-                                <br>
-
-
-                                <small>
-
-                                    หน่วย:
-
-                                    <?= htmlspecialchars(
-                                        $assignment["unit"] ?? "-"
-                                    ) ?>
-
-                                </small>
-
-                            </td>
-
-
-                            <!-- KPI TYPE -->
-
-                            <td>
-
-                                <?php
-
-                                $type_class =
-                                    strtolower(
-                                        $assignment["kpi_type"]
-                                    ) === "performance"
-                                        ? "performance"
-                                        : "";
-
-                                ?>
-
 
                                 <span
-                                    class="badge badge-type <?= $type_class ?>"
-                                >
+                                    class="badge badge-department">
 
                                     <?= htmlspecialchars(
-                                        $assignment["kpi_type"]
+                                        $assignment[
+                                            "department_name"
+                                        ] ?? "-"
                                     ) ?>
 
                                 </span>
@@ -1607,48 +2139,118 @@ while (
                             </td>
 
 
-                            <!-- PERIOD -->
+                            <td>
+
+                                <strong>
+
+                                    <?= htmlspecialchars(
+                                        $assignment[
+                                            "kpi_name"
+                                        ]
+                                    ) ?>
+
+                                </strong>
+
+                                <br>
+
+                                <small>
+
+                                    หน่วย:
+
+                                    <?= htmlspecialchars(
+                                        $assignment[
+                                            "unit"
+                                        ] ?? "-"
+                                    ) ?>
+
+                                </small>
+
+                            </td>
+
+
+                            <td>
+
+                                <?php
+
+                                $type_class =
+                                    strtolower(
+                                        $assignment[
+                                            "kpi_type"
+                                        ]
+                                    ) ===
+                                    "performance"
+                                    ? "performance"
+                                    : "";
+
+                                ?>
+
+                                <span
+                                    class="badge badge-type <?= $type_class ?>">
+
+                                    <?= htmlspecialchars(
+                                        $assignment[
+                                            "kpi_type"
+                                        ]
+                                    ) ?>
+
+                                </span>
+
+                            </td>
+
 
                             <td>
 
                                 <?= htmlspecialchars(
-                                    $assignment["period_name"]
+                                    $assignment[
+                                        "period_name"
+                                    ]
                                 ) ?>
 
                             </td>
 
 
-                            <!-- TARGET -->
+                            <td>
+
+                                <?= htmlspecialchars(
+                                    $assignment[
+                                        "assignment_year"
+                                    ]
+                                ) ?>
+
+                            </td>
+
 
                             <td>
 
                                 <?= number_format(
-                                    $assignment["target_value"],
-                                    2
-                                ) ?>
+                                    $assignment[
+                                        "target_value"
+                                    ]
+                                ) ?>%
 
                             </td>
 
-
-                            <!-- WEIGHT -->
 
                             <td>
 
                                 <strong>
 
                                     <?= number_format(
-                                        $assignment["weight"],
-                                        2
-                                    ) ?>%
+                                        $assignment[
+                                            "weight"
+                                        ]
+                                    ) ?>
 
                                 </strong>
 
-
-                                <div class="weight-current">
+                                <div
+                                    class="weight-current">
 
                                     รวม
                                     <?= htmlspecialchars(
-                                        $assignment["kpi_type"]
+                                        $assignment[
+                                            "kpi_type"
+                                        ]
                                     ) ?>:
 
                                     <?= number_format(
@@ -1661,122 +2263,111 @@ while (
                             </td>
 
 
-                            <!-- DATE -->
-
                             <td>
 
                                 <?= date(
                                     "d/m/Y",
                                     strtotime(
-                                        $assignment["start_date"]
+                                        $assignment[
+                                            "start_date"
+                                        ]
                                     )
                                 ) ?>
 
-
                                 <br>
-
 
                                 -
 
-
                                 <br>
-
 
                                 <?= date(
                                     "d/m/Y",
                                     strtotime(
-                                        $assignment["end_date"]
+                                        $assignment[
+                                            "end_date"
+                                        ]
                                     )
                                 ) ?>
 
                             </td>
 
 
-                            <!-- STATUS -->
-
                             <td>
 
                                 <?php if (
-                                    $assignment["status"]
-                                    === "Active"
+                                    $assignment[
+                                        "status"
+                                    ] === "Active"
                                 ): ?>
 
-
                                     <span
-                                        class="badge badge-active"
-                                    >
-                                        Active
-                                    </span>
+                                        class="badge badge-active">
 
+                                        Active
+
+                                    </span>
 
                                 <?php else: ?>
 
-
                                     <span
-                                        class="badge badge-inactive"
-                                    >
-                                        Inactive
-                                    </span>
+                                        class="badge badge-inactive">
 
+                                        Inactive
+
+                                    </span>
 
                                 <?php endif; ?>
 
                             </td>
 
 
-                            <!-- ACTION -->
-
                             <td>
 
-                                <div class="action-buttons">
-
+                                <div
+                                    class="action-buttons">
 
                                     <a
-                                        href="kpi-assignment-edit.php?id=<?= $assignment["assignment_id"] ?>"
-                                        class="btn-small btn-edit"
-                                    >
+                                        href="kpi-assignment/kpi-assignment-edit.php?id=<?= $assignment["assignment_id"] ?>"
+                                        class="btn-small btn-edit">
+
                                         แก้ไข
+
                                     </a>
 
 
                                     <a
-                                        href="kpi-assignment-delete.php?id=<?= $assignment["assignment_id"] ?>"
+                                        href="kpi-assignment/kpi-assignment-delete.php?id=<?= $assignment["assignment_id"] ?>"
                                         class="btn-small btn-delete"
 
-                                        onclick="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')"
-                                    >
-                                        ลบ
-                                    </a>
+                                        onclick="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
 
+                                        ลบ
+
+                                    </a>
 
                                 </div>
 
                             </td>
 
-
                         </tr>
-
 
                     <?php endforeach; ?>
 
-
                 <?php else: ?>
-
 
                     <tr>
 
                         <td
-                            colspan="10"
-                            class="empty"
-                        >
+                            colspan="12"
+                            class="empty">
+
                             ยังไม่มีข้อมูล KPI Assignment
+
                         </td>
 
                     </tr>
 
-
                 <?php endif; ?>
-
 
                 </tbody>
 
@@ -1789,6 +2380,344 @@ while (
 
 </div>
 
-</body>
 
-</html>
+<script>
+
+
+/* =========================================================
+   FORM ELEMENTS
+========================================================= */
+
+const yearInput =
+    document.getElementById(
+        "assignment_year"
+    );
+
+const monthInput =
+    document.getElementById(
+        "assignment_month"
+    );
+
+const departmentSelect =
+    document.getElementById(
+        "department_select"
+    );
+
+const employeeSelect =
+    document.getElementById(
+        "employee_select"
+    );
+
+const selectedCount =
+    document.getElementById(
+        "selected_count"
+    );
+
+const startDate =
+    document.getElementById(
+        "start_date"
+    );
+
+const endDate =
+    document.getElementById(
+        "end_date"
+    );
+
+
+/* =========================================================
+   SET DATE FROM YEAR + MONTH
+========================================================= */
+
+function setMonthDates() {
+
+    const year =
+        parseInt(
+            yearInput.value
+        );
+
+    const month =
+        parseInt(
+            monthInput.value
+        );
+
+
+    if (
+        !year ||
+        !month ||
+        year < 2000 ||
+        year > 2100 ||
+        month < 1 ||
+        month > 12
+    ) {
+
+        startDate.value = "";
+        endDate.value = "";
+
+        return;
+    }
+
+
+    /* =====================================================
+       วันที่ 1 ของเดือน
+    ===================================================== */
+
+    const monthText =
+        String(month).padStart(
+            2,
+            "0"
+        );
+
+
+    startDate.value =
+        `${year}-${monthText}-01`;
+
+
+    /* =====================================================
+       วันสุดท้ายของเดือน
+       new Date(year, month, 0)
+       จะคืนวันสุดท้ายของเดือนที่เลือก
+    ===================================================== */
+
+    const lastDay =
+        new Date(
+            year,
+            month,
+            0
+        ).getDate();
+
+
+    endDate.value =
+        `${year}-${monthText}-${String(lastDay).padStart(2, "0")}`;
+}
+
+
+/* =========================================================
+   YEAR CHANGE
+========================================================= */
+
+yearInput.addEventListener(
+    "change",
+    setMonthDates
+);
+
+
+/* =========================================================
+   MONTH CHANGE
+========================================================= */
+
+monthInput.addEventListener(
+    "change",
+    setMonthDates
+);
+
+
+/* =========================================================
+   DEPARTMENT -> EMPLOYEE FILTER
+========================================================= */
+
+function filterEmployees() {
+
+    const departmentId =
+        departmentSelect.value;
+
+
+    const options =
+        employeeSelect.querySelectorAll(
+            "option"
+        );
+
+
+    options.forEach(
+        function (option) {
+
+            option.selected = false;
+
+        }
+    );
+
+
+    options.forEach(
+        function (option) {
+
+            const employeeDepartment =
+                option.dataset.department;
+
+
+            if (
+                departmentId === "" ||
+                employeeDepartment ===
+                    departmentId
+            ) {
+
+                option.hidden = false;
+
+                option.style.display = "";
+
+            } else {
+
+                option.hidden = true;
+
+                option.style.display = "none";
+            }
+
+        }
+    );
+
+
+    updateSelectedCount();
+}
+
+
+departmentSelect.addEventListener(
+    "change",
+    filterEmployees
+);
+
+
+/* =========================================================
+   COUNT SELECTED EMPLOYEES
+========================================================= */
+
+function updateSelectedCount() {
+
+    const selected =
+        employeeSelect.querySelectorAll(
+            "option:checked"
+        );
+
+
+    selectedCount.textContent =
+        "เลือกพนักงานแล้ว "
+        + selected.length
+        + " คน";
+}
+
+
+employeeSelect.addEventListener(
+    "change",
+    updateSelectedCount
+);
+
+
+/* =========================================================
+   RESET FORM
+========================================================= */
+
+document
+    .getElementById(
+        "assignmentForm"
+    )
+    .addEventListener(
+        "reset",
+        function () {
+
+            setTimeout(
+                function () {
+
+                    departmentSelect.value =
+                        "";
+
+                    filterEmployees();
+
+                    updateSelectedCount();
+
+                    setMonthDates();
+
+                },
+                0
+            );
+
+        }
+    );
+
+
+/* =========================================================
+   FILTER PAGE EMPLOYEE
+========================================================= */
+
+const filterDepartment =
+    document.getElementById(
+        "filter_department"
+    );
+
+const filterEmployee =
+    document.getElementById(
+        "filter_employee"
+    );
+
+
+function filterEmployeeList() {
+
+    const departmentId =
+        filterDepartment.value;
+
+
+    const options =
+        filterEmployee.querySelectorAll(
+            "option"
+        );
+
+
+    options.forEach(
+        function (option) {
+
+            if (
+                option.value === "0"
+            ) {
+
+                option.hidden = false;
+
+                return;
+            }
+
+
+            const employeeDepartment =
+                option.dataset.department;
+
+
+            if (
+                departmentId === "0" ||
+                employeeDepartment ===
+                    departmentId
+            ) {
+
+                option.hidden = false;
+
+            } else {
+
+                option.hidden = true;
+
+                if (
+                    option.selected
+                ) {
+
+                    filterEmployee.value =
+                        "0";
+                }
+
+            }
+
+        }
+    );
+}
+
+
+filterDepartment.addEventListener(
+    "change",
+    filterEmployeeList
+);
+
+
+/* =========================================================
+   INITIAL
+========================================================= */
+
+setMonthDates();
+
+updateSelectedCount();
+
+filterEmployeeList();
+
+</script>
+
+

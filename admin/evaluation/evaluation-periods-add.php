@@ -106,7 +106,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             */
 
             header(
-                "Location: evaluation-periods.php"
+                "Location: ../index.php?page=evaluation"
             );
 
             exit;
@@ -170,7 +170,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="header-actions">
 
                 <a
-                    href="evaluation-periods.php"
+                    href="../index.php?page=evaluation"
                     class="btn btn-secondary">
                     ← กลับ
                 </a>
@@ -304,7 +304,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <div class="form-actions">
 
                     <a
-                        href="evaluation-periods.php"
+                        href="../index.php?page=evaluation"
                         class="btn btn-secondary">
                         Cancel
                     </a>
@@ -325,6 +325,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
     </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

@@ -11,7 +11,7 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 40px;
+  padding: 10px;
 }
 
 .page-header {
@@ -76,7 +76,7 @@
 
 body {
   margin: 0;
-  font-family: "Kanit", sans-serif;
+  font-family: var(--font-family, "Kanit", sans-serif);
   background: #f5f7fb;
   color: #1f2937;
 }
@@ -171,11 +171,11 @@ body {
 
 .nav-item:hover {
   background: #f1f5f9;
-  color: #1e3a8a;
+  color: #244397;
 }
 
 .nav-item.active {
-  background: #1e3a8a;
+  background: #244397;
   color: #ffffff;
 }
 
@@ -232,14 +232,14 @@ body {
 ========================================================= */
 
 .main-content {
-  margin-left: 260px;
+  margin-left: 100px;
 
   min-height: 100vh;
 
-  padding: 30px 35px;
+  padding: 10px 15px;
 }
 
-/* =========================================================
+/* =======================================================
    TOPBAR
 ========================================================= */
 
@@ -283,7 +283,7 @@ body {
 
   border-radius: 50%;
 
-  background: #1e3a8a;
+  background: #244397;
   color: #ffffff;
 
   font-weight: 600;
@@ -310,7 +310,7 @@ body {
 ========================================================= */
 
 .welcome-section {
-  background: #1e3a8a;
+  background: #244397;
 
   color: #ffffff;
 
@@ -498,7 +498,7 @@ body {
 .dashboard-card:hover {
   transform: translateY(-2px);
 
-  border-color: #1e3a8a;
+  border-color: #244397;
 
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.06);
 }

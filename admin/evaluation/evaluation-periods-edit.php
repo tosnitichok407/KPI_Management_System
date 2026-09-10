@@ -31,7 +31,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $id = (int) ($_GET["id"] ?? 0);
 
 if ($id <= 0) {
-    header("Location: evaluation-periods.php");
+    header("Location: ../index.php?page=evaluation");
     exit;
 }
 
@@ -77,7 +77,7 @@ try {
 
     if (!$period) {
 
-        header("Location: evaluation-periods.php");
+        header("Location: ../index.php?page=evaluation");
         exit;
     }
 
@@ -191,7 +191,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             */
 
             header(
-                "Location: evaluation-periods.php"
+                "Location: ../index.php?page=evaluation"
             );
 
             exit;
@@ -280,7 +280,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div class="header-actions">
 
             <a
-                href="evaluation-periods.php"
+                href="../index.php?page=evaluation"
                 class="btn btn-secondary"
             >
                 ← กลับ
@@ -459,7 +459,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-actions">
 
                 <a
-                    href="evaluation-periods.php"
+                    href="../index.php?page=evaluation"
                     class="btn btn-secondary"
                 >
                     Cancel
@@ -482,6 +482,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
 </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

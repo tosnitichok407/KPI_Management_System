@@ -25,7 +25,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $id = (int) ($_GET["kpi_id"] ?? 0);
 
 if ($id <= 0) {
-    header("Location: kpi-management.php");
+    header("Location: ../index.php?page=kpi-management");
     exit;
 }
 
@@ -59,5 +59,5 @@ try {
 }
 
 
-header("Location: kpi-management.php");
+header("Location: ../index.php?page=kpi-management");
 exit;

@@ -128,7 +128,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             ]);
 
 
-            header("Location: employees.php");
+            header("Location: ../index.php?page=employees");
             exit;
 
         } catch (PDOException $e) {
@@ -394,7 +394,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </button>
 
                  <a
-                href="employees.php"
+                href="../index.php?page=employees"
                 class="btn btn-secondary"
                 style="margin-left: 5px;"
             >
@@ -409,6 +409,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </section>
 
 </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

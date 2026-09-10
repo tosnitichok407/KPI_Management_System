@@ -27,7 +27,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $user_id = (int) ($_GET["id"] ?? 0);
 
 if ($user_id <= 0) {
-    header("Location: ../../user-accounts/user-accounts.php");
+    header("Location: ../index.php?page=accounts");
     exit;
 }
 
@@ -59,7 +59,7 @@ try {
         $_SESSION["user_error"] =
             "ไม่พบ Account ที่ต้องการ";
 
-        header("Location: /user-accounts/user-accounts.php");
+        header("Location: ../index.php?page=accounts");
         exit;
     }
 
@@ -127,5 +127,5 @@ try {
 |--------------------------------------------------------------------------
 */
 
-header("Location: /user-accounts/user-accounts.php");
+header("Location: ../index.php?page=accounts");
 exit;

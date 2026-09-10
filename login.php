@@ -430,11 +430,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         </div>
 
                         <h1>
-                            Welcome Back
+                            ยินดีต้อนรับ
                         </h1>
 
                         <p>
-                            Sign in to your KPI Management System
+                            กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ
                         </p>
 
                     </div>

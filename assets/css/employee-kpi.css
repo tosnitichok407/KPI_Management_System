@@ -175,7 +175,7 @@ tbody tr:hover {
 .weight {
   font-weight: 600;
 
-  color: #1e3a8a;
+  color: #244397;
 }
 
 /* =========================================================
@@ -187,7 +187,7 @@ tbody tr:hover {
 
   padding: 7px 13px;
 
-  background: #1e3a8a;
+  background: #244397;
 
   color: white;
 
@@ -329,7 +329,7 @@ tbody tr:hover {
   height: 58px;
   border-radius: 50%;
   background: #dbeafe;
-  color: #1e3a8a;
+  color: #244397;
   font-size: 20px;
   font-weight: 600;
 }

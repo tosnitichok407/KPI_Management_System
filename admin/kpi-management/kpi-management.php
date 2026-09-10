@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -55,33 +57,7 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 
-<!DOCTYPE html>
 
-<html lang="th">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>KPI Management</title>
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/kpi.css">
-
-
-
-</head>
-
-<body>
 
     <div class="page-container">
         <div class="page-header">
@@ -98,13 +74,7 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="header-actions">
 
                 <a
-                    href="../index.php"
-                    class="btn btn-secondary">
-                    Dashboard
-                </a>
-
-                <a
-                    href="kpi-add.php"
+                    href="kpi-management/kpi-add.php"
                     class="btn btn-primary">
                     + เพิ่ม KPI
                 </a>
@@ -203,13 +173,13 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                                         <div class="action-buttons">
                                             <a
-                                                href="kpi-edit.php?id=<?= $kpi["kpi_id"] ?>"
+                                                href="kpi-management/kpi-edit.php?id=<?= $kpi["kpi_id"] ?>"
                                                 class="btn-small edit">
                                                 แก้ไข
                                             </a>
 
                                             <a
-                                                href="kpi-delete.php?id=<?= $kpi["kpi_id"] ?>"
+                                                href="kpi-management/kpi-delete.php?id=<?= $kpi["kpi_id"] ?>"
                                                 class="btn-small danger"
                                                 onclick="return confirm('ต้องการลบ KPI นี้ใช่หรือไม่?');">
                                                 ลบ
@@ -238,6 +208,3 @@ $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </div>
-</body>
-
-</html>

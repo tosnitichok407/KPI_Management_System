@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -79,7 +81,7 @@ if (isset($_GET["delete"])) {
         }
     }
 
-    header("Location: kpi-categories.php");
+    header("Location: ../index.php?page=kpi-categories");
     exit;
 }
 
@@ -136,39 +138,7 @@ unset($_SESSION["category_error"]);
 
 ?>
 
-<!DOCTYPE html>
 
-<html lang="th">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>KPI Category Management</title>
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/variables.css">
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/responsive.css">
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/kpi.css">
-
-</head>
-
-<body>
     <div class="page-container">
 
         <!-- === PAGE HEADER === -->
@@ -185,13 +155,7 @@ unset($_SESSION["category_error"]);
             </div>
             <div class="header-actions">
                 <a
-                    href="../index.php"
-                    class="btn btn-secondary">
-                    Dashboard
-                </a>
-
-                <a
-                    href="kpi-category-add.php"
+                    href="kpi-categories/kpi-category-add.php"
                     class="btn btn-primary">
                     + เพิ่มหมวดหมู่ KPI
                 </a>
@@ -325,13 +289,13 @@ unset($_SESSION["category_error"]);
                                         <div class="actions">
 
                                             <a
-                                                href="kpi-category-edit.php?id=<?= (int) $category["category_id"] ?>"
+                                                href="kpi-categories/kpi-category-edit.php?id=<?= (int) $category["category_id"] ?>"
                                                 class="btn-small edit">
                                                 แก้ไข
                                             </a>
 
                                             <a
-                                                href="kpi-categories.php?delete=<?= (int) $category["category_id"] ?>"
+                                                href="index.php?page=kpi-categories&delete=<?= (int) $category["category_id"] ?>"
                                                 class="btn-small danger"
                                                 onclick="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');">
                                                 ลบ
@@ -366,6 +330,3 @@ unset($_SESSION["category_error"]);
             </div>
         </div>
     </div>
-</body>
-
-</html>

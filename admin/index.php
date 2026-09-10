@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../config/database.php";
+require_once __DIR__ . "/../config/database.php";
 
 
 /*
@@ -15,7 +15,6 @@ if (!isset($_SESSION["user_id"])) {
 
     header("Location: ../login.php");
     exit;
-
 }
 
 
@@ -29,7 +28,6 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
     header("Location: ../dashboard.php");
     exit;
-
 }
 
 
@@ -50,365 +48,513 @@ $fullName = trim($firstName . " " . $lastName);
 
 /*
 |--------------------------------------------------------------------------
-| Selected Evaluation Period
+| Current Page
 |--------------------------------------------------------------------------
+*/
+
+$page = $_GET["page"] ?? "home";
+
+
+/*
+|--------------------------------------------------------------------------
+| Page Routing
+|--------------------------------------------------------------------------
+|
+| หน้าที่แสดงใน Content ด้านขวา
+|
+*/
+
+$pages = [
+
+    "home" => null,
+
+    "employees" =>
+    "employees/employees.php",
+
+    "accounts" =>
+    "user-accounts/user-accounts.php",
+
+    "kpi-categories" =>
+    "kpi-categories/kpi-categories.php",
+
+    "kpi-management" =>
+    "kpi-management/kpi-management.php",
+
+    "evaluation" =>
+    "evaluation/evaluation-periods.php",
+
+    "kpi-assignment" =>
+    "kpi-assignment/kpi-assignment.php",
+
+    "summary" =>
+    "kpi-summary/kpi-summary.php"
+
+];
+
+
+/*
+|--------------------------------------------------------------------------
+| Validate Page
+|--------------------------------------------------------------------------
+*/
+
+if (!array_key_exists($page, $pages)) {
+
+    $page = "home";
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| Content Page
+|--------------------------------------------------------------------------
+*/
+
+$contentPage = $pages[$page];
+
+
+/*
+|--------------------------------------------------------------------------
+| Dashboard Data
+|--------------------------------------------------------------------------
+|
+| ทำเฉพาะหน้า Home
+|
 */
 
 $selectedPeriod = (int) ($_GET["period_id"] ?? 0);
 
-
-/*
-|--------------------------------------------------------------------------
-| Get Evaluation Periods
-|--------------------------------------------------------------------------
-*/
-
-$stmt = $pdo->query("
-    SELECT
-        period_id,
-        period_name,
-        start_date,
-        end_date,
-        status
-    FROM evaluation_periods
-    ORDER BY start_date DESC, period_id DESC
-");
-
-$periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-/*
-|--------------------------------------------------------------------------
-| Default Period
-|--------------------------------------------------------------------------
-*/
-
-if ($selectedPeriod <= 0 && !empty($periods)) {
-
-    $selectedPeriod = (int) $periods[0]["period_id"];
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Selected Period Information
-|--------------------------------------------------------------------------
-*/
-
-$selectedPeriodData = null;
-
-foreach ($periods as $period) {
-
-    if ((int) $period["period_id"] === $selectedPeriod) {
-
-        $selectedPeriodData = $period;
-        break;
-
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Dashboard Statistics
-|--------------------------------------------------------------------------
-*/
+$periods = [];
 
 $totalEmployees = 0;
-$activeEmployees = 0;
 $totalAssignments = 0;
 $evaluatedKpis = 0;
 $averageScore = 0;
 
-
-/*
-|--------------------------------------------------------------------------
-| Total Employees
-|--------------------------------------------------------------------------
-*/
-
-$stmt = $pdo->query("
-    SELECT COUNT(*)
-    FROM employees
-    WHERE status = 'Active'
-");
-
-$totalEmployees = (int) $stmt->fetchColumn();
-
-
-/*
-|--------------------------------------------------------------------------
-| KPI Assignments
-|--------------------------------------------------------------------------
-*/
-
-if ($selectedPeriod > 0) {
-
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM kpi_assignments
-        WHERE period_id = :period_id
-        AND status = 'Active'
-    ");
-
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $totalAssignments = (int) $stmt->fetchColumn();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Evaluated KPI
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM employee_kpi
-        WHERE period_id = :period_id
-        AND score IS NOT NULL
-    ");
-
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $evaluatedKpis = (int) $stmt->fetchColumn();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Average Score
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $pdo->prepare("
-        SELECT COALESCE(AVG(score), 0)
-        FROM employee_kpi
-        WHERE period_id = :period_id
-        AND score IS NOT NULL
-    ");
-
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $averageScore = (float) $stmt->fetchColumn();
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Employee Performance
-|--------------------------------------------------------------------------
-|
-| Calculate weighted KPI performance
-|
-*/
-
 $employeeLabels = [];
 $employeeScores = [];
-
-if ($selectedPeriod > 0) {
-
-    $sql = "
-        SELECT
-            e.employee_id,
-
-            CONCAT(
-                e.first_name,
-                ' ',
-                e.last_name
-            ) AS employee_name,
-
-            COALESCE(
-                SUM(
-                    ek.score *
-                    COALESCE(ka.weight, ki.weight, 0)
-                    / NULLIF(ki.max_score, 0)
-                )
-                /
-                NULLIF(
-                    SUM(
-                        CASE
-                            WHEN ek.score IS NOT NULL
-                            THEN COALESCE(ka.weight, ki.weight, 0)
-                            ELSE 0
-                        END
-                    ),
-                    0
-                )
-                * 100,
-                0
-            ) AS performance_percentage
-
-        FROM employees e
-
-        INNER JOIN kpi_assignments ka
-            ON e.employee_id = ka.employee_id
-
-        INNER JOIN kpi_indicators ki
-            ON ka.kpi_id = ki.kpi_id
-
-        LEFT JOIN employee_kpi ek
-            ON ek.employee_id = e.employee_id
-            AND ek.kpi_id = ka.kpi_id
-            AND ek.period_id = ka.period_id
-
-        WHERE
-            e.status = 'Active'
-            AND ka.status = 'Active'
-            AND ka.period_id = :period_id
-
-        GROUP BY
-            e.employee_id,
-            e.first_name,
-            e.last_name
-
-        ORDER BY
-            performance_percentage DESC
-    ";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $employeePerformance = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    foreach ($employeePerformance as $row) {
-
-        $employeeLabels[] =
-            $row["employee_name"];
-
-        $employeeScores[] =
-            round(
-                (float) $row["performance_percentage"],
-                2
-            );
-
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| KPI Type Performance
-|--------------------------------------------------------------------------
-*/
 
 $typeLabels = [];
 $typeScores = [];
 
-if ($selectedPeriod > 0) {
-
-    $stmt = $pdo->prepare("
-        SELECT
-            ki.kpi_type,
-            ROUND(AVG(ek.score), 2) AS average_score
-
-        FROM employee_kpi ek
-
-        INNER JOIN kpi_indicators ki
-            ON ek.kpi_id = ki.kpi_id
-
-        WHERE
-            ek.period_id = :period_id
-            AND ek.score IS NOT NULL
-
-        GROUP BY
-            ki.kpi_type
-
-        ORDER BY
-            ki.kpi_type
-    ");
-
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $typePerformance = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    foreach ($typePerformance as $row) {
-
-        $typeLabels[] =
-            $row["kpi_type"];
-
-        $typeScores[] =
-            (float) $row["average_score"];
-
-    }
-
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| KPI Performance
-|--------------------------------------------------------------------------
-*/
-
 $kpiLabels = [];
 $kpiScores = [];
 
-if ($selectedPeriod > 0) {
 
-    $stmt = $pdo->prepare("
+if ($page === "home") {
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Get Evaluation Periods
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->query("
         SELECT
-
-            ki.kpi_name,
-
-            ROUND(
-                AVG(ek.score),
-                2
-            ) AS average_score
-
-        FROM employee_kpi ek
-
-        INNER JOIN kpi_indicators ki
-            ON ek.kpi_id = ki.kpi_id
-
-        WHERE
-            ek.period_id = :period_id
-            AND ek.score IS NOT NULL
-
-        GROUP BY
-            ki.kpi_id,
-            ki.kpi_name
-
-        ORDER BY
-            average_score DESC
-
-        LIMIT 10
+            period_id,
+            period_name,
+            start_date,
+            end_date,
+            status
+        FROM evaluation_periods
+        ORDER BY start_date DESC, period_id DESC
     ");
 
-    $stmt->execute([
-        ":period_id" => $selectedPeriod
-    ]);
-
-    $kpiPerformance =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
-    foreach ($kpiPerformance as $row) {
+    /*
+    |--------------------------------------------------------------------------
+    | Default Period
+    |--------------------------------------------------------------------------
+    */
 
-        $kpiLabels[] =
-            $row["kpi_name"];
+    if ($selectedPeriod <= 0 && !empty($periods)) {
 
-        $kpiScores[] =
-            (float) $row["average_score"];
-
+        $selectedPeriod =
+            (int) $periods[0]["period_id"];
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Total Employees
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->query("
+        SELECT COUNT(*)
+        FROM employees
+        WHERE status = 'Active'
+    ");
+
+    $totalEmployees =
+        (int) $stmt->fetchColumn();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | KPI Assignments
+    |--------------------------------------------------------------------------
+    */
+
+    if ($selectedPeriod > 0) {
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM kpi_assignments
+            WHERE period_id = :period_id
+            AND status = 'Active'
+        ");
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+        $totalAssignments =
+            (int) $stmt->fetchColumn();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Evaluated KPI
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM employee_kpi
+            WHERE period_id = :period_id
+            AND score IS NOT NULL
+        ");
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+        $evaluatedKpis =
+            (int) $stmt->fetchColumn();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Average Score
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(AVG(score), 0)
+            FROM employee_kpi
+            WHERE period_id = :period_id
+            AND score IS NOT NULL
+        ");
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+        $averageScore =
+            (float) $stmt->fetchColumn();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee Performance
+        |--------------------------------------------------------------------------
+        */
+
+        $sql = "
+
+            SELECT
+
+                e.employee_id,
+
+                CONCAT(
+                    e.first_name,
+                    ' ',
+                    e.last_name
+                ) AS employee_name,
+
+                COALESCE(
+
+                    SUM(
+
+                        ek.score *
+
+                        COALESCE(
+                            ka.weight,
+                            ki.weight,
+                            0
+                        )
+
+                        / NULLIF(
+                            ki.max_score,
+                            0
+                        )
+
+                    )
+
+                    /
+
+                    NULLIF(
+
+                        SUM(
+
+                            CASE
+
+                                WHEN ek.score IS NOT NULL
+
+                                THEN COALESCE(
+                                    ka.weight,
+                                    ki.weight,
+                                    0
+                                )
+
+                                ELSE 0
+
+                            END
+
+                        ),
+
+                        0
+
+                    )
+
+                    * 100,
+
+                    0
+
+                ) AS performance_percentage
+
+
+            FROM employees e
+
+
+            INNER JOIN kpi_assignments ka
+
+                ON e.employee_id =
+                   ka.employee_id
+
+
+            INNER JOIN kpi_indicators ki
+
+                ON ka.kpi_id =
+                   ki.kpi_id
+
+
+            LEFT JOIN employee_kpi ek
+
+                ON ek.employee_id =
+                   e.employee_id
+
+                AND ek.kpi_id =
+                    ka.kpi_id
+
+                AND ek.period_id =
+                    ka.period_id
+
+
+            WHERE
+
+                e.status = 'Active'
+
+                AND ka.status = 'Active'
+
+                AND ka.period_id =
+                    :period_id
+
+
+            GROUP BY
+
+                e.employee_id,
+                e.first_name,
+                e.last_name
+
+
+            ORDER BY
+
+                performance_percentage DESC
+
+        ";
+
+
+        $stmt =
+            $pdo->prepare($sql);
+
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+
+        $employeePerformance =
+            $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+        foreach (
+            $employeePerformance
+            as $row
+        ) {
+
+            $employeeLabels[] =
+                $row["employee_name"];
+
+
+            $employeeScores[] =
+                round(
+                    (float)
+                    $row["performance_percentage"],
+                    2
+                );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KPI Type Performance
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $pdo->prepare("
+
+            SELECT
+
+                ki.kpi_type,
+
+                ROUND(
+                    AVG(ek.score),
+                    2
+                ) AS average_score
+
+
+            FROM employee_kpi ek
+
+
+            INNER JOIN kpi_indicators ki
+
+                ON ek.kpi_id =
+                   ki.kpi_id
+
+
+            WHERE
+
+                ek.period_id =
+                    :period_id
+
+                AND ek.score IS NOT NULL
+
+
+            GROUP BY
+
+                ki.kpi_type
+
+
+            ORDER BY
+
+                ki.kpi_type
+
+        ");
+
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+
+        $typePerformance =
+            $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+        foreach (
+            $typePerformance
+            as $row
+        ) {
+
+            $typeLabels[] =
+                $row["kpi_type"];
+
+
+            $typeScores[] =
+                (float)
+                $row["average_score"];
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KPI Performance
+        |--------------------------------------------------------------------------
+        */
+
+        $stmt = $pdo->prepare("
+
+            SELECT
+
+                ki.kpi_name,
+
+                ROUND(
+                    AVG(ek.score),
+                    2
+                ) AS average_score
+
+
+            FROM employee_kpi ek
+
+
+            INNER JOIN kpi_indicators ki
+
+                ON ek.kpi_id =
+                   ki.kpi_id
+
+
+            WHERE
+
+                ek.period_id =
+                    :period_id
+
+                AND ek.score IS NOT NULL
+
+
+            GROUP BY
+
+                ki.kpi_id,
+                ki.kpi_name
+
+
+            ORDER BY
+
+                average_score DESC
+
+
+            LIMIT 10
+
+        ");
+
+
+        $stmt->execute([
+            ":period_id" => $selectedPeriod
+        ]);
+
+
+        $kpiPerformance =
+            $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+        foreach (
+            $kpiPerformance
+            as $row
+        ) {
+
+            $kpiLabels[] =
+                $row["kpi_name"];
+
+
+            $kpiScores[] =
+                (float)
+                $row["average_score"];
+        }
+    }
 }
 
 ?>
@@ -426,11 +572,11 @@ if ($selectedPeriod > 0) {
         content="width=device-width, initial-scale=1.0">
 
     <title>
-        Admin Dashboard | KPI Management System
+        Admin | KPI Management System
     </title>
 
 
-    <!-- Google Font -->
+    <!-- Kanit -->
 
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
@@ -443,16 +589,31 @@ if ($selectedPeriod > 0) {
         rel="stylesheet"
         href="../assets/css/admin.css">
 
+    <link rel="stylesheet" href="../assets/css/variables.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/forms.css">
+    <link rel="stylesheet" href="../assets/css/tables.css">
+    <link rel="stylesheet" href="../assets/css/employee.css">
+    <link rel="stylesheet" href="../assets/css/evaluation.css">
+    <link rel="stylesheet" href="../assets/css/kpi.css">
+    <link rel="stylesheet" href="../assets/css/summary.css">
+    <link rel="stylesheet" href="../assets/css/user-account.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
 
-    <!-- Chart.js -->
 
-    <script
-        src="https://cdn.jsdelivr.net/npm/chart.js">
-    </script>
+    <?php if ($page === "home"): ?>
+
+        <!-- Chart.js -->
+
+        <script
+            src="https://cdn.jsdelivr.net/npm/chart.js">
+        </script>
+
+    <?php endif; ?>
 
 
     <style>
-
+    
         /*
         |--------------------------------------------------------------------------
         | Dashboard
@@ -464,42 +625,44 @@ if ($selectedPeriod > 0) {
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard Header
-        |--------------------------------------------------------------------------
-        */
-
         .dashboard-header {
             display: flex;
+
             justify-content: space-between;
+
             align-items: center;
+
             gap: 20px;
+
             margin-bottom: 25px;
         }
 
 
         .dashboard-header h1 {
             margin: 0;
+
             font-size: 28px;
         }
 
 
         .dashboard-header p {
             margin: 5px 0 0;
+
             color: #6b7280;
         }
 
 
         /*
         |--------------------------------------------------------------------------
-        | Period Filter
+        | Period
         |--------------------------------------------------------------------------
         */
 
         .period-filter {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
         }
 
@@ -511,11 +674,17 @@ if ($selectedPeriod > 0) {
 
         .period-filter select {
             min-width: 220px;
+
             padding: 10px 14px;
+
             border: 1px solid #d1d5db;
+
             border-radius: 8px;
+
             background: white;
+
             font-family: inherit;
+
             font-size: 14px;
         }
 
@@ -528,6 +697,7 @@ if ($selectedPeriod > 0) {
 
         .stats-grid {
             display: grid;
+
             grid-template-columns:
                 repeat(4, 1fr);
 
@@ -539,7 +709,9 @@ if ($selectedPeriod > 0) {
 
         .stat-card {
             background: white;
+
             border-radius: 14px;
+
             padding: 22px;
 
             box-shadow:
@@ -551,13 +723,16 @@ if ($selectedPeriod > 0) {
 
         .stat-card-header {
             display: flex;
+
             justify-content: space-between;
+
             align-items: center;
         }
 
 
         .stat-title {
             color: #6b7280;
+
             font-size: 14px;
         }
 
@@ -567,7 +742,9 @@ if ($selectedPeriod > 0) {
             height: 42px;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             border-radius: 10px;
@@ -591,7 +768,7 @@ if ($selectedPeriod > 0) {
 
         /*
         |--------------------------------------------------------------------------
-        | Chart Grid
+        | Charts
         |--------------------------------------------------------------------------
         */
 
@@ -644,12 +821,6 @@ if ($selectedPeriod > 0) {
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Empty State
-        |--------------------------------------------------------------------------
-        */
-
         .chart-empty {
             height: 100%;
 
@@ -665,7 +836,7 @@ if ($selectedPeriod > 0) {
 
         /*
         |--------------------------------------------------------------------------
-        | Responsive
+        | Mobile
         |--------------------------------------------------------------------------
         */
 
@@ -676,7 +847,6 @@ if ($selectedPeriod > 0) {
                     repeat(2, 1fr);
             }
 
-
             .chart-grid {
                 grid-template-columns: 1fr;
             }
@@ -685,6 +855,31 @@ if ($selectedPeriod > 0) {
 
 
         @media (max-width: 650px) {
+
+            .sidebar {
+                transform: translateX(-100%);
+
+                transition:
+                    transform .3s ease;
+            }
+
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+
+            .main-content {
+                margin-left: 0;
+
+                width: 100%;
+            }
+
+
+            .mobile-menu-button {
+                display: block;
+            }
+
 
             .dashboard-content {
                 padding: 20px;
@@ -720,7 +915,6 @@ if ($selectedPeriod > 0) {
             }
 
         }
-
     </style>
 
 </head>
@@ -729,219 +923,70 @@ if ($selectedPeriod > 0) {
 <body>
 
 
-<!-- Mobile Overlay -->
+    <!-- =========================================================
+     MOBILE OVERLAY
+========================================================= -->
 
-<div
-    class="mobile-menu-overlay"
-    id="mobileMenuOverlay">
-</div>
+    <div
+        class="mobile-menu-overlay"
+        id="mobileMenuOverlay">
+    </div>
 
 
-<!-- =========================================================
+    <!-- =========================================================
      SIDEBAR
 ========================================================= -->
 
-<aside class="sidebar">
+    <?php include __DIR__ . "/includes/sidebar.php"; ?>
 
 
-    <!-- Logo -->
+    <!-- =========================================================
+     MAIN
+========================================================= -->
 
-    <div class="sidebar-logo">
+    <main class="main-content">
 
-        <img
-            src="../assets/images/Advance-Logo.png"
-            alt="Advance Asia Group Logo">
 
-        <div>
+        <!-- =====================================================
+         TOPBAR
+    ====================================================== -->
 
-            <h2>
-                KPI System
-            </h2>
+        <header class="topbar">
 
-            <span>
-                สำหรับผู้ดูแลระบบ
-            </span>
 
-        </div>
+            <button
+                type="button"
+                class="mobile-menu-button"
+                id="mobileMenuButton"
+                aria-label="Open navigation menu"
+                aria-expanded="false">
 
-    </div>
+                ☰
 
+            </button>
 
-    <!-- Navigation -->
-
-    <nav class="sidebar-nav">
-
-
-        <a
-            href="index.php"
-            class="nav-item active">
-
-            <span class="nav-icon">
-                🏠
-            </span>
-
-            <span>
-                หน้าแรก
-            </span>
-
-        </a>
-
-
-        <a
-            href="employees/employees.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                👥
-            </span>
-
-            <span>
-                จัดการพนักงาน
-            </span>
-
-        </a>
-
-
-        <a
-            href="user-accounts/user-accounts.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                🔐
-            </span>
-
-            <span>
-                จัดการบัญชีผู้ใช้
-            </span>
-
-        </a>
-
-
-        <a
-            href="kpi-categories/kpi-categories.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                📂
-            </span>
-
-            <span>
-                หมวดหมู่ KPI
-            </span>
-
-        </a>
-
-
-        <a
-            href="kpi-management/kpi-management.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                🎯
-            </span>
-
-            <span>
-                จัดการ KPI
-            </span>
-
-        </a>
-
-
-        <a
-            href="evaluation/evaluation-periods.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                📅
-            </span>
-
-            <span>
-                ช่วงเวลาประเมิน
-            </span>
-
-        </a>
-
-
-        <a
-            href="kpi-assignment/kpi-assignment.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                📋
-            </span>
-
-            <span>
-                มอบหมาย KPI
-            </span>
-
-        </a>
-
-
-        <a
-            href="kpi-summary/kpi-summary.php"
-            class="nav-item">
-
-            <span class="nav-icon">
-                📊
-            </span>
-
-            <span>
-                สรุปผลการประเมิน
-            </span>
-
-        </a>
-
-
-    </nav>
-
-
-    <!-- Sidebar Bottom -->
-
-    <div class="sidebar-bottom">
-
-        <a
-            href="../logout.php"
-            class="logout-button">
-
-            ออกจากระบบ
-
-        </a>
-
-    </div>
-
-</aside>
-
-<!-- === MAIN === -->
-
-<main class="main-content">
-
-    <!-- TOPBAR -->
-    <header class="topbar">
-
-        <button
-            type="button"
-            class="mobile-menu-button"
-            id="mobileMenuButton"
-            aria-label="Open navigation menu"
-            aria-expanded="false">
-
-            ☰
-
-        </button>
-
-        <div>
 
             <div class="user-info">
+
 
                 <div class="user-avatar">
 
                     <?= htmlspecialchars(
-                            mb_substr($firstName, 0, 1, 'UTF-8'),
-                            ENT_QUOTES,
+
+                        mb_substr(
+                            $firstName,
+                            0,
+                            1,
                             "UTF-8"
-                        ) ?>
+                        ),
+
+                        ENT_QUOTES,
+                        "UTF-8"
+
+                    ) ?>
 
                 </div>
+
 
                 <div class="user-detail">
 
@@ -954,6 +999,7 @@ if ($selectedPeriod > 0) {
                         ) ?>
 
                     </strong>
+
 
                     <span>
 
@@ -970,713 +1016,904 @@ if ($selectedPeriod > 0) {
 
             </div>
 
-        </div>
 
-    </header>
+        </header>
 
-    <!-- === DASHBOARD CONTENT === -->
 
-    <div class="dashboard-content">
+        <!-- =====================================================
+         CONTENT
+    ====================================================== -->
 
-        <!-- Header -->
-        <div class="dashboard-header">
+        <section class="page-content">
 
-            <div>
 
-                <h1>
-                    KPI Performance Dashboard
-                </h1>
+            <?php if ($page === "home"): ?>
 
-                <p>
-                    ภาพรวมผลการปฏิบัติงานของพนักงาน
-                </p>
 
-            </div>
+                <!-- =================================================
+                 DASHBOARD
+            ================================================= -->
 
-            <!-- Period -->
-            <form
-                method="GET"
-                class="period-filter">
+                <div class="dashboard-content">
 
-                <label for="period_id">
-                    รอบประเมิน
-                </label>
 
-                <select
-                    name="period_id"
-                    id="period_id"
-                    onchange="this.form.submit()">
+                    <div class="dashboard-header">
 
-                    <?php if (empty($periods)): ?>
 
-                        <option value="">
-                            ไม่มีรอบประเมิน
-                        </option>
+                        <div>
 
-                    <?php endif; ?>
+                            <h1>
+                                KPI Performance Dashboard
+                            </h1>
 
 
-                    <?php foreach ($periods as $period): ?>
-
-                        <option
-                            value="<?= (int) $period["period_id"] ?>"
-                            <?= (
-                                (int) $period["period_id"]
-                                === $selectedPeriod
-                            )
-                                ? "selected"
-                                : ""
-                            ?>>
-
-                            <?= htmlspecialchars(
-                                $period["period_name"],
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
-
-                        </option>
-
-                    <?php endforeach; ?>
-
-
-                </select>
-
-
-            </form>
-
-
-        </div>
-
-
-        <!-- =================================================
-             STATISTICS
-        ================================================= -->
-
-        <div class="stats-grid">
-
-
-            <!-- Employees -->
-
-            <div class="stat-card">
-
-                <div class="stat-card-header">
-
-                    <div class="stat-title">
-                        พนักงาน Active
-                    </div>
-
-                    <div class="stat-icon">
-                        👥
-                    </div>
-
-                </div>
-
-                <div class="stat-value">
-
-                    <?= number_format(
-                        $totalEmployees
-                    ) ?>
-
-                </div>
-
-            </div>
-
-
-            <!-- KPI Assignment -->
-
-            <div class="stat-card">
-
-                <div class="stat-card-header">
-
-                    <div class="stat-title">
-                        KPI ที่มอบหมาย
-                    </div>
-
-                    <div class="stat-icon">
-                        🎯
-                    </div>
-
-                </div>
-
-                <div class="stat-value">
-
-                    <?= number_format(
-                        $totalAssignments
-                    ) ?>
-
-                </div>
-
-            </div>
-
-
-            <!-- Evaluated -->
-
-            <div class="stat-card">
-
-                <div class="stat-card-header">
-
-                    <div class="stat-title">
-                        KPI ที่ประเมินแล้ว
-                    </div>
-
-                    <div class="stat-icon">
-                        ✅
-                    </div>
-
-                </div>
-
-                <div class="stat-value">
-
-                    <?= number_format(
-                        $evaluatedKpis
-                    ) ?>
-
-                </div>
-
-            </div>
-
-
-            <!-- Average Score -->
-
-            <div class="stat-card">
-
-                <div class="stat-card-header">
-
-                    <div class="stat-title">
-                        คะแนนเฉลี่ย
-                    </div>
-
-                    <div class="stat-icon">
-                        ⭐
-                    </div>
-
-                </div>
-
-                <div class="stat-value">
-
-                    <?= number_format(
-                        $averageScore,
-                        2
-                    ) ?>
-
-                    <small>
-                        / 5
-                    </small>
-
-                </div>
-
-            </div>
-
-
-        </div>
-
-
-        <!-- =================================================
-             CHART ROW 1
-        ================================================= -->
-
-        <div class="chart-grid">
-
-
-            <!-- Employee Performance -->
-
-            <div class="chart-card">
-
-                <h2>
-                    ผลการประเมินรายพนักงาน
-                </h2>
-
-                <p>
-                    แสดงผล KPI เป็นเปอร์เซ็นต์
-                </p>
-
-
-                <div class="chart-container">
-
-
-                    <?php if (!empty($employeeLabels)): ?>
-
-                        <canvas
-                            id="employeeChart">
-                        </canvas>
-
-                    <?php else: ?>
-
-                        <div class="chart-empty">
-
-                            ยังไม่มีข้อมูลการประเมิน
+                            <p>
+                                ภาพรวมผลการปฏิบัติงานของพนักงาน
+                            </p>
 
                         </div>
 
-                    <?php endif; ?>
+
+                        <!-- Period -->
+
+                        <form
+                            method="GET"
+                            class="period-filter">
 
 
-                </div>
+                            <!-- สำคัญ:
+                             ส่ง page=home กลับไปด้วย -->
 
-            </div>
-
-
-            <!-- KPI Type -->
-
-            <div class="chart-card">
-
-                <h2>
-                    คะแนนตามประเภท KPI
-                </h2>
-
-                <p>
-                    Performance / Competency
-                </p>
+                            <input
+                                type="hidden"
+                                name="page"
+                                value="home">
 
 
-                <div class="chart-container">
+                            <label for="period_id">
+
+                                รอบประเมิน
+
+                            </label>
 
 
-                    <?php if (!empty($typeLabels)): ?>
-
-                        <canvas
-                            id="typeChart">
-                        </canvas>
-
-                    <?php else: ?>
-
-                        <div class="chart-empty">
-
-                            ยังไม่มีข้อมูลการประเมิน
-
-                        </div>
-
-                    <?php endif; ?>
+                            <select
+                                name="period_id"
+                                id="period_id"
+                                onchange="this.form.submit()">
 
 
-                </div>
+                                <?php if (empty($periods)): ?>
 
-            </div>
+                                    <option value="">
 
+                                        ไม่มีรอบประเมิน
 
-        </div>
+                                    </option>
 
-
-        <!-- =================================================
-             CHART ROW 2
-        ================================================= -->
-
-        <div class="chart-card">
+                                <?php endif; ?>
 
 
-            <h2>
-                คะแนนเฉลี่ยราย KPI
-            </h2>
+                                <?php foreach (
+                                    $periods
+                                    as $period
+                                ): ?>
 
-            <p>
-                แสดง KPI ที่มีคะแนนสูงสุด 10 รายการ
-            </p>
+                                    <option
+
+                                        value="<?= (int)
+                                                $period["period_id"] ?>"
+
+                                        <?= (
+                                            (int)
+                                            $period["period_id"]
+                                            === $selectedPeriod
+                                        )
+                                            ? "selected"
+                                            : ""
+                                        ?>>
+
+                                        <?= htmlspecialchars(
+                                            $period["period_name"],
+                                            ENT_QUOTES,
+                                            "UTF-8"
+                                        ) ?>
+
+                                    </option>
+
+                                <?php endforeach; ?>
 
 
-            <div class="chart-container">
+                            </select>
 
 
-                <?php if (!empty($kpiLabels)): ?>
+                        </form>
 
-                    <canvas
-                        id="kpiChart">
-                    </canvas>
-
-                <?php else: ?>
-
-                    <div class="chart-empty">
-
-                        ยังไม่มีข้อมูลการประเมิน
 
                     </div>
 
-                <?php endif; ?>
+
+                    <!-- =================================================
+                     STATISTICS
+                ================================================= -->
+
+                    <div class="stats-grid">
 
 
-            </div>
+                        <div class="stat-card">
 
 
-        </div>
+                            <div class="stat-card-header">
 
 
-    </div>
+                                <div class="stat-title">
+
+                                    พนักงาน Active
+
+                                </div>
 
 
-</main>
+                                <div class="stat-icon">
+
+                                    👥
+
+                                </div>
 
 
-<!-- =========================================================
-     CHART JS
+                            </div>
+
+
+                            <div class="stat-value">
+
+                                <?= number_format(
+                                    $totalEmployees
+                                ) ?>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="stat-card">
+
+
+                            <div class="stat-card-header">
+
+
+                                <div class="stat-title">
+
+                                    KPI ที่มอบหมาย
+
+                                </div>
+
+
+                                <div class="stat-icon">
+
+                                    🎯
+
+                                </div>
+
+
+                            </div>
+
+
+                            <div class="stat-value">
+
+                                <?= number_format(
+                                    $totalAssignments
+                                ) ?>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="stat-card">
+
+
+                            <div class="stat-card-header">
+
+
+                                <div class="stat-title">
+
+                                    KPI ที่ประเมินแล้ว
+
+                                </div>
+
+
+                                <div class="stat-icon">
+
+                                    ✅
+
+                                </div>
+
+
+                            </div>
+
+
+                            <div class="stat-value">
+
+                                <?= number_format(
+                                    $evaluatedKpis
+                                ) ?>
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="stat-card">
+
+
+                            <div class="stat-card-header">
+
+
+                                <div class="stat-title">
+
+                                    คะแนนเฉลี่ย
+
+                                </div>
+
+
+                                <div class="stat-icon">
+
+                                    ⭐
+
+                                </div>
+
+
+                            </div>
+
+
+                            <div class="stat-value">
+
+                                <?= number_format(
+                                    $averageScore,
+                                    2
+                                ) ?>
+
+                                <small>
+                                    / 5
+                                </small>
+
+                            </div>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                    <!-- =================================================
+                     CHART 1
+                ================================================= -->
+
+                    <div class="chart-grid">
+
+
+                        <div class="chart-card">
+
+
+                            <h2>
+                                ผลการประเมินรายพนักงาน
+                            </h2>
+
+
+                            <p>
+                                แสดงผล KPI เป็นเปอร์เซ็นต์
+                            </p>
+
+
+                            <div class="chart-container">
+
+
+                                <?php if (
+                                    !empty($employeeLabels)
+                                ): ?>
+
+                                    <canvas
+                                        id="employeeChart">
+                                    </canvas>
+
+                                <?php else: ?>
+
+                                    <div class="chart-empty">
+
+                                        ยังไม่มีข้อมูลการประเมิน
+
+                                    </div>
+
+                                <?php endif; ?>
+
+
+                            </div>
+
+
+                        </div>
+
+
+                        <div class="chart-card">
+
+
+                            <h2>
+                                คะแนนตามประเภท KPI
+                            </h2>
+
+
+                            <p>
+                                Performance / Competency
+                            </p>
+
+
+                            <div class="chart-container">
+
+
+                                <?php if (
+                                    !empty($typeLabels)
+                                ): ?>
+
+                                    <canvas
+                                        id="typeChart">
+                                    </canvas>
+
+                                <?php else: ?>
+
+                                    <div class="chart-empty">
+
+                                        ยังไม่มีข้อมูลการประเมิน
+
+                                    </div>
+
+                                <?php endif; ?>
+
+
+                            </div>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                    <!-- =================================================
+                     CHART 2
+                ================================================= -->
+
+                    <div class="chart-card">
+
+
+                        <h2>
+                            คะแนนเฉลี่ยราย KPI
+                        </h2>
+
+
+                        <p>
+                            แสดง KPI ที่มีคะแนนสูงสุด 10 รายการ
+                        </p>
+
+
+                        <div class="chart-container">
+
+
+                            <?php if (
+                                !empty($kpiLabels)
+                            ): ?>
+
+                                <canvas
+                                    id="kpiChart">
+                                </canvas>
+
+                            <?php else: ?>
+
+                                <div class="chart-empty">
+
+                                    ยังไม่มีข้อมูลการประเมิน
+
+                                </div>
+
+                            <?php endif; ?>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+            <?php else: ?>
+
+
+                <!-- =================================================
+                 OTHER ADMIN PAGES
+            ================================================= -->
+
+                <?php
+
+                if (
+                    $contentPage &&
+                    file_exists(__DIR__ . "/" . $contentPage)
+                ) {
+
+                    include __DIR__ . "/" . $contentPage;
+                } else {
+
+                ?>
+
+                    <div
+                        style="
+                        padding:40px;
+                        text-align:center;
+                    ">
+
+                        <h2>
+                            ไม่พบหน้าที่ต้องการ
+                        </h2>
+
+                        <p>
+                            กรุณาตรวจสอบไฟล์ของหน้านี้
+                        </p>
+
+                    </div>
+
+                <?php
+
+                }
+
+                ?>
+
+
+            <?php endif; ?>
+
+
+        </section>
+
+
+    </main>
+
+
+    <!-- =========================================================
+     JAVASCRIPT
 ========================================================= -->
 
-<script>
+    <?php if ($page === "home"): ?>
 
-const employeeLabels =
-    <?= json_encode(
-        $employeeLabels,
-        JSON_UNESCAPED_UNICODE
-    ) ?>;
-
-const employeeScores =
-    <?= json_encode(
-        $employeeScores
-    ) ?>;
-
-
-const typeLabels =
-    <?= json_encode(
-        $typeLabels,
-        JSON_UNESCAPED_UNICODE
-    ) ?>;
-
-const typeScores =
-    <?= json_encode(
-        $typeScores
-    ) ?>;
-
-
-const kpiLabels =
-    <?= json_encode(
-        $kpiLabels,
-        JSON_UNESCAPED_UNICODE
-    ) ?>;
-
-const kpiScores =
-    <?= json_encode(
-        $kpiScores
-    ) ?>;
-
-
-/*
+        <script>
+            /*
 |--------------------------------------------------------------------------
-| Employee Chart
+| Chart Data
 |--------------------------------------------------------------------------
 */
 
-if (
-    document.getElementById("employeeChart")
-) {
+            const employeeLabels =
+                <?= json_encode(
+                    $employeeLabels,
+                    JSON_UNESCAPED_UNICODE
+                ) ?>;
 
-    new Chart(
-        document
-            .getElementById("employeeChart"),
-        {
 
-            type: "bar",
+            const employeeScores =
+                <?= json_encode(
+                    $employeeScores
+                ) ?>;
 
-            data: {
 
-                labels: employeeLabels,
+            const typeLabels =
+                <?= json_encode(
+                    $typeLabels,
+                    JSON_UNESCAPED_UNICODE
+                ) ?>;
 
-                datasets: [
+
+            const typeScores =
+                <?= json_encode(
+                    $typeScores
+                ) ?>;
+
+
+            const kpiLabels =
+                <?= json_encode(
+                    $kpiLabels,
+                    JSON_UNESCAPED_UNICODE
+                ) ?>;
+
+
+            const kpiScores =
+                <?= json_encode(
+                    $kpiScores
+                ) ?>;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Employee Chart
+            |--------------------------------------------------------------------------
+            */
+
+            if (
+                document.getElementById(
+                    "employeeChart"
+                )
+            ) {
+
+                new Chart(
+
+                    document.getElementById(
+                        "employeeChart"
+                    ),
 
                     {
 
-                        label:
-                            "Performance (%)",
+                        type: "bar",
 
-                        data:
-                            employeeScores,
+                        data: {
 
-                        borderWidth: 1
+                            labels: employeeLabels,
 
-                    }
+                            datasets: [
 
-                ]
+                                {
 
-            },
+                                    label: "Performance (%)",
 
-            options: {
+                                    data: employeeScores,
 
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                scales: {
-
-                    y: {
-
-                        beginAtZero: true,
-
-                        max: 100,
-
-                        ticks: {
-
-                            callback:
-                                function(value) {
-
-                                    return value + "%";
+                                    borderWidth: 1
 
                                 }
+
+                            ]
+
+                        },
+
+                        options: {
+
+                            responsive: true,
+
+                            maintainAspectRatio: false,
+
+                            scales: {
+
+                                y: {
+
+                                    beginAtZero: true,
+
+                                    max: 100,
+
+                                    ticks: {
+
+                                        callback: function(value) {
+
+                                            return value + "%";
+
+                                        }
+
+                                    }
+
+                                }
+
+                            },
+
+                            plugins: {
+
+                                legend: {
+
+                                    display: false
+
+                                }
+
+                            }
 
                         }
 
                     }
 
-                },
-
-                plugins: {
-
-                    legend: {
-
-                        display: false
-
-                    }
-
-                }
+                );
 
             }
 
-        }
-    );
 
-}
+            /*
+            |--------------------------------------------------------------------------
+            | KPI Type Chart
+            |--------------------------------------------------------------------------
+            */
 
+            if (
+                document.getElementById(
+                    "typeChart"
+                )
+            ) {
 
-/*
-|--------------------------------------------------------------------------
-| KPI Type Chart
-|--------------------------------------------------------------------------
-*/
+                new Chart(
 
-if (
-    document.getElementById("typeChart")
-) {
-
-    new Chart(
-        document
-            .getElementById("typeChart"),
-        {
-
-            type: "doughnut",
-
-            data: {
-
-                labels: typeLabels,
-
-                datasets: [
+                    document.getElementById(
+                        "typeChart"
+                    ),
 
                     {
 
-                        data:
-                            typeScores,
+                        type: "doughnut",
 
-                        borderWidth: 1
+                        data: {
+
+                            labels: typeLabels,
+
+                            datasets: [
+
+                                {
+
+                                    data: typeScores,
+
+                                    borderWidth: 1
+
+                                }
+
+                            ]
+
+                        },
+
+                        options: {
+
+                            responsive: true,
+
+                            maintainAspectRatio: false,
+
+                            plugins: {
+
+                                legend: {
+
+                                    position: "bottom"
+
+                                }
+
+                            }
+
+                        }
 
                     }
 
-                ]
-
-            },
-
-            options: {
-
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                plugins: {
-
-                    legend: {
-
-                        position: "bottom"
-
-                    }
-
-                }
+                );
 
             }
 
-        }
-    );
 
-}
+            /*
+            |--------------------------------------------------------------------------
+            | KPI Chart
+            |--------------------------------------------------------------------------
+            */
 
+            if (
+                document.getElementById(
+                    "kpiChart"
+                )
+            ) {
 
-/*
-|--------------------------------------------------------------------------
-| KPI Chart
-|--------------------------------------------------------------------------
-*/
+                new Chart(
 
-if (
-    document.getElementById("kpiChart")
-) {
-
-    new Chart(
-        document
-            .getElementById("kpiChart"),
-        {
-
-            type: "bar",
-
-            data: {
-
-                labels: kpiLabels,
-
-                datasets: [
+                    document.getElementById(
+                        "kpiChart"
+                    ),
 
                     {
 
-                        label:
-                            "Average Score",
+                        type: "bar",
 
-                        data:
-                            kpiScores,
+                        data: {
 
-                        borderWidth: 1
+                            labels: kpiLabels,
+
+                            datasets: [
+
+                                {
+
+                                    label: "Average Score",
+
+                                    data: kpiScores,
+
+                                    borderWidth: 1
+
+                                }
+
+                            ]
+
+                        },
+
+                        options: {
+
+                            indexAxis: "y",
+
+                            responsive: true,
+
+                            maintainAspectRatio: false,
+
+                            scales: {
+
+                                x: {
+
+                                    beginAtZero: true,
+
+                                    max: 5
+
+                                }
+
+                            },
+
+                            plugins: {
+
+                                legend: {
+
+                                    display: false
+
+                                }
+
+                            }
+
+                        }
 
                     }
 
-                ]
-
-            },
-
-            options: {
-
-                indexAxis: "y",
-
-                responsive: true,
-
-                maintainAspectRatio: false,
-
-                scales: {
-
-                    x: {
-
-                        beginAtZero: true,
-
-                        max: 5
-
-                    }
-
-                },
-
-                plugins: {
-
-                    legend: {
-
-                        display: false
-
-                    }
-
-                }
+                );
 
             }
+        </script>
 
-        }
-    );
-
-}
+    <?php endif; ?>
 
 
-/*
-|--------------------------------------------------------------------------
-| Mobile Menu
-|--------------------------------------------------------------------------
-*/
+    <!-- =========================================================
+     MOBILE MENU
+========================================================= -->
 
-const mobileMenuButton =
-    document.getElementById(
-        "mobileMenuButton"
-    );
-
-const sidebar =
-    document.querySelector(
-        ".sidebar"
-    );
-
-const mobileMenuOverlay =
-    document.getElementById(
-        "mobileMenuOverlay"
-    );
+    <script>
+        const mobileMenuButton =
+            document.getElementById(
+                "mobileMenuButton"
+            );
 
 
-function openMobileMenu() {
-
-    sidebar.classList.add(
-        "mobile-open"
-    );
-
-    mobileMenuOverlay.classList.add(
-        "active"
-    );
-
-    mobileMenuButton.setAttribute(
-        "aria-expanded",
-        "true"
-    );
-
-    mobileMenuButton.textContent =
-        "✕";
-
-}
+        const sidebar =
+            document.querySelector(
+                ".sidebar"
+            );
 
 
-function closeMobileMenu() {
-
-    sidebar.classList.remove(
-        "mobile-open"
-    );
-
-    mobileMenuOverlay.classList.remove(
-        "active"
-    );
-
-    mobileMenuButton.setAttribute(
-        "aria-expanded",
-        "false"
-    );
-
-    mobileMenuButton.textContent =
-        "☰";
-
-}
+        const mobileMenuOverlay =
+            document.getElementById(
+                "mobileMenuOverlay"
+            );
 
 
-mobileMenuButton.addEventListener(
-    "click",
-    function() {
+        function openMobileMenu() {
 
-        if (
-            sidebar.classList.contains(
+            sidebar.classList.add(
                 "mobile-open"
-            )
-        ) {
+            );
 
-            closeMobileMenu();
+            mobileMenuOverlay.classList.add(
+                "active"
+            );
 
-        } else {
+            mobileMenuButton.setAttribute(
+                "aria-expanded",
+                "true"
+            );
 
-            openMobileMenu();
-
-        }
-
-    }
-);
-
-
-mobileMenuOverlay.addEventListener(
-    "click",
-    closeMobileMenu
-);
-
-
-window.addEventListener(
-    "resize",
-    function() {
-
-        if (window.innerWidth > 650) {
-
-            closeMobileMenu();
+            mobileMenuButton.textContent =
+                "✕";
 
         }
 
-    }
-);
 
-</script>
+        function closeMobileMenu() {
 
+            sidebar.classList.remove(
+                "mobile-open"
+            );
+
+            mobileMenuOverlay.classList.remove(
+                "active"
+            );
+
+            mobileMenuButton.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+
+            mobileMenuButton.textContent =
+                "☰";
+
+        }
+
+
+        if (mobileMenuButton) {
+
+            mobileMenuButton.addEventListener(
+                "click",
+                function() {
+
+                    if (
+                        sidebar.classList.contains(
+                            "mobile-open"
+                        )
+                    ) {
+
+                        closeMobileMenu();
+
+                    } else {
+
+                        openMobileMenu();
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        if (mobileMenuOverlay) {
+
+            mobileMenuOverlay.addEventListener(
+                "click",
+                closeMobileMenu
+            );
+
+        }
+
+
+        window.addEventListener(
+            "resize",
+            function() {
+
+                if (window.innerWidth > 650) {
+
+                    closeMobileMenu();
+
+                }
+
+            }
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Close Mobile Menu After Clicking Menu
+        |--------------------------------------------------------------------------
+        */
+
+        document
+            .querySelectorAll(".nav-item")
+            .forEach(function(item) {
+
+                item.addEventListener(
+                    "click",
+                    function() {
+
+                        if (
+                            window.innerWidth <= 650
+                        ) {
+
+                            closeMobileMenu();
+
+                        }
+
+                    }
+                );
+
+            });
+    </script>
+
+
+    <script src="../assets/js/admin.js"></script>
 
 </body>
 

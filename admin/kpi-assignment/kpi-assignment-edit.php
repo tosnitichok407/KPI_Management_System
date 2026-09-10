@@ -32,7 +32,7 @@ if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
 $assignment_id = intval($_GET["id"] ?? 0);
 
 if ($assignment_id <= 0) {
-    header("Location: kpi-assignment.php");
+    header("Location: ../index.php?page=kpi-assignment");
     exit;
 }
 
@@ -70,7 +70,7 @@ $assignment = $assignment_stmt->fetch(PDO::FETCH_ASSOC);
 
 
 if (!$assignment) {
-    header("Location: kpi-assignment.php");
+    header("Location: ../index.php?page=kpi-assignment");
     exit;
 }
 
@@ -331,7 +331,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                      */
 
                     header(
-                        "Location: kpi-assignment.php?success=updated"
+                        "Location: ../index.php?page=kpi-assignment&success=updated"
                     );
 
                     exit;
@@ -484,7 +484,7 @@ $periods_result =
 
         body {
             margin: 0;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             background: #f5f7fb;
             color: #333;
         }
@@ -571,7 +571,7 @@ $periods_result =
             padding: 11px 13px;
             border: 1px solid #d8dce5;
             border-radius: 7px;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             font-size: 14px;
             outline: none;
             background: #fff;
@@ -596,7 +596,7 @@ $periods_result =
             border: none;
             padding: 10px 22px;
             border-radius: 7px;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             font-size: 14px;
             cursor: pointer;
             text-decoration: none;
@@ -1034,7 +1034,7 @@ $periods_result =
 
 
                 <a
-                    href="kpi-assignment.php"
+                    href="../index.php?page=kpi-assignment"
                     class="btn btn-secondary"
                 >
                     ยกเลิก
@@ -1059,6 +1059,8 @@ $periods_result =
 
 </div>
 
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

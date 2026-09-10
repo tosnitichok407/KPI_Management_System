@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../config/database.php";
+require_once __DIR__ . "/../config/database.php";
 
 
 /*
@@ -12,7 +14,7 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit;
 }
 
@@ -26,7 +28,7 @@ if (!isset($_SESSION["user_id"])) {
 $employeeId = (int) ($_SESSION["employee_id"] ?? 0);
 
 if ($employeeId <= 0) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit;
 }
 
@@ -58,6 +60,7 @@ $sql = "
         a.employee_id,
         a.period_id,
         a.kpi_id,
+        a.target_value,
         a.weight,
         a.status AS assignment_status,
 
@@ -115,6 +118,8 @@ $error = "";
 
 $success = "";
 
+$targetValue = (float) $kpi["target_value"];
+
 
 /*
 |--------------------------------------------------------------------------
@@ -122,13 +127,10 @@ $success = "";
 |--------------------------------------------------------------------------
 */
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
     $performanceDate =
         $_POST["performance_date"] ?? "";
-
-    $target =
-        $_POST["target"] ?? "";
 
     $actual =
         $_POST["actual"] ?? "";
@@ -147,18 +149,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $error =
             "กรุณาเลือกวันที่";
-    } elseif ($target === "") {
-
-        $error =
-            "กรุณากรอก Target";
     } elseif ($actual === "") {
 
         $error =
             "กรุณากรอก Actual";
-    } elseif (!is_numeric($target)) {
-
-        $error =
-            "Target ต้องเป็นตัวเลข";
     } elseif (!is_numeric($actual)) {
 
         $error =
@@ -171,9 +165,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         Calculate Score
         ----------------------------------------------------------
         */
-
-        $targetValue =
-            (float) $target;
 
         $actualValue =
             (float) $actual;
@@ -427,6 +418,18 @@ $performances =
 
             padding: 0 20px;
 
+        }
+
+        .target-value {
+            display: flex;
+            align-items: center;
+            min-height: 42px;
+            padding: 0 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 7px;
+            background: #f3f4f6;
+            color: #244397;
+            font-weight: 600;
         }
 
 
@@ -955,13 +958,9 @@ $performances =
                             Target
                         </label>
 
-                        <input
-                            type="number"
-                            name="target"
-                            step="0.01"
-                            min="0"
-                            placeholder="เช่น 100000"
-                            required>
+                        <div class="target-value">
+                            <?= number_format($targetValue, 0) ?>
+                        </div>
 
                     </div>
 
@@ -977,7 +976,7 @@ $performances =
                             name="actual"
                             step="0.01"
                             min="0"
-                            placeholder="เช่น 95000"
+                            placeholder="เช่น 100"
                             required>
 
                     </div>
@@ -1108,9 +1107,8 @@ $performances =
                                     <td>
 
                                         <?= number_format(
-                                            (float)
-                                            $performance["target"],
-                                            2
+                                            $targetValue,
+                                            0
                                         ) ?>
 
                                     </td>

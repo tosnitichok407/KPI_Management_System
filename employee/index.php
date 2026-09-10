@@ -1302,24 +1302,18 @@ $avatar =
         <!-- === PROFILE === -->
 
         <section class="profile-card">
-
             <div class="profile-left">
-
                 <div class="profile-avatar">
-
                     <?= htmlspecialchars(
                         mb_substr($firstName, 0, 1, 'UTF-8'),
                         ENT_QUOTES,
                         "UTF-8"
                     ) ?>
-
                 </div>
-
 
                 <div>
 
                     <div class="profile-name">
-
                         <?= htmlspecialchars(
                             $employee["first_name"]
                                 . " "
@@ -1327,7 +1321,6 @@ $avatar =
                             ENT_QUOTES,
                             "UTF-8"
                         ) ?>
-
                     </div>
 
                     <div class="profile-code">

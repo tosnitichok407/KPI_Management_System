@@ -31,7 +31,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $user_id = (int) ($_GET["id"] ?? 0);
 
 if ($user_id <= 0) {
-    header("Location: user-accounts.php");
+    header("Location: ../index.php?page=accounts");
     exit;
 }
 
@@ -69,7 +69,7 @@ try {
 
 
     if (!$user) {
-        header("Location: user-accounts.php");
+        header("Location: ../index.php?page=accounts");
         exit;
     }
 
@@ -296,7 +296,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["user_success"] =
                         "แก้ไข Account เรียบร้อยแล้ว";
 
-                    header("Location: user-accounts.php");
+                    header("Location: ../index.php?page=accounts");
                     exit;
 
 
@@ -358,7 +358,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         body {
             margin: 0;
-            font-family: "Kanit", sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             background: #f5f7fb;
             color: #1f2937;
         }
@@ -713,7 +713,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="actions">
 
                 <a
-                    href="/user-accounts/user-accounts.php"
+                    href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
                     ยกเลิก
@@ -729,5 +729,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </form>
     </div>
 </div>
+<script src="../../assets/js/admin.js"></script>
+
 </body>
 </html>

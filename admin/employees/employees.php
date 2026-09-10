@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -133,50 +135,12 @@ try {
 
 ?>
 
-<!DOCTYPE html>
 
-<html lang="th">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/employee.css">
-
-    <title>Employee Management</title>
-
-</head>
-
-<body>
 
     <div class="page-container">
 
         <!-- === HEADER === -->
         <header class="page-header">
-
-            <div class="topbar">
-
-                <!-- Mobile Menu Button -->
-                <button
-                    type="button"
-                    class="mobile-menu-button"
-                    id="mobileMenuButton"
-                    aria-label="Open navigation menu"
-                    aria-expanded="false">
-                    ☰
-                </button>
-
-            </div>
 
             <div class="page-title-block">
                 <h1>
@@ -192,13 +156,7 @@ try {
             <div class="header-actions">
 
                 <a
-                    href="../index.php"
-                    class="btn btn-secondary">
-                    Dashboard
-                </a>
-
-                <a
-                    href="employee-add.php"
+                    href="employees/employee-add.php"
                     class="btn btn-primary">
                     + เพิ่มพนักงาน
                 </a>
@@ -212,7 +170,7 @@ try {
 
             <form
                 method="GET"
-                action="employees.php"
+                action="index.php?page=employees"
                 class="filter-form">
 
                 <div class="form-group">
@@ -271,7 +229,7 @@ try {
                     </button>
 
                     <a
-                        href="employees.php"
+                        href="index.php?page=employees"
                         class="btn btn-secondary">
                         ล้าง
                     </a>
@@ -462,7 +420,7 @@ try {
 
                                             <!-- Edit -->
                                             <a
-                                                href="employee-edit.php?id=<?= (int) $employee["employee_id"] ?>"
+                                                href="employees/employee-edit.php?id=<?= (int) $employee["employee_id"] ?>"
                                                 class="btn-small edit">
                                                 แก้ไข
                                             </a>
@@ -472,7 +430,7 @@ try {
                                             <?php if ($employee["status"] === "Active"): ?>
 
                                                 <a
-                                                    href="employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=deactivate"
+                                                    href="employees/employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=deactivate"
                                                     class="btn-small danger"
                                                     onclick="return confirm('Deactivate this employee?');">
                                                     Deactivate
@@ -481,7 +439,7 @@ try {
                                             <?php else: ?>
 
                                                 <a
-                                                    href="employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=activate"
+                                                    href="employees/employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=activate"
                                                     class="btn-small activate"
                                                     onclick="return confirm('Activate this employee?');">
                                                     Activate
@@ -492,7 +450,7 @@ try {
 
                                             <!-- Delete -->
                                             <a
-                                                href="employee-delete.php?id=<?= (int) $employee["employee_id"] ?>"
+                                                href="employees/employee-delete.php?id=<?= (int) $employee["employee_id"] ?>"
                                                 class="btn-small danger"
                                                 onclick="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้? ข้อมูลจะถูกลบถาวร');">
                                                 ลบ
@@ -508,90 +466,3 @@ try {
             </div>
         </section>
     </div>
-    <script>
-        const mobileMenuButton =
-            document.getElementById("mobileMenuButton");
-
-        const sidebar =
-            document.querySelector(".sidebar");
-
-        const mobileMenuOverlay =
-            document.getElementById("mobileMenuOverlay");
-
-
-        function openMobileMenu() {
-
-            sidebar.classList.add("mobile-open");
-
-            mobileMenuOverlay.classList.add("active");
-
-            mobileMenuButton.setAttribute(
-                "aria-expanded",
-                "true"
-            );
-
-            mobileMenuButton.textContent = "✕";
-
-        }
-
-
-        function closeMobileMenu() {
-
-            sidebar.classList.remove("mobile-open");
-
-            mobileMenuOverlay.classList.remove("active");
-
-            mobileMenuButton.setAttribute(
-                "aria-expanded",
-                "false"
-            );
-
-            mobileMenuButton.textContent = "☰";
-
-        }
-
-
-        mobileMenuButton.addEventListener(
-            "click",
-            function() {
-
-                if (
-                    sidebar.classList.contains(
-                        "mobile-open"
-                    )
-                ) {
-
-                    closeMobileMenu();
-
-                } else {
-
-                    openMobileMenu();
-
-                }
-
-            }
-        );
-
-
-        mobileMenuOverlay.addEventListener(
-            "click",
-            closeMobileMenu
-        );
-
-
-        window.addEventListener(
-            "resize",
-            function() {
-
-                if (window.innerWidth > 650) {
-
-                    closeMobileMenu();
-
-                }
-
-            }
-        );
-    </script>
-</body>
-
-</html>

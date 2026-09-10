@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /*
@@ -164,31 +166,7 @@ try {
 
 ?>
 
-<!DOCTYPE html>
-<html lang="th">
-<head>
 
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
-        rel="stylesheet"
-    >
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/user-account.css"
-    >
-
-    <title>User Account Management</title>
-
-</head>
-
-<body>
 
 <div class="page-container">
 
@@ -211,14 +189,7 @@ try {
         <div class="header-actions">
 
             <a
-                href="../index.php"
-                class="btn btn-secondary"
-            >
-                Dashboard
-            </a>
-
-            <a
-                href="user-account-add.php"
+                href="user-accounts/user-account-add.php"
                 class="btn btn-primary"
             >
                 + สร้างบัญชีผู้ใช้
@@ -234,7 +205,7 @@ try {
 
         <form
             method="GET"
-            action="user-accounts.php"
+            action="index.php?page=accounts"
             class="filter-form"
         >
 
@@ -311,7 +282,7 @@ try {
                 </button>
 
                 <a
-                    href="/user-accounts/user-accounts.php"
+                    href="index.php?page=accounts"
                     class="btn btn-secondary"
                 >
                     ล้าง
@@ -548,7 +519,7 @@ try {
 
 
                                         <a
-                                            href="/user-accounts/user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
+                                            href="user-accounts/user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
                                             class="btn-small activate"
                                         >
                                             เพิ่มบัญชีผู้ใช้
@@ -559,7 +530,7 @@ try {
 
 
                                         <a
-                                            href="../user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
+                                            href="user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
                                             แก้ไข
@@ -572,7 +543,7 @@ try {
                                         ): ?>
 
                                             <a
-                                                href="/user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
+                                                href="user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=deactivate"
                                                 class="btn-small danger"
                                                 onclick="return confirm('Deactivate this account?');"
                                             >
@@ -582,7 +553,7 @@ try {
                                         <?php else: ?>
 
                                             <a
-                                                href="/user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
+                                                href="user-accounts/user-account-toggle.php?id=<?= (int) $employee["user_id"] ?>&action=activate"
                                                 class="btn-small activate"
                                                 onclick="return confirm('Activate this account?');"
                                             >
@@ -618,6 +589,4 @@ try {
 
 </div>
 
-</body>
 
-</html>

@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../config/database.php";
+require_once __DIR__ . "/../config/database.php";
 
 
 /*
@@ -12,7 +14,7 @@ require_once "../config/database.php";
 */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit;
 }
 
@@ -26,7 +28,7 @@ if (!isset($_SESSION["user_id"])) {
 $employeeId = (int) ($_SESSION["employee_id"] ?? 0);
 
 if ($employeeId <= 0) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit;
 }
 
@@ -42,6 +44,27 @@ $lastName = $_SESSION["last_name"] ?? "";
 $employeeCode = $_SESSION["employee_code"] ?? "-";
 
 $fullName = trim($firstName . " " . $lastName);
+
+$periodStmt = $pdo->prepare("
+    SELECT DISTINCT
+        ep.period_id,
+        ep.period_name,
+        ep.start_date,
+        ep.end_date,
+        ep.status
+    FROM evaluation_periods ep
+    INNER JOIN kpi_assignments a ON a.period_id = ep.period_id
+    WHERE a.employee_id = :employee_id
+      AND a.status = 'Active'
+    ORDER BY ep.start_date DESC, ep.period_id DESC
+");
+$periodStmt->execute([":employee_id" => $employeeId]);
+$availablePeriods = $periodStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$selectedPeriod = (int) ($_GET["period_id"] ?? 0);
+if ($selectedPeriod <= 0 && !empty($availablePeriods)) {
+    $selectedPeriod = (int) $availablePeriods[0]["period_id"];
+}
 
 
 /*
@@ -62,6 +85,7 @@ $sql = "
 
         k.kpi_name,
         k.description,
+        k.kpi_type,
         k.unit,
         k.max_score,
 
@@ -107,6 +131,8 @@ $sql = "
 
     AND a.status = 'Active'
 
+    AND a.period_id = :period_id
+
     ORDER BY
         ep.start_date DESC,
         a.assignment_id ASC
@@ -119,7 +145,8 @@ try {
 
     $stmt->execute([
         ":employee_id_sub" => $employeeId,
-        ":employee_id" => $employeeId
+        ":employee_id" => $employeeId,
+        ":period_id" => $selectedPeriod
     ]);
 
     $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -299,7 +326,6 @@ foreach ($assignments as $assignment) {
         $totalPerformanceRecords++;
     }
 
-
     /*
     --------------------------------------------------------------
     Add KPI
@@ -347,7 +373,6 @@ if ($scoreCount > 0) {
         $totalScore / $scoreCount;
 }
 
-
 /*
 |--------------------------------------------------------------------------
 | Overall Progress
@@ -357,19 +382,14 @@ if ($scoreCount > 0) {
 $overallProgress = 0;
 
 if ($totalKpi > 0) {
-
     $progressSum = 0;
-
     $progressCount = 0;
 
-
     foreach ($assignments as $assignment) {
-
         if (
             isset($assignment["progress"]) &&
             !empty($assignment["performance_id"])
         ) {
-
             $progressSum +=
                 (float) $assignment["progress"];
 
@@ -377,14 +397,12 @@ if ($totalKpi > 0) {
         }
     }
 
-
     if ($progressCount > 0) {
 
         $overallProgress =
             $progressSum / $progressCount;
     }
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -409,17 +427,12 @@ if ($totalPerformanceRecords === 0) {
 ?>
 
 <!DOCTYPE html>
-
 <html lang="th">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0">
-
     <title>
         Performance | KPI Management System
     </title>
@@ -436,113 +449,62 @@ if ($totalPerformanceRecords === 0) {
 
 <style>
     .summary-grid {
-
         display: grid;
-
-        grid-template-columns:
-
-            repeat(4, 1fr);
-
+        grid-template-columns: repeat(4, 1fr);
         gap: 20px;
-
         margin-top: 20px;
-
     }
 
     .performance-list {
-
         padding: 20px;
-
     }
 
     .performance-item {
-
         border: 1px solid #e5e7eb;
-
         border-radius: 10px;
-
         padding: 20px;
-
         margin-bottom: 15px;
-
     }
 
     .performance-item:last-child {
-
         margin-bottom: 0;
 
     }
 
     .performance-item-top {
-
         display: flex;
-
         align-items: flex-start;
-
         justify-content: space-between;
-
         gap: 20px;
-
     }
 
     .performance-item h3 {
-
         margin: 0;
-
         font-size: 17px;
-
     }
 
     .performance-description {
-
         margin-top: 5px;
-
         color: #6b7280;
-
         font-size: 13px;
-
     }
 
     .performance-weight {
-
         padding: 6px 12px;
-
         border-radius: 20px;
-
         background: #eff6ff;
-
-        color: #1e3a8a;
-
+        color: #244397;
         font-size: 13px;
-
         font-weight: 600;
-
         white-space: nowrap;
-
     }
-
-    /*
-
-        =========================================================
-
-        KPI DATA
-
-        =========================================================
-
-        */
-
+    
+        /* === KPI DATA=== */
     .kpi-data-grid {
-
         display: grid;
-
-        grid-template-columns:
-
-            repeat(4, 1fr);
-
+        grid-template-columns: repeat(4, 1fr);
         gap: 12px;
-
         margin-top: 20px;
-
     }
 
     .kpi-data-box {
@@ -621,7 +583,7 @@ if ($totalPerformanceRecords === 0) {
 
         height: 100%;
 
-        background: #1e3a8a;
+        background: #244397;
 
         border-radius: 20px;
 
@@ -649,7 +611,7 @@ if ($totalPerformanceRecords === 0) {
 
         background: #eff6ff;
 
-        color: #1e3a8a;
+        color: #244397;
 
         font-size: 12px;
 
@@ -687,7 +649,7 @@ if ($totalPerformanceRecords === 0) {
 
         padding: 8px 15px;
 
-        background: #1e3a8a;
+        background: #244397;
 
         color: white;
 
@@ -701,8 +663,36 @@ if ($totalPerformanceRecords === 0) {
 
     .performance-button:hover {
 
-        background: #172e6d;
+        background: #1b3475;
 
+    }
+
+    .performance-export-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .performance-export-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 14px;
+        border-radius: 7px;
+        color: #ffffff;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .performance-export-button.pdf {
+        background: #b42318;
+    }
+
+    .performance-export-button.excel {
+        background: #217346;
     }
 
     /*
@@ -869,6 +859,11 @@ if ($totalPerformanceRecords === 0) {
 
         }
 
+        .performance-export-actions {
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+
     }
 </style>
 
@@ -980,17 +975,13 @@ if ($totalPerformanceRecords === 0) {
             <div class="user-info">
                 <div class="user-avatar">
                     <?= htmlspecialchars(
-
-                        strtoupper(
-                            substr(
+                            mb_substr(
                                 $firstName,
                                 0,
-                                1
-                            )
-                        ),
-
+                                1,
+                                'UTF-8'
+                            ),
                         ENT_QUOTES,
-
                         "UTF-8"
                     ) ?>
                 </div>
@@ -1031,6 +1022,40 @@ if ($totalPerformanceRecords === 0) {
             </div>
 
         </section>
+
+        <form method="get" class="period-filter">
+            <label for="period_id">รอบประเมิน</label>
+            <select name="period_id" id="period_id" onchange="this.form.submit()">
+                <?php if (empty($availablePeriods)): ?>
+                    <option value="0">ไม่มีรอบประเมิน</option>
+                <?php endif; ?>
+                <?php foreach ($availablePeriods as $availablePeriod): ?>
+                    <option
+                        value="<?= (int) $availablePeriod["period_id"] ?>"
+                        <?= (int) $availablePeriod["period_id"] === $selectedPeriod ? "selected" : "" ?>
+                    >
+                        <?= htmlspecialchars($availablePeriod["period_name"], ENT_QUOTES, "UTF-8") ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+
+        <?php if ($selectedPeriod > 0): ?>
+            <div class="performance-export-actions">
+                <a
+                    href="performance-export-pdf.php?period_id=<?= (int) $selectedPeriod ?>"
+                    class="performance-export-button pdf"
+                >
+                    📄 Export PDF
+                </a>
+                <a
+                    href="performance-export-excel.php?period_id=<?= (int) $selectedPeriod ?>"
+                    class="performance-export-button excel"
+                >
+                    📊 Export Excel
+                </a>
+            </div>
+        <?php endif; ?>
 
         <?php if (isset($error)): ?>
 

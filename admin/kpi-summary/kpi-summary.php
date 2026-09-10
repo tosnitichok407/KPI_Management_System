@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /* =========================================================
@@ -476,35 +478,7 @@ function getTypeClass($type)
 ?>
 
 
-<!DOCTYPE html>
-
-<html lang="th">
-
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>KPI Summary</title>
-
-
-    <!-- GOOGLE FONT -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap"
-        rel="stylesheet"
-    >
-
-    <link 
-        rel="stylesheet"
-        href="../../assets/css/summary.css"
-    >
-
-    <style>
+<style>
 
         * {
             box-sizing: border-box;
@@ -1024,9 +998,6 @@ function getTypeClass($type)
         }
 
     </style>
-</head>
-
-<body>
 
 <div class="page-container">
 
@@ -1050,14 +1021,7 @@ function getTypeClass($type)
         <div class="header-actions">
 
             <a
-                href="../index.php"
-                class="btn btn-secondary"
-            >
-                Dashboard
-            </a>
-
-            <a
-                href="../kpi-assignment/kpi-assignment.php"
+                href="index.php?page=kpi-assignment"
                 class="btn btn-primary"
             >
                 มอบหมาย KPI
@@ -1875,5 +1839,3 @@ function getTypeClass($type)
         </div>
     </div>
 </div>
-</body>
-</html>

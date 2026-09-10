@@ -24,7 +24,7 @@ $action = $_GET["action"] ?? "";
 
 
 if ($id <= 0) {
-    header("Location: employees.php");
+    header("Location: ../index.php?page=employees");
     exit;
 }
 
@@ -39,7 +39,7 @@ if ($action === "activate") {
 
 } else {
 
-    header("Location: employees.php");
+    header("Location: ../index.php?page=employees");
     exit;
 }
 
@@ -63,5 +63,5 @@ try {
 }
 
 
-header("Location: employees.php");
+header("Location: ../index.php?page=employees");
 exit;

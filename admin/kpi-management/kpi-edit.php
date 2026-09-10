@@ -25,7 +25,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $id = (int) ($_GET["id"] ?? 0);
 
 if ($id <= 0) {
-    header("Location: kpi-management.php");
+    header("Location: ../index.php?page=kpi-management");
     exit;
 }
 
@@ -49,7 +49,7 @@ $stmt->execute([
 $kpi = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$kpi) {
-    header("Location: kpi-management.php");
+    header("Location: ../index.php?page=kpi-management");
     exit;
 }
 
@@ -166,7 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             ]);
 
-            header("Location: kpi-management.php");
+            header("Location: ../index.php?page=kpi-management");
             exit;
         } catch (PDOException $e) {
 
@@ -202,7 +202,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <style>
         body {
             margin: 0;
-            font-family: Kanit, sans-serif;
+            font-family: var(--font-family, "Kanit", sans-serif);
             background: #f5f7fb;
         }
 
@@ -501,7 +501,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     </button>
 
                     <a
-                        href="kpi-management.php"
+                        href="../index.php?page=kpi-management"
                         class="back">
                         ยกเลิก
                     </a>
@@ -513,6 +513,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </div>
 
     </div>
+
+<script src="../../assets/js/admin.js"></script>
 
 </body>
 

@@ -1155,14 +1155,10 @@ $totalCompetency =
                 <span>
                     Employee
                 </span>
-
             </div>
-
         </div>
 
-
         <nav class="sidebar-nav">
-
             <a
                 href="../index.php"
                 class="nav-item">
@@ -1174,9 +1170,7 @@ $totalCompetency =
                 <span>
                     หน้าแรก
                 </span>
-
             </a>
-
 
             <a
                 href="kpi.php"
@@ -1189,9 +1183,7 @@ $totalCompetency =
                 <span>
                     KPI ของฉัน
                 </span>
-
             </a>
-
 
             <a
                 href="../../employee/performance.php"
@@ -1204,9 +1196,7 @@ $totalCompetency =
                 <span>
                     ผลการปฏิบัติงาน
                 </span>
-
             </a>
-
 
             <a
                 href="../profile.php"
@@ -1219,14 +1209,10 @@ $totalCompetency =
                 <span>
                     ข้อมูลส่วนตัว
                 </span>
-
             </a>
-
         </nav>
 
-
         <div class="sidebar-bottom">
-
             <a
                 href="../../logout.php"
                 class="logout-button">
@@ -1234,42 +1220,29 @@ $totalCompetency =
                 ออกจากระบบ
 
             </a>
-
         </div>
-
     </aside>
 
-    <!-- =========================================================
-     MAIN
-========================================================= -->
-
+    <!-- === MAIN === -->
     <main class="main-content">
-
-        <!-- TOPBAR -->
-
         <header class="topbar">
-
             <button
                 type="button"
                 class="mobile-menu-button"
                 id="mobileMenuButton">
 
                 ☰
-
             </button>
 
             <div class="user-info">
-
                 <div class="user-avatar">
-
                     <?= htmlspecialchars(
-                        strtoupper(
-                            substr(
+                            mb_substr(
                                 $firstName,
                                 0,
-                                1
-                            )
-                        ),
+                                1,
+                                'UTF-8'
+                            ),
                         ENT_QUOTES,
                         "UTF-8"
                     ) ?>
