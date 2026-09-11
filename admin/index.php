@@ -619,8 +619,8 @@ if ($page === "home") {
     <link rel="stylesheet" href="../assets/css/forms.css">
     <link rel="stylesheet" href="../assets/css/tables.css">
     <link rel="stylesheet" href="../assets/css/employee.css">
-    <link rel="stylesheet" href="../assets/css/evaluation.css">
-    <link rel="stylesheet" href="../assets/css/kpi.css">
+    <link rel="stylesheet" href="../assets/css/evaluation.css?v=period-form-2">
+    <link rel="stylesheet" href="../assets/css/kpi.css?v=category-form-1">
     <link rel="stylesheet" href="../assets/css/summary.css">
     <link rel="stylesheet" href="../assets/css/user-account.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
@@ -644,11 +644,6 @@ if ($page === "home") {
         | Dashboard
         |--------------------------------------------------------------------------
         */
-
-        .dashboard-content {
-            padding: 30px;
-        }
-
 
         .dashboard-header {
             display: flex;
@@ -906,11 +901,6 @@ if ($page === "home") {
             }
 
 
-            .dashboard-content {
-                padding: 20px;
-            }
-
-
             .dashboard-header {
                 flex-direction: column;
 
@@ -1049,7 +1039,7 @@ if ($page === "home") {
          CONTENT
     ====================================================== -->
 
-        <section class="page-content">
+        <section class="page-container">
 
 
             <?php if ($page === "home"): ?>
@@ -1059,7 +1049,7 @@ if ($page === "home") {
                  DASHBOARD
             ================================================= -->
 
-                <div class="dashboard-content">
+                <div class="page-container dashboard-content">
 
 
                     <div class="dashboard-header">
@@ -1957,7 +1947,7 @@ if ($page === "home") {
     </script>
 
 
-    <script src="../assets/js/admin.js"></script>
+    <script src="../assets/js/admin.js?v=scroll-2"></script>
 
 </body>
 

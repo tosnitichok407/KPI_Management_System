@@ -5,6 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
+require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 
 
 /*
@@ -52,6 +54,53 @@ if (!in_array($activeTab, ["performance", "competency"])) {
 
 /*
 |--------------------------------------------------------------------------
+| Selected Month (ปี + เดือน)
+|--------------------------------------------------------------------------
+|
+| Assignment ใช้ได้ทั้งปี / Performance ผูกกับรอบประเมินของเดือนที่เลือก
+|
+*/
+
+$currentYear = (int) date("Y");
+$currentMonth = (int) date("n");
+
+$selectedYear = (int) ($_GET["year"] ?? $currentYear);
+$selectedMonth = (int) ($_GET["month"] ?? $currentMonth);
+
+if ($selectedYear < 2000 || $selectedYear > 2100) {
+    $selectedYear = $currentYear;
+}
+
+if ($selectedMonth < 1 || $selectedMonth > 12) {
+    $selectedMonth = $currentMonth;
+}
+
+$thaiMonths = monthlyPeriodMonths();
+$selectedQuarter = getQuarterByMonth($selectedMonth);
+$selectedMonthStart = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
+$selectedMonthEnd = date("Y-m-t", strtotime($selectedMonthStart));
+
+$selectedPeriod = findEvaluationPeriodByMonth($pdo, $selectedYear, $selectedMonth);
+$selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
+
+$monthQuery = "year=" . $selectedYear . "&month=" . $selectedMonth;
+
+$yearStmt = $pdo->prepare("
+    SELECT DISTINCT assignment_year
+    FROM kpi_assignments
+    WHERE employee_id = :employee_id
+      AND status = 'Active'
+");
+$yearStmt->execute([":employee_id" => $employeeId]);
+
+$availableYears = array_map("intval", $yearStmt->fetchAll(PDO::FETCH_COLUMN));
+$availableYears[] = $currentYear;
+$availableYears[] = $selectedYear;
+$availableYears = array_unique($availableYears);
+rsort($availableYears);
+
+/*
+|--------------------------------------------------------------------------
 | Messages
 |--------------------------------------------------------------------------
 */
@@ -91,6 +140,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($assignmentId <= 0) {
 
         $error = "ไม่พบ KPI ที่ต้องการบันทึก";
+    } elseif (!$selectedPeriod) {
+
+        $error = "ยังไม่มีรอบประเมินของเดือน"
+            . $thaiMonths[$selectedMonth] . " " . $selectedYear
+            . " กรุณาติดต่อผู้ดูแลระบบ";
     } else {
 
         try {
@@ -119,13 +173,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 WHERE a.assignment_id = :assignment_id
                   AND a.employee_id = :employee_id
                   AND a.status = 'Active'
+                  AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
+                  AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
 
                 LIMIT 1
             ");
 
             $checkStmt->execute([
                 ":assignment_id" => $assignmentId,
-                ":employee_id" => $employeeId
+                ":employee_id" => $employeeId,
+                ":month_start" => $selectedPeriod["start_date"],
+                ":month_end" => $selectedPeriod["end_date"]
             ]);
 
             $assignment = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -133,7 +191,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             if (!$assignment) {
 
-                $error = "ไม่สามารถบันทึก KPI นี้ได้";
+                $error = "ไม่สามารถบันทึก KPI นี้ในเดือนที่เลือกได้";
             } else {
 
                 /*
@@ -268,14 +326,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         WHERE assignment_id = :assignment_id
                           AND employee_id = :employee_id
-                                                    AND performance_date = CURDATE()
+                          AND period_id = :period_id
 
                         LIMIT 1
                     ");
 
                     $existingStmt->execute([
                         ":assignment_id" => $assignmentId,
-                        ":employee_id" => $employeeId
+                        ":employee_id" => $employeeId,
+                        ":period_id" => $selectedPeriodId
                     ]);
 
                     $existing =
@@ -294,7 +353,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             UPDATE kpi_performances
 
                             SET
-                                performance_date = CURDATE(),
+                                performance_date = :performance_date,
                                 target = :target,
                                 actual = :actual,
                                 score = :score,
@@ -326,6 +385,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                 ? $comment
                                 : null,
 
+                            ":performance_date" =>
+                            $selectedPeriod["start_date"],
+
                             ":performance_id" =>
                             $existing["performance_id"],
 
@@ -347,6 +409,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             (
                                 assignment_id,
                                 employee_id,
+                                period_id,
                                 performance_date,
                                 target,
                                 actual,
@@ -359,7 +422,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             (
                                 :assignment_id,
                                 :employee_id,
-                                CURDATE(),
+                                :period_id,
+                                :performance_date,
                                 :target,
                                 :actual,
                                 :score,
@@ -376,6 +440,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                             ":employee_id" =>
                             $employeeId,
+
+                            ":period_id" =>
+                            $selectedPeriodId,
+
+                            ":performance_date" =>
+                            $selectedPeriod["start_date"],
 
                             ":target" =>
                             (int) $assignment["target_value"],
@@ -439,10 +509,9 @@ $sql = "
         k.max_score,
         k.kpi_type,
 
-        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
-        COALESCE(ep.start_date, a.start_date) AS start_date,
-        COALESCE(ep.end_date, a.end_date) AS end_date,
-        COALESCE(ep.status, 'Open') AS period_status,
+        a.assignment_year,
+        a.start_date,
+        a.end_date,
 
         kp.performance_id,
         kp.performance_date,
@@ -457,9 +526,6 @@ $sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    LEFT JOIN evaluation_periods ep
-        ON a.period_id = ep.period_id
-
     LEFT JOIN kpi_performances kp
         ON kp.performance_id = (
 
@@ -469,6 +535,7 @@ $sql = "
 
             WHERE kp2.assignment_id = a.assignment_id
               AND kp2.employee_id = a.employee_id
+              AND kp2.period_id = :period_id
 
             ORDER BY
                 kp2.performance_id DESC
@@ -480,8 +547,10 @@ $sql = "
 
       AND a.status = 'Active'
 
+      AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
+      AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
+
     ORDER BY
-        ep.start_date DESC,
         a.assignment_id ASC
 ";
 
@@ -491,7 +560,10 @@ try {
     $stmt = $pdo->prepare($sql);
 
     $stmt->execute([
-        ":employee_id" => $employeeId
+        ":period_id" => $selectedPeriodId,
+        ":employee_id" => $employeeId,
+        ":month_start" => $selectedMonthStart,
+        ":month_end" => $selectedMonthEnd
     ]);
 
     $assignments =
@@ -1126,6 +1198,38 @@ $totalCompetency =
             }
 
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Month Filter
+        |--------------------------------------------------------------------------
+        */
+
+        .period-filter {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .period-filter label {
+            font-weight: 500;
+        }
+
+        .period-filter select {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .period-filter-status {
+            color: #475569;
+            font-size: 14px;
+        }
     </style>
 
 </head>
@@ -1296,6 +1400,53 @@ $totalCompetency =
 
         </section>
 
+        <!-- MONTH FILTER -->
+
+        <form method="get" class="period-filter">
+
+            <input
+                type="hidden"
+                name="tab"
+                value="<?= htmlspecialchars($activeTab, ENT_QUOTES, "UTF-8") ?>">
+
+            <label for="year">ปี</label>
+
+            <select name="year" id="year" onchange="this.form.submit()">
+                <?php foreach ($availableYears as $year): ?>
+                    <option value="<?= $year ?>" <?= $year === $selectedYear ? "selected" : "" ?>><?= $year ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <label for="month">เดือน</label>
+
+            <select name="month" id="month" onchange="this.form.submit()">
+                <?php foreach ($thaiMonths as $monthNumber => $monthName): ?>
+                    <option value="<?= $monthNumber ?>" <?= $monthNumber === $selectedMonth ? "selected" : "" ?>><?= $monthName ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <span class="period-filter-status">
+
+                <?php if ($selectedPeriod): ?>
+
+                    <?= htmlspecialchars($selectedPeriod["period_name"], ENT_QUOTES, "UTF-8") ?>
+                    <?= $selectedYear ?>
+                    · <?= htmlspecialchars($selectedPeriod["quarter"], ENT_QUOTES, "UTF-8") ?>
+                    · <?= date("d/m/Y", strtotime($selectedPeriod["start_date"])) ?>
+                    - <?= date("d/m/Y", strtotime($selectedPeriod["end_date"])) ?>
+
+                <?php else: ?>
+
+                    <?= $thaiMonths[$selectedMonth] ?> <?= $selectedYear ?>
+                    · <?= $selectedQuarter ?>
+                    · ยังไม่มีรอบประเมินของเดือนนี้
+
+                <?php endif; ?>
+
+            </span>
+
+        </form>
+
         <!-- MESSAGE -->
 
         <?php if ($success !== ""): ?>
@@ -1400,7 +1551,7 @@ $totalCompetency =
         <div class="kpi-tabs">
 
             <a
-                href="kpi.php?tab=performance"
+                href="kpi.php?tab=performance&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "performance" ? "active" : "" ?>">
 
                 📈 Performance KPI
@@ -1410,7 +1561,7 @@ $totalCompetency =
             </a>
 
             <a
-                href="kpi.php?tab=competency"
+                href="kpi.php?tab=competency&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "competency" ? "active" : "" ?>">
 
                 ⭐ Competency KPI
@@ -1454,11 +1605,11 @@ $totalCompetency =
                         </div>
 
                         <h3>
-                            ยังไม่มี Performance KPI
+                            ยังไม่มี KPI ที่ได้รับมอบหมายในเดือนนี้
                         </h3>
 
                         <p>
-                            ยังไม่มี KPI ประเภท Performance ที่ได้รับมอบหมาย
+                            Performance KPI · <?= $thaiMonths[$selectedMonth] ?> <?= $selectedYear ?> (<?= $selectedQuarter ?>)
                         </p>
 
                     </div>
@@ -1592,7 +1743,7 @@ $totalCompetency =
 
                                             <form
                                                 method="POST"
-                                                action="kpi.php?tab=performance">
+                                                action="kpi.php?tab=performance&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>">
 
                                                 <input
 
@@ -1745,11 +1896,11 @@ $totalCompetency =
                         </div>
 
                         <h3>
-                            ยังไม่มี Competency KPI
+                            ยังไม่มี KPI ที่ได้รับมอบหมายในเดือนนี้
                         </h3>
 
                         <p>
-                            ยังไม่มี KPI ประเภท Competency ที่ได้รับมอบหมาย
+                            Competency KPI · <?= $thaiMonths[$selectedMonth] ?> <?= $selectedYear ?> (<?= $selectedQuarter ?>)
                         </p>
 
                     </div>

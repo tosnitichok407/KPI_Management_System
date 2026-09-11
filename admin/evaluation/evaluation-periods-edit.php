@@ -2,8 +2,9 @@
 
 session_start();
 
-require_once "../../config/database.php";
-require_once "../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
+require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 
 
 /*
@@ -86,6 +87,30 @@ try {
     }
 
 
+    /*
+    |--------------------------------------------------------------------------
+    | Performances In This Period
+    |--------------------------------------------------------------------------
+    |
+    | ถ้ามีผลงานบันทึกในเดือนนี้แล้ว ห้ามย้ายปี/เดือน
+    | เพื่อไม่ให้ผลงานเดิมถูกย้ายไปอยู่เดือนอื่น
+    |
+    */
+
+    $performanceCountStmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM kpi_performances
+        WHERE period_id = :period_id
+    ");
+
+    $performanceCountStmt->execute([
+        ":period_id" => $id
+    ]);
+
+    $hasPerformances =
+        (int) $performanceCountStmt->fetchColumn() > 0;
+
+
 } catch (PDOException $e) {
 
     die("Database error.");
@@ -118,7 +143,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ) {
 
         $error =
-            "กรุณากรอกข้อมูลให้ครบถ้วน";
+            "กรุณาเลือกปีและเดือนให้ครบถ้วน";
 
     } elseif (
         !in_array(
@@ -130,6 +155,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $error =
             "สถานะไม่ถูกต้อง";
+
+    } elseif (
+        $hasPerformances &&
+        (
+            $periodYear !== (int) $period["period_year"] ||
+            $periodMonth !== (int) $period["period_month"]
+        )
+    ) {
+
+        $error =
+            "ไม่สามารถเปลี่ยนปี/เดือนได้ เนื่องจากมีผลงาน KPI บันทึกในรอบนี้แล้ว (แก้ไขได้เฉพาะสถานะ)";
 
     } else {
 
@@ -216,6 +252,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $status;
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Form
+|--------------------------------------------------------------------------
+*/
+
+$formAction = "evaluation-periods-edit.php?id=" . $id;
+$formYear = (int) $period["period_year"];
+$formMonth = (int) $period["period_month"];
+$formStatus = $period["status"];
+$existingMonths = evaluationPeriodMonthsByYear($pdo, $id);
+$lockPeriod = $hasPerformances;
+$submitLabel = "Save Changes";
+
 ?>
 
 <!DOCTYPE html>
@@ -238,7 +289,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../../assets/css/evaluation.css"
+        href="../../assets/css/evaluation.css?v=period-form-2"
     >
 
     <title>Edit Evaluation Period</title>
@@ -256,29 +307,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <header class="page-header">
 
-        <div>
+        <div class="page-title-block">
 
             <h1>
                 Edit Evaluation Period
             </h1>
 
             <p>
-                แก้ไขรอบการประเมินผลการปฏิบัติงาน
+                แก้ไขรอบการประเมิน
+                <?= htmlspecialchars($period["period_name"] ?? "", ENT_QUOTES, "UTF-8") ?>
+                · ID <?= (int) $id ?>
             </p>
 
         </div>
 
-
-        <div class="header-actions">
-
-            <a
-                href="../index.php?page=evaluation"
-                class="btn btn-secondary"
-            >
-                ← กลับ
-            </a>
-
-        </div>
 
     </header>
 
@@ -304,189 +346,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <?php endif; ?>
 
-
-        <form
-            method="POST"
-            action="evaluation-periods-edit.php?id=<?= (int) $id ?>"
-        >
-
-
-            <!-- =====================================================
-                 Period ID
-            ====================================================== -->
-
-            <div class="form-group">
-
-                <label for="period_year">ปี</label>
-                <input type="number" id="period_year" name="period_year" value="<?= (int) $period["period_year"] ?>" min="2000" max="2100" required>
-
-            </div>
-
-            <div class="form-group">
-
-                <label for="period_month">เดือน</label>
-                <select id="period_month" name="period_month" required>
-                    <?php foreach (monthlyPeriodMonths() as $number => $monthName): ?>
-                        <option value="<?= $number ?>" <?= $number === (int) $period["period_month"] ? "selected" : "" ?>><?= htmlspecialchars($monthName, ENT_QUOTES, "UTF-8") ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <small>ชื่อรอบ, Quarter และช่วงวันจะคำนวณจากปีและเดือนที่เลือก</small>
-
-            </div>
-
-            <div class="form-group">
-
-                <label>
-                    Period ID
-                </label>
-
-                <input
-                    type="text"
-                    value="<?= (int) $period["period_id"] ?>"
-                    disabled
-                >
-
-            </div>
-
-
-            <!-- =====================================================
-                 Period Name
-            ====================================================== -->
-
-            <div class="form-group">
-
-                <label for="period_name">
-                    ชื่อรอบการประเมิน
-                </label>
-
-                <input
-                    type="text"
-                    id="period_name"
-                    name="period_name"
-                    value="<?= htmlspecialchars(
-                        $period["period_name"],
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>"
-                    placeholder="เช่น ประจำเดือน สิงหาคม 2569"
-                    required
-                >
-
-            </div>
-
-
-            <!-- =====================================================
-                 Start Date
-            ====================================================== -->
-
-            <div class="form-group">
-
-                <label for="start_date">
-                    วันที่เริ่มต้น
-                </label>
-
-                <input
-                    type="date"
-                    id="start_date"
-                    name="start_date"
-                    value="<?= htmlspecialchars(
-                        $period["start_date"],
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>"
-                    required
-                >
-
-            </div>
-
-
-            <!-- =====================================================
-                 End Date
-            ====================================================== -->
-
-            <div class="form-group">
-
-                <label for="end_date">
-                    วันที่สิ้นสุด
-                </label>
-
-                <input
-                    type="date"
-                    id="end_date"
-                    name="end_date"
-                    value="<?= htmlspecialchars(
-                        $period["end_date"],
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>"
-                    required
-                >
-
-            </div>
-
-
-            <!-- =====================================================
-                 Status
-            ====================================================== -->
-
-            <div class="form-group">
-
-                <label for="status">
-                    สถานะ
-                </label>
-
-                <select
-                    id="status"
-                    name="status"
-                >
-
-                    <option
-                        value="Open"
-                        <?= $period["status"] === "Open"
-                            ? "selected"
-                            : "" ?>
-                    >
-                        Open
-                    </option>
-
-                    <option
-                        value="Closed"
-                        <?= $period["status"] === "Closed"
-                            ? "selected"
-                            : "" ?>
-                    >
-                        Closed
-                    </option>
-
-                </select>
-
-            </div>
-
-
-            <!-- =====================================================
-                 Buttons
-            ====================================================== -->
-
-            <div class="form-actions">
-
-                <a
-                    href="../index.php?page=evaluation"
-                    class="btn btn-secondary"
-                >
-                    Cancel
-                </a>
-
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Save Changes
-                </button>
-
-            </div>
-
-
-        </form>
+        <?php include __DIR__ . "/evaluation-period-form.php"; ?>
 
 
     </section>
@@ -494,7 +354,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 </div>
 
-<script src="../../assets/js/admin.js"></script>
+<script src="../../assets/js/admin.js?v=scroll-2"></script>
 
 </body>
 

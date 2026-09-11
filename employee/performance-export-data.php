@@ -52,11 +52,12 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
             ORDER BY latest.performance_date DESC, latest.performance_id DESC LIMIT 1
         )
         WHERE a.employee_id = :employee_id
-          AND a.assignment_year = :assignment_year
+          AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
+          AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
           AND a.status = 'Active'
         ORDER BY k.kpi_type, a.assignment_id
     ");
-    $stmt->execute([":period_id" => $periodId, ":employee_id" => $employeeId, ":assignment_year" => $year]);
+    $stmt->execute([":period_id" => $periodId, ":employee_id" => $employeeId, ":month_start" => $start, ":month_end" => $end]);
     $kpis = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $performanceScore = 0;
     $competencyScore = 0;

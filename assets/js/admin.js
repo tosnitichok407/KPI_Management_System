@@ -44,10 +44,14 @@
         }
 
         if (scrollY !== null) {
+            const applyScroll = function () {
+                window.scrollTo(0, Number(scrollY) || 0);
+            };
+
+            // เลื่อนทันที แล้วเลื่อนซ้ำหลังวาดเฟรมถัดไป เผื่อ layout ยังขยับอยู่
+            applyScroll();
             requestAnimationFrame(function () {
-                requestAnimationFrame(function () {
-                    window.scrollTo(0, Number(scrollY) || 0);
-                });
+                requestAnimationFrame(applyScroll);
             });
         }
     }
@@ -90,7 +94,19 @@
         }
 
         saveScroll(window.location.href);
-        if (!sessionStorage.getItem(pendingKey)) {
+
+        // ฟอร์มที่ส่งกลับมาหน้าเดิม (เช่น ฟอร์มค้นหา) ให้จำตำแหน่งปัจจุบันเสมอ
+        // ส่วนฟอร์มที่ไปหน้าอื่น (เช่น หน้าแก้ไข) คงตำแหน่งที่จำไว้ตอนคลิกเข้ามา
+        // เฉพาะ GET form: ค่าในฟอร์ม (รวม hidden page=...) กลายเป็น query string ของหน้าปลายทาง
+        // ส่วน POST form (หน้าแก้ไข) มักถูก redirect ไปหน้าอื่น จึงใช้กฎเดิม
+        let returnsToSamePage = false;
+        if ((form.method || "get").toLowerCase() === "get") {
+            const targetUrl = new URL(form.getAttribute("action") || window.location.href, window.location.href);
+            targetUrl.search = new URLSearchParams(new FormData(form)).toString();
+            returnsToSamePage = pageIdentity(targetUrl.href) === pageIdentity(window.location.href);
+        }
+
+        if (returnsToSamePage || !sessionStorage.getItem(pendingKey)) {
             savePendingReturn();
         }
     });

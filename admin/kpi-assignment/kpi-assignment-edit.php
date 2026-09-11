@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /* =========================
@@ -138,6 +138,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif ($start_date > $end_date) {
 
         $error = "วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด";
+
+    } elseif (substr($start_date, 0, 4) !== substr($end_date, 0, 4)) {
+
+        $error = "ช่วงเวลาของ KPI ต้องอยู่ภายในปีเดียวกัน";
 
     } elseif (
         $status !== "Active" &&
@@ -433,26 +437,6 @@ $kpis_result =
     $pdo->query($kpis_sql);
 
 
-/* =========================================================
-   GET EVALUATION PERIODS
-========================================================= */
-
-$periods_sql = "
-    SELECT
-        period_id,
-        period_name,
-        start_date,
-        end_date,
-        status
-
-    FROM evaluation_periods
-
-    ORDER BY start_date DESC
-";
-
-$periods_result =
-    $pdo->query($periods_sql);
-
 ?>
 
 <!DOCTYPE html>
@@ -730,65 +714,6 @@ $periods_result =
             <div class="form-grid">
 
 
-                <!-- PERIOD -->
-
-                <div class="form-group">
-
-                    <label>
-                        รอบการประเมิน <span>*</span>
-                    </label>
-
-
-                    <select
-                        name="period_id"
-                    >
-
-                        <option value="">
-                            -- เลือกรอบการประเมิน --
-                        </option>
-
-
-                        <?php while (
-                            $period =
-                            $periods_result->fetch(PDO::FETCH_ASSOC)
-                        ): ?>
-
-                            <option
-                                value="<?= $period["period_id"] ?>"
-
-                                <?= $assignment["period_id"] ==
-                                    $period["period_id"]
-                                    ? "selected"
-                                    : "" ?>
-                            >
-
-                                <?= htmlspecialchars(
-                                    $period["period_name"]
-                                ) ?>
-
-                                (
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime($period["start_date"])
-                                ) ?>
-
-                                -
-
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime($period["end_date"])
-                                ) ?>
-                                )
-
-                            </option>
-
-                        <?php endwhile; ?>
-
-                    </select>
-
-                </div>
-
-
                 <!-- EMPLOYEE -->
 
                 <div class="form-group">
@@ -994,6 +919,10 @@ $periods_result =
 
                         required
                     >
+
+                    <small style="display:block;margin-top:6px;color:#667085;">
+                        KPI จะแสดงให้ประเมินได้ทุกเดือนที่อยู่ในช่วงวันที่นี้ (ภายในปีเดียวกัน)
+                    </small>
 
                 </div>
 

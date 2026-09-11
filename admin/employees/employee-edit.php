@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /*
@@ -332,14 +332,6 @@ if (!$employee) {
             </p>
 
         </div>
-
-
-        <a
-            href="../index.php?page=employees"
-            class="btn btn-secondary"
-        >
-            Back
-        </a>
 
     </header>
 

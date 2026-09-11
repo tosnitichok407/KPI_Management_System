@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
+require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 
 
 /*
@@ -31,17 +32,27 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 |--------------------------------------------------------------------------
 */
 
+// จำนวนข้อมูลที่อ้างอิงรอบประเมิน (> 0 = ลบไม่ได้)
+$usageSql = implode(" + ", array_map(
+    fn($table) => "(SELECT COUNT(*) FROM {$table} ref WHERE ref.period_id = p.period_id)",
+    array_keys(evaluationPeriodReferenceTables())
+));
+
 $sql = "
     SELECT
-        period_id,
-        period_name,
-        start_date,
-        end_date,
-        status
+        p.period_id,
+        p.period_name,
+        p.period_year,
+        p.period_month,
+        p.quarter,
+        p.start_date,
+        p.end_date,
+        p.status,
+        ({$usageSql}) AS usage_count
 
-    FROM evaluation_periods
+    FROM evaluation_periods p
 
-    ORDER BY start_date DESC, period_id DESC
+    ORDER BY p.period_year DESC, p.period_month DESC, p.period_id DESC
 ";
 
 $stmt = $pdo->prepare($sql);
@@ -49,25 +60,56 @@ $stmt->execute();
 
 $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$periodYears = [];
-foreach ($periods as $period) {
-    $year = (int) date("Y", strtotime($period["start_date"]));
-    $periodYears[$year] = true;
-}
+$monthNames = monthlyPeriodMonths();
+
+/*
+| Quarter cards: แต่ละ Quarter แสดงเดือนที่สร้างรอบประเมินแล้ว
+*/
 
 $quarterPeriods = [];
-foreach (array_keys($periodYears) as $year) {
+foreach ($periods as $period) {
+    $year = (int) $period["period_year"];
+
     foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter) {
-        [$quarterStart, $quarterEnd] = getQuarterMonths($quarter);
-        $quarterPeriods[$year . "-" . $quarter] = [
-            "year" => $year,
-            "quarter" => $quarter,
-            "start_date" => sprintf("%04d-%02d-01", $year, $quarterStart),
-            "end_date" => date("Y-m-t", strtotime(sprintf("%04d-%02d-01", $year, $quarterEnd))),
-            "status" => "Open"
-        ];
+        $key = $year . "-" . $quarter;
+
+        if (!isset($quarterPeriods[$key])) {
+            [$quarterStart, $quarterEnd] = getQuarterMonths($quarter);
+            $quarterPeriods[$key] = [
+                "year" => $year,
+                "quarter" => $quarter,
+                "start_date" => sprintf("%04d-%02d-01", $year, $quarterStart),
+                "end_date" => date("Y-m-t", strtotime(sprintf("%04d-%02d-01", $year, $quarterEnd))),
+                "months" => []
+            ];
+        }
     }
+
+    $month = (int) $period["period_month"];
+    $quarterPeriods[$year . "-" . $period["quarter"]]["months"][$month] = $monthNames[$month];
 }
+
+foreach ($quarterPeriods as &$quarterPeriod) {
+    ksort($quarterPeriod["months"]);
+}
+unset($quarterPeriod);
+
+
+/*
+|--------------------------------------------------------------------------
+| Messages (หลังลบรอบประเมิน)
+|--------------------------------------------------------------------------
+*/
+
+$successMessage = [
+    "deleted" => "ลบรอบประเมินเรียบร้อยแล้ว"
+][$_GET["success"] ?? ""] ?? "";
+
+$errorMessage = [
+    "not_found" => "ไม่พบรอบประเมินที่ต้องการลบ",
+    "in_use" => "ไม่สามารถลบรอบประเมินได้ เนื่องจากมีข้อมูลที่ใช้รอบนี้อยู่",
+    "delete_failed" => "ไม่สามารถลบรอบประเมินได้"
+][$_GET["error"] ?? ""] ?? "";
 
 ?>
 
@@ -108,12 +150,24 @@ foreach (array_keys($periodYears) as $year) {
 
     </header>
 
+    <?php if ($successMessage !== ""): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($successMessage, ENT_QUOTES, "UTF-8") ?></div>
+    <?php endif; ?>
+
+    <?php if ($errorMessage !== ""): ?>
+        <div class="alert alert-error"><?= htmlspecialchars($errorMessage, ENT_QUOTES, "UTF-8") ?></div>
+    <?php endif; ?>
+
     <section class="quarter-period-grid">
         <?php foreach ($quarterPeriods as $quarterPeriod): ?>
             <article class="quarter-period-card">
                 <h2><?= $quarterPeriod["quarter"] ?>/<?= $quarterPeriod["year"] ?></h2>
                 <p><?= $quarterPeriod["start_date"] ?> - <?= $quarterPeriod["end_date"] ?></p>
-                <strong><?= htmlspecialchars($quarterPeriod["status"], ENT_QUOTES, "UTF-8") ?></strong>
+                <strong>
+                    <?= empty($quarterPeriod["months"])
+                        ? "ยังไม่มีรอบประเมิน"
+                        : htmlspecialchars(implode(", ", $quarterPeriod["months"]), ENT_QUOTES, "UTF-8") ?>
+                </strong>
             </article>
         <?php endforeach; ?>
     </section>
@@ -155,11 +209,15 @@ foreach (array_keys($periodYears) as $year) {
                             รอบการประเมิน
                         </th>
 
+                        <th>ปี</th>
+
+                        <th>เดือน</th>
+
+                        <th>Quarter</th>
+
                         <th>
                             วันที่เริ่มต้น
                         </th>
-
-                        <th>Q</th>
 
                         <th>
                             วันที่สิ้นสุด
@@ -186,7 +244,7 @@ foreach (array_keys($periodYears) as $year) {
                     <tr>
 
                         <td
-                            colspan="6"
+                            colspan="9"
                             class="empty-state"
                         >
                             ยังไม่มีรอบการประเมิน
@@ -228,30 +286,29 @@ foreach (array_keys($periodYears) as $year) {
                             </td>
 
 
+                            <!-- Year / Month / Quarter -->
+
+                            <td><?= (int) $period["period_year"] ?></td>
+
+                            <td><?= htmlspecialchars($monthNames[(int) $period["period_month"]] ?? "-", ENT_QUOTES, "UTF-8") ?></td>
+
+                            <td><?= htmlspecialchars($period["quarter"], ENT_QUOTES, "UTF-8") ?></td>
+
+
                             <!-- Start Date -->
 
                             <td>
 
-                                <?= htmlspecialchars(
-                                    $period["start_date"],
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>
+                                <?= date("d/m/Y", strtotime($period["start_date"])) ?>
 
                             </td>
-
-                            <td><?= htmlspecialchars(getQuarterFromDate($period["start_date"])) ?></td>
 
 
                             <!-- End Date -->
 
                             <td>
 
-                                <?= htmlspecialchars(
-                                    $period["end_date"],
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>
+                                <?= date("d/m/Y", strtotime($period["end_date"])) ?>
 
                             </td>
 
@@ -291,6 +348,31 @@ foreach (array_keys($periodYears) as $year) {
                                     >
                                         Edit
                                     </a>
+
+                                    <?php $inUse = (int) $period["usage_count"] > 0; ?>
+
+                                    <form
+                                        method="POST"
+                                        action="evaluation/evaluation-periods-delete.php"
+                                        class="inline-form"
+                                        onsubmit="return confirm(<?= htmlspecialchars(json_encode(
+                                            "ต้องการลบรอบประเมิน " . $period["period_name"] . " " . $period["period_year"] . " หรือไม่?",
+                                            JSON_UNESCAPED_UNICODE
+                                        ), ENT_QUOTES, "UTF-8") ?>)"
+                                    >
+                                        <input type="hidden" name="id" value="<?= (int) $period["period_id"] ?>">
+
+                                        <button
+                                            type="submit"
+                                            class="btn-small danger"
+                                            <?= $inUse ? "disabled" : "" ?>
+                                            title="<?= $inUse
+                                                ? "มีข้อมูลที่ใช้รอบนี้อยู่ " . (int) $period["usage_count"] . " รายการ จึงลบไม่ได้"
+                                                : "ลบรอบประเมิน" ?>"
+                                        >
+                                            Delete
+                                        </button>
+                                    </form>
 
                                 </div>
 

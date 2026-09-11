@@ -65,9 +65,8 @@ if ($selectedMonth < 1 || $selectedMonth > 12) {
 $selectedQuarter = getQuarterByMonth($selectedMonth);
 $selectedMonthStart = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
 $selectedMonthEnd = date("Y-m-t", strtotime($selectedMonthStart));
-$selectedPeriodStmt = $pdo->prepare("SELECT period_id FROM evaluation_periods WHERE period_year = :year AND period_month = :month LIMIT 1");
-$selectedPeriodStmt->execute([":year" => $selectedYear, ":month" => $selectedMonth]);
-$selectedPeriodId = (int) ($selectedPeriodStmt->fetchColumn() ?: 0);
+$selectedPeriod = findEvaluationPeriodByMonth($pdo, $selectedYear, $selectedMonth);
+$selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
 
 $quarterScoreStmt = $pdo->prepare("
     SELECT
@@ -148,10 +147,8 @@ $sql = "
         k.unit,
         k.max_score,
 
-        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
-        COALESCE(ep.start_date, a.start_date) AS start_date,
-        COALESCE(ep.end_date, a.end_date) AS end_date,
-        COALESCE(ep.status, 'Open') AS period_status,
+        a.start_date,
+        a.end_date,
 
         p.performance_id,
         p.performance_date,
@@ -165,9 +162,6 @@ $sql = "
 
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
-
-    LEFT JOIN evaluation_periods ep
-        ON a.period_id = ep.period_id
 
     LEFT JOIN kpi_performances p
         ON p.performance_id = (
@@ -188,10 +182,12 @@ $sql = "
     WHERE a.employee_id = :employee_id
 
     AND a.status = 'Active'
-    AND a.assignment_year = :assignment_year
+
+    -- KPI ที่มีผลในเดือนที่เลือก (Assignment เดียวใช้ได้ทุกเดือนในช่วงเวลา)
+    AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
+    AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
 
     ORDER BY
-        ep.start_date DESC,
         a.assignment_id ASC
 ";
 
@@ -204,7 +200,8 @@ try {
         ":employee_id_sub" => $employeeId,
         ":period_id_sub" => $selectedPeriodId,
         ":employee_id" => $employeeId,
-        ":assignment_year" => $selectedYear
+        ":month_start" => $selectedMonthStart,
+        ":month_end" => $selectedMonthEnd
     ]);
 
     $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -243,8 +240,7 @@ $periods = [];
 
 foreach ($assignments as $assignment) {
 
-    $periodId = $assignment["period_id"]
-        ?? $assignment["assignment_year"];
+    $periodId = $selectedPeriodId;
 
 
     /*
@@ -258,16 +254,17 @@ foreach ($assignments as $assignment) {
         $periods[$periodId] = [
 
             "period_name" =>
-            $assignment["period_name"],
+            ($selectedPeriod["period_name"] ?? "ประจำเดือน" . $thaiMonths[$selectedMonth])
+                . " " . $selectedYear . " (" . $selectedQuarter . ")",
 
             "start_date" =>
-            $assignment["start_date"],
+            $selectedMonthStart,
 
             "end_date" =>
-            $assignment["end_date"],
+            $selectedMonthEnd,
 
             "status" =>
-            $assignment["period_status"],
+            $selectedPeriod["status"] ?? "ยังไม่เปิดรอบประเมิน",
 
             "kpis" => []
 
@@ -1296,7 +1293,7 @@ if ($totalPerformanceRecords === 0) {
                 </div>
 
                 <h2>
-                    ยังไม่มี KPI ที่ได้รับมอบหมาย
+                    ยังไม่มี KPI ที่ได้รับมอบหมายในเดือนนี้
                 </h2>
 
                 <p>

@@ -2,8 +2,9 @@
 
 session_start();
 
-require_once "../../config/database.php";
-require_once "../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
+require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 
 
 /*
@@ -25,6 +26,10 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
 $error = "";
 
+$formYear = (int) ($_POST["period_year"] ?? date("Y"));
+$formMonth = (int) ($_POST["period_month"] ?? date("n"));
+$formStatus = $_POST["status"] ?? "Open";
+
 
 /*
 |--------------------------------------------------------------------------
@@ -34,11 +39,6 @@ $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $year = (int) ($_POST["period_year"] ?? 0);
-    $month = (int) ($_POST["period_month"] ?? 0);
-    $status = $_POST["status"] ?? "Open";
-
-
     /*
     |--------------------------------------------------------------------------
     | Validate
@@ -46,11 +46,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     */
 
     if (
-        $year < 2000 || $year > 2100 || $month < 1 || $month > 12
+        $formYear < 2000 || $formYear > 2100 || $formMonth < 1 || $formMonth > 12
     ) {
 
-        $error = "กรุณากรอกข้อมูลให้ครบถ้วน";
-    } elseif (!in_array($status, ["Open", "Closed"])) {
+        $error = "กรุณาเลือกปีและเดือนให้ครบถ้วน";
+    } elseif (!in_array($formStatus, ["Open", "Closed"], true)) {
 
         $error = "สถานะไม่ถูกต้อง";
     } else {
@@ -63,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         */
 
         try {
-            $period = monthlyPeriodDetails($year, $month);
+            $period = monthlyPeriodDetails($formYear, $formMonth);
 
             $stmt = $pdo->prepare("
                 INSERT INTO evaluation_periods
@@ -97,7 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 ":start_date" => $period["start_date"],
                 ":end_date" => $period["end_date"],
 
-                ":status" => $status
+                ":status" => $formStatus
 
             ]);
 
@@ -121,6 +121,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Form
+|--------------------------------------------------------------------------
+*/
+
+$formAction = "evaluation-periods-add.php";
+$existingMonths = evaluationPeriodMonthsByYear($pdo);
+$lockPeriod = false;
+$submitLabel = "Save Evaluation Period";
+
 ?>
 
 <!DOCTYPE html>
@@ -141,7 +153,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../../assets/css/evaluation.css">
+        href="../../assets/css/evaluation.css?v=period-form-2">
 
     <title>Add Evaluation Period</title>
 
@@ -158,28 +170,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <header class="page-header">
 
-            <div>
+            <div class="page-title-block">
 
                 <h1>
                     Add Evaluation Period
                 </h1>
 
                 <p>
-                    เพิ่มรอบการประเมินผลการปฏิบัติงาน
+                    เพิ่มรอบการประเมินรายเดือน
                 </p>
 
             </div>
 
-
-            <div class="header-actions">
-
-                <a
-                    href="../index.php?page=evaluation"
-                    class="btn btn-secondary">
-                    ← กลับ
-                </a>
-
-            </div>
 
         </header>
 
@@ -189,7 +191,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ========================================================== -->
 
         <section class="form-card">
-
 
             <?php if ($error !== ""): ?>
 
@@ -205,84 +206,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             <?php endif; ?>
 
-
-            <form
-                method="POST"
-                action="">
-
-
-                <div class="form-group">
-                    <label for="period_year">ปี</label>
-                    <input
-                        type="number" id="period_year" name="period_year"
-                        value="<?= (int) ($_POST["period_year"] ?? date("Y")) ?>" min="2000" max="2100" required>
-
-                </div>
-                <div class="form-group">
-                    <label for="period_month">เดือน</label>
-                    <select id="period_month" name="period_month" required>
-                        <?php foreach (monthlyPeriodMonths() as $number => $name): ?>
-                            <option value="<?= $number ?>" <?= $number === (int) ($_POST["period_month"] ?? date("n")) ? "selected" : "" ?>><?= $name ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <small>ระบบจะกำหนดชื่อรอบ, Quarter และช่วงวันของเดือนให้อัตโนมัติ</small>
-
-                </div>
-
-
-                <!-- Status -->
-
-                <div class="form-group">
-
-                    <label for="status">
-                        สถานะ
-                    </label>
-
-                    <select
-                        id="status"
-                        name="status">
-
-                        <option value="Open">
-                            Open
-                        </option>
-
-                        <option value="Closed">
-                            Closed
-                        </option>
-
-                    </select>
-
-                </div>
-
-
-                <!-- Buttons -->
-
-                <div class="form-actions">
-
-                    <a
-                        href="../index.php?page=evaluation"
-                        class="btn btn-secondary">
-                        Cancel
-                    </a>
-
-                    <button
-                        type="submit"
-                        class="btn btn-primary">
-                        Save Evaluation Period
-                    </button>
-
-                </div>
-
-
-            </form>
-
+            <?php include __DIR__ . "/evaluation-period-form.php"; ?>
 
         </section>
 
 
     </div>
 
-<script src="../../assets/js/admin.js"></script>
+<script src="../../assets/js/admin.js?v=scroll-2"></script>
 
 </body>
 

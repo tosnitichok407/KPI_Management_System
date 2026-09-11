@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
+require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 
 
 /* =========================================================
@@ -658,6 +659,14 @@ $filter_employee =
 $filter_status =
     $_GET["status"] ?? "";
 
+$filter_has_month =
+    $filter_month >= 1 && $filter_month <= 12;
+
+$filter_period =
+    ($filter_year > 0 && $filter_has_month)
+    ? findEvaluationPeriodByMonth($pdo, $filter_year, $filter_month)
+    : null;
+
 
 /* =========================================================
    GET ASSIGNMENTS
@@ -686,9 +695,7 @@ $assignment_sql = "
 
         k.kpi_name,
         k.kpi_type,
-        k.unit,
-
-        COALESCE(p.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name
+        k.unit
 
     FROM kpi_assignments a
 
@@ -700,9 +707,6 @@ $assignment_sql = "
 
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
-
-    LEFT JOIN evaluation_periods p
-        ON a.period_id = p.period_id
 
     WHERE 1 = 1
 ";
@@ -725,10 +729,15 @@ if ($filter_year > 0) {
         $filter_year;
 }
 
+/* =========================================================
+   FILTER MONTH
+   KPI ที่มีผลในเดือนนั้น = ช่วงเวลาของ Assignment ครอบคลุมเดือนที่เลือก
+========================================================= */
+
 if ($filter_month >= 1 && $filter_month <= 12) {
     $assignment_sql .= "
-        AND a.start_date <= LAST_DAY(CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01'))
-        AND a.end_date >= CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01')
+        AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= LAST_DAY(CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01'))
+        AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01')
     ";
     $params[] = $filter_month;
     $params[] = $filter_month;
@@ -783,9 +792,15 @@ if (
 }
 
 
+/* เรียงตามพนักงานเพื่อจัดกลุ่มในตาราง: Performance ก่อน Competency แล้วตามชื่อ KPI */
 $assignment_sql .= "
     ORDER BY
-        a.created_at DESC
+        e.first_name ASC,
+        e.last_name ASC,
+        a.employee_id ASC,
+        a.assignment_year DESC,
+        FIELD(k.kpi_type, 'Performance', 'Competency'),
+        k.kpi_name ASC
 ";
 
 
@@ -805,6 +820,39 @@ $assignments_result =
 
 
 /* =========================================================
+   GROUP BY EMPLOYEE (+ ปี)
+   ตารางแสดงพนักงาน 1 คนเป็น 1 กลุ่ม แล้วรายการ KPI อยู่ใต้กลุ่ม
+========================================================= */
+
+$grouped_assignments = [];
+
+foreach ($assignments_result as $assignment) {
+
+    $group_key =
+        $assignment["employee_id"]
+        . "_"
+        . $assignment["assignment_year"];
+
+    if (!isset($grouped_assignments[$group_key])) {
+
+        $grouped_assignments[$group_key] = [
+            "employee" => [
+                "employee_id" => $assignment["employee_id"],
+                "employee_code" => $assignment["employee_code"],
+                "first_name" => $assignment["first_name"],
+                "last_name" => $assignment["last_name"],
+                "department_name" => $assignment["department_name"],
+                "assignment_year" => $assignment["assignment_year"]
+            ],
+            "kpis" => []
+        ];
+    }
+
+    $grouped_assignments[$group_key]["kpis"][] = $assignment;
+}
+
+
+/* =========================================================
    TOTAL WEIGHT
 ========================================================= */
 
@@ -813,7 +861,6 @@ $weight_total_sql = "
 
         a.employee_id,
         a.assignment_year,
-        a.period_id,
         k.kpi_type,
 
         SUM(a.weight) AS total_weight
@@ -828,7 +875,6 @@ $weight_total_sql = "
     GROUP BY
         a.employee_id,
         a.assignment_year,
-        a.period_id,
         k.kpi_type
 ";
 
@@ -852,8 +898,6 @@ while (
         $row["employee_id"]
         . "_"
         . $row["assignment_year"]
-        . "_"
-        . $row["period_id"]
         . "_"
         . $row["kpi_type"];
 
@@ -880,18 +924,6 @@ $form_year =
 
 <style>
 
-        * {
-            box-sizing: border-box;
-        }
-
-
-        body {
-            margin: 0;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            background: #f5f7fb;
-            color: #333;
-        }
-
         .quarter-preview {
             margin-top: 8px;
             color: #667085;
@@ -903,13 +935,7 @@ $form_year =
         }
 
 
-        .page-container {
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 40px;
-        }
-
+        /* .page-container ใช้ขนาดเดียวกับหน้าอื่นจาก assets/css/admin.css */
 
         .page-header {
             display: flex;
@@ -1088,14 +1114,17 @@ $form_year =
         .filter-grid {
             display: grid;
             grid-template-columns:
-                1fr
-                1fr
-                1fr
-                1fr
+                repeat(5, 1fr)
                 auto;
 
             gap: 15px;
             align-items: end;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            white-space: nowrap;
         }
 
 
@@ -1107,7 +1136,179 @@ $form_year =
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1200px;
+            min-width: 900px;
+        }
+
+
+        /* =================================================
+           ASSIGNMENT TABLE (จัดกลุ่มตามพนักงาน)
+        ================================================= */
+
+        .table-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 22px;
+            margin-bottom: 16px;
+            color: #667085;
+            font-size: 14px;
+        }
+
+        .table-summary strong {
+            color: #244397;
+        }
+
+        .assignment-table .col-index {
+            width: 44px;
+            color: #98a2b3;
+            text-align: center;
+        }
+
+        .assignment-table .col-number {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .assignment-table .group-row td {
+            padding: 0;
+            border-top: 1px solid #dfe4ee;
+            border-bottom: 1px solid #dfe4ee;
+            background: #f4f6fb;
+        }
+
+        .assignment-table .group-row:first-child td {
+            border-top: 0;
+        }
+
+        .assignment-table .group-row:hover td {
+            background: #f4f6fb;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 14px;
+        }
+
+        .group-employee {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .group-employee strong {
+            font-size: 15px;
+            color: #1f2937;
+        }
+
+        .group-avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #244397;
+            color: #fff;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .group-meta {
+            margin-top: 2px;
+            color: #667085;
+            font-size: 13px;
+        }
+
+        .group-weights {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .weight-chip {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 5px;
+            padding: 5px 11px;
+            border: 1px solid #dfe4ee;
+            border-radius: 20px;
+            background: #fff;
+            color: #667085;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .weight-chip strong {
+            color: #1f2937;
+            font-size: 14px;
+        }
+
+        .weight-chip small {
+            color: #98a2b3;
+        }
+
+        .weight-chip.full {
+            border-color: #bfe3cb;
+            background: #eefaf2;
+        }
+
+        .weight-chip.full strong {
+            color: #237a42;
+        }
+
+        .weight-chip.over {
+            border-color: #f5c2c2;
+            background: #fff0f0;
+        }
+
+        .weight-chip.over strong {
+            color: #c62828;
+        }
+
+        .kpi-name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .kpi-unit {
+            margin-top: 2px;
+            color: #98a2b3;
+            font-size: 12px;
+        }
+
+        .assignment-table .col-period {
+            min-width: 250px;
+        }
+
+        .period-main {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .period-dates {
+            margin-top: 3px;
+            color: #98a2b3;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .badge-quarter {
+            background: #eef2ff;
+            color: #244397;
+            font-weight: 500;
+        }
+
+        .row-inactive td {
+            color: #98a2b3;
+        }
+
+        .row-inactive .kpi-name {
+            color: #98a2b3;
         }
 
 
@@ -1206,13 +1407,6 @@ $form_year =
         }
 
 
-        .weight-current {
-            font-size: 12px;
-            color: #666;
-            margin-top: 3px;
-        }
-
-
         @media (max-width: 1100px) {
 
             .filter-grid {
@@ -1225,11 +1419,6 @@ $form_year =
 
 
         @media (max-width: 900px) {
-
-            .page-container {
-                padding: 20px;
-            }
-
 
             .form-grid {
                 grid-template-columns: 1fr;
@@ -1249,11 +1438,6 @@ $form_year =
 
 
         @media (max-width: 600px) {
-
-            .page-container {
-                padding: 15px;
-            }
-
 
             .card {
                 padding: 18px;
@@ -1374,6 +1558,13 @@ $form_year =
                         min="2000"
                         max="2100"
                         required>
+
+                    <div class="select-hint">
+
+                        Assign ครั้งเดียวใช้ได้ทั้งปี (มกราคม - ธันวาคม)
+                        และประเมินผลได้ทุกเดือน
+
+                    </div>
 
                 </div>
 
@@ -1664,7 +1855,10 @@ $form_year =
         </h2>
 
 
-        <form method="GET">
+        <form method="GET" action="index.php">
+
+            <!-- ต้องส่ง page กลับไปด้วย ไม่งั้น index.php จะเด้งไปหน้า home -->
+            <input type="hidden" name="page" value="kpi-assignment">
 
             <div class="filter-grid">
 
@@ -1863,17 +2057,55 @@ $form_year =
                 </div>
 
 
-                <button
-                    type="submit"
-                    class="btn btn-primary">
+                <div class="filter-actions">
 
-                    ค้นหา
+                    <button
+                        type="submit"
+                        class="btn btn-primary">
 
-                </button>
+                        ค้นหา
+
+                    </button>
+
+                    <?php if ($filter_year || $filter_has_month || $filter_department || $filter_employee || $filter_status !== ""): ?>
+
+                        <a
+                            href="index.php?page=kpi-assignment"
+                            class="btn btn-secondary">
+                            ล้างตัวกรอง
+                        </a>
+
+                    <?php endif; ?>
+
+                </div>
 
             </div>
 
         </form>
+
+        <?php if ($filter_year > 0 && $filter_has_month): ?>
+
+            <div class="select-hint">
+
+                <?php if ($filter_period): ?>
+
+                    รอบประเมิน:
+                    <strong><?= htmlspecialchars($filter_period["period_name"]) ?> <?= (int) $filter_period["period_year"] ?></strong>
+                    · <?= htmlspecialchars($filter_period["quarter"]) ?>
+                    · <?= date("d/m/Y", strtotime($filter_period["start_date"])) ?>
+                    - <?= date("d/m/Y", strtotime($filter_period["end_date"])) ?>
+                    · <?= htmlspecialchars($filter_period["status"]) ?>
+
+                <?php else: ?>
+
+                    ยังไม่ได้สร้างรอบประเมินของเดือน<?= monthlyPeriodMonths()[$filter_month] ?> <?= $filter_year ?>
+                    (<?= getQuarterByMonth($filter_month) ?>) พนักงานจะยังบันทึกผลงานเดือนนี้ไม่ได้
+
+                <?php endif; ?>
+
+            </div>
+
+        <?php endif; ?>
 
     </div>
 
@@ -1884,338 +2116,59 @@ $form_year =
 
     <div class="card">
 
+        <div class="table-summary">
+
+            <span>
+                <strong><?= count($grouped_assignments) ?></strong> พนักงาน
+            </span>
+
+            <span>
+                <strong><?= count($assignments_result) ?></strong> รายการ KPI
+            </span>
+
+            <?php if ($filter_has_month && $filter_year > 0): ?>
+
+                <span>
+                    แสดง KPI ที่มีผลในเดือน
+                    <strong><?= monthlyPeriodMonths()[$filter_month] ?> <?= $filter_year ?></strong>
+                    (<?= getQuarterByMonth($filter_month) ?>)
+                </span>
+
+            <?php endif; ?>
+
+        </div>
+
+
         <div class="table-wrapper">
 
-            <table>
+            <table class="assignment-table">
 
                 <thead>
 
                     <tr>
 
-                        <th>#</th>
-                        <th>พนักงาน</th>
-                        <th>แผนก</th>
+                        <th class="col-index">#</th>
                         <th>KPI</th>
                         <th>ประเภท</th>
-                        <th>รอบประเมิน</th>
-                        <th>ปี</th>
-                        <th>Target</th>
-                        <th>Weight</th>
-                        <th>ช่วงเวลา</th>
+                        <th class="col-number">Target</th>
+                        <th class="col-number">Weight</th>
+                        <th class="col-period">ช่วงเวลาที่มีผล</th>
                         <th>สถานะ</th>
                         <th>จัดการ</th>
 
+                    </tr>
 
-                <?php if (
-                    !empty(
-                        $assignments_result
-                    )
-                ): ?>
+                </thead>
 
-                    <?php $no = 1; ?>
+                <tbody>
 
-                    <?php foreach (
-                        $assignments_result
-                        as $assignment
-                    ): ?>
 
-                        <?php
-
-                        $weight_key =
-                            $assignment["employee_id"]
-                            . "_"
-                            . $assignment["assignment_year"]
-                            . "_"
-                            . $assignment["period_id"]
-                            . "_"
-                            . $assignment["kpi_type"];
-
-
-                        $total_weight =
-                            $weights[
-                                $weight_key
-                            ] ?? 0;
-
-                        ?>
-
-                        <tr>
-
-                            <td>
-                                <?= $no++ ?>
-                            </td>
-
-
-                            <td>
-
-                                <strong>
-
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "employee_code"
-                                        ]
-                                    ) ?>
-
-                                </strong>
-
-                                <br>
-
-                                <?= htmlspecialchars(
-                                    $assignment[
-                                        "first_name"
-                                    ]
-                                ) ?>
-
-                                <?= htmlspecialchars(
-                                    $assignment[
-                                        "last_name"
-                                    ]
-                                ) ?>
-
-                            </td>
-
-
-                            <td>
-
-                                <span
-                                    class="badge badge-department">
-
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "department_name"
-                                        ] ?? "-"
-                                    ) ?>
-
-                                </span>
-
-                            </td>
-
-
-                            <td>
-
-                                <strong>
-
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "kpi_name"
-                                        ]
-                                    ) ?>
-
-                                </strong>
-
-                                <br>
-
-                                <small>
-
-                                    หน่วย:
-
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "unit"
-                                        ] ?? "-"
-                                    ) ?>
-
-                                </small>
-
-                            </td>
-
-
-                            <td>
-
-                                <?php
-
-                                $type_class =
-                                    strtolower(
-                                        $assignment[
-                                            "kpi_type"
-                                        ]
-                                    ) ===
-                                    "performance"
-                                    ? "performance"
-                                    : "";
-
-                                ?>
-
-                                <span
-                                    class="badge badge-type <?= $type_class ?>">
-
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "kpi_type"
-                                        ]
-                                    ) ?>
-
-                                </span>
-
-                            </td>
-
-
-                            <td>
-
-                                <?= htmlspecialchars(
-                                    $assignment[
-                                        "period_name"
-                                    ]
-                                ) ?>
-
-                            </td>
-
-
-                            <td>
-
-                                <?= htmlspecialchars(
-                                    $assignment[
-                                        "assignment_year"
-                                    ]
-                                ) ?>
-
-                            </td>
-
-                            <td>
-                                <?= htmlspecialchars(
-                                    getQuarterFromDate($assignment["start_date"])
-                                ) ?>
-                            </td>
-
-
-                            <td>
-
-                                <?= number_format(
-                                    $assignment[
-                                        "target_value"
-                                    ]
-                                ) ?>%
-
-                            </td>
-
-
-                            <td>
-
-                                <strong>
-
-                                    <?= number_format(
-                                        $assignment[
-                                            "weight"
-                                        ]
-                                    ) ?>
-
-                                </strong>
-
-                                <div
-                                    class="weight-current">
-
-                                    รวม
-                                    <?= htmlspecialchars(
-                                        $assignment[
-                                            "kpi_type"
-                                        ]
-                                    ) ?>:
-
-                                    <?= number_format(
-                                        $total_weight,
-                                        2
-                                    ) ?>%
-
-                                </div>
-
-                            </td>
-
-
-                            <td>
-
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime(
-                                        $assignment[
-                                            "start_date"
-                                        ]
-                                    )
-                                ) ?>
-
-                                <br>
-
-                                -
-
-                                <br>
-
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime(
-                                        $assignment[
-                                            "end_date"
-                                        ]
-                                    )
-                                ) ?>
-
-                            </td>
-
-
-                            <td>
-
-                                <?php if (
-                                    $assignment[
-                                        "status"
-                                    ] === "Active"
-                                ): ?>
-
-                                    <span
-                                        class="badge badge-active">
-
-                                        Active
-
-                                    </span>
-
-                                <?php else: ?>
-
-                                    <span
-                                        class="badge badge-inactive">
-
-                                        Inactive
-
-                                    </span>
-
-                                <?php endif; ?>
-
-                            </td>
-
-
-                            <td>
-
-                                <div
-                                    class="action-buttons">
-
-                                    <a
-                                        href="kpi-assignment/kpi-assignment-edit.php?id=<?= $assignment["assignment_id"] ?>"
-                                        class="btn-small btn-edit">
-
-                                        แก้ไข
-
-                                    </a>
-
-
-                                    <a
-                                        href="kpi-assignment/kpi-assignment-delete.php?id=<?= $assignment["assignment_id"] ?>"
-                                        class="btn-small btn-delete"
-
-                                        onclick="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
-
-                                        ลบ
-
-                                    </a>
-
-                                </div>
-
-                            </td>
-
-                        </tr>
-
-                    <?php endforeach; ?>
-
-                <?php else: ?>
+                <?php if (empty($grouped_assignments)): ?>
 
                     <tr>
 
                         <td
-                            colspan="12"
+                            colspan="8"
                             class="empty">
 
                             ยังไม่มีข้อมูล KPI Assignment
@@ -2223,6 +2176,235 @@ $form_year =
                         </td>
 
                     </tr>
+
+                <?php else: ?>
+
+                    <?php foreach ($grouped_assignments as $group): ?>
+
+                        <?php
+                        $employee = $group["employee"];
+                        $kpi_count = count($group["kpis"]);
+                        ?>
+
+
+                        <!-- =========================================
+                             EMPLOYEE GROUP HEADER
+                        ========================================== -->
+
+                        <tr class="group-row">
+
+                            <td colspan="8">
+
+                                <div class="group-header">
+
+                                    <div class="group-employee">
+
+                                        <span class="group-avatar">
+                                            <?= htmlspecialchars(
+                                                mb_substr($employee["first_name"], 0, 1, "UTF-8")
+                                            ) ?>
+                                        </span>
+
+                                        <div>
+
+                                            <strong>
+                                                <?= htmlspecialchars($employee["first_name"]) ?>
+                                                <?= htmlspecialchars($employee["last_name"]) ?>
+                                            </strong>
+
+                                            <div class="group-meta">
+
+                                                <?= htmlspecialchars($employee["employee_code"]) ?>
+
+                                                ·
+
+                                                <?= htmlspecialchars($employee["department_name"] ?? "ไม่ระบุแผนก") ?>
+
+                                                ·
+
+                                                ปี <?= (int) $employee["assignment_year"] ?>
+
+                                                ·
+
+                                                <?= $kpi_count ?> KPI
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+
+                                    <!-- Weight รวมทุกประเภท (Performance + Competency = 100%) -->
+
+                                    <?php
+                                    $weight_key_prefix =
+                                        $employee["employee_id"]
+                                        . "_" . $employee["assignment_year"] . "_";
+
+                                    $total_weight =
+                                        ($weights[$weight_key_prefix . "Performance"] ?? 0)
+                                        + ($weights[$weight_key_prefix . "Competency"] ?? 0);
+
+                                    $chip_class = $total_weight > 100
+                                        ? "over"
+                                        : ($total_weight == 100 ? "full" : "");
+                                    ?>
+
+                                    <div class="group-weights">
+
+                                        <span class="weight-chip <?= $chip_class ?>">
+
+                                            Weight รวม
+
+                                            <strong><?= number_format($total_weight) ?>%</strong>
+
+                                            <small>/ 100%</small>
+
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+
+                        <!-- =========================================
+                             KPI ROWS
+                        ========================================== -->
+
+                        <?php foreach ($group["kpis"] as $index => $assignment): ?>
+
+                            <?php
+                            $is_performance =
+                                strtolower($assignment["kpi_type"]) === "performance";
+
+                            $period_label = $filter_has_month
+                                ? monthlyPeriodMonths()[$filter_month]
+                                : assignmentMonthRangeLabel(
+                                    $assignment["start_date"],
+                                    $assignment["end_date"]
+                                );
+
+                            $quarter_label = $filter_has_month
+                                ? getQuarterByMonth($filter_month)
+                                : assignmentQuarterRangeLabel(
+                                    $assignment["start_date"],
+                                    $assignment["end_date"]
+                                );
+                            ?>
+
+                            <tr class="<?= $assignment["status"] === "Active" ? "" : "row-inactive" ?>">
+
+                                <td class="col-index">
+                                    <?= $index + 1 ?>
+                                </td>
+
+
+                                <td>
+
+                                    <div class="kpi-name">
+                                        <?= htmlspecialchars($assignment["kpi_name"]) ?>
+                                    </div>
+
+                                    <div class="kpi-unit">
+                                        หน่วย: <?= htmlspecialchars($assignment["unit"] ?? "-") ?>
+                                    </div>
+
+                                </td>
+
+
+                                <td>
+
+                                    <span class="badge badge-type <?= $is_performance ? "performance" : "" ?>">
+                                        <?= htmlspecialchars($assignment["kpi_type"]) ?>
+                                    </span>
+
+                                </td>
+
+
+                                <td class="col-number">
+
+                                    <?= number_format($assignment["target_value"]) ?>%
+
+                                </td>
+
+
+                                <td class="col-number">
+
+                                    <strong><?= number_format($assignment["weight"]) ?>%</strong>
+
+                                </td>
+
+
+                                <td>
+
+                                    <div class="period-main">
+
+                                        <?= htmlspecialchars($period_label) ?>
+                                        <?= (int) $assignment["assignment_year"] ?>
+
+                                        <span class="badge badge-quarter">
+                                            <?= htmlspecialchars($quarter_label) ?>
+                                        </span>
+
+                                    </div>
+
+                                    <div class="period-dates">
+
+                                        <?= date("d/m/Y", strtotime($assignment["start_date"])) ?>
+                                        –
+                                        <?= date("d/m/Y", strtotime($assignment["end_date"])) ?>
+
+                                    </div>
+
+                                </td>
+
+
+                                <td>
+
+                                    <?php if ($assignment["status"] === "Active"): ?>
+
+                                        <span class="badge badge-active">Active</span>
+
+                                    <?php else: ?>
+
+                                        <span class="badge badge-inactive">Inactive</span>
+
+                                    <?php endif; ?>
+
+                                </td>
+
+
+                                <td>
+
+                                    <div class="action-buttons">
+
+                                        <a
+                                            href="kpi-assignment/kpi-assignment-edit.php?id=<?= (int) $assignment["assignment_id"] ?>"
+                                            class="btn-small btn-edit">
+                                            แก้ไข
+                                        </a>
+
+                                        <a
+                                            href="kpi-assignment/kpi-assignment-delete.php?id=<?= (int) $assignment["assignment_id"] ?>"
+                                            class="btn-small btn-delete"
+                                            onclick="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
+                                            ลบ
+                                        </a>
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
+
+                        <?php endforeach; ?>
+
+                    <?php endforeach; ?>
 
                 <?php endif; ?>
 

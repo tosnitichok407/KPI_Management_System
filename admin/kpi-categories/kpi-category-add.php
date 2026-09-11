@@ -2,7 +2,7 @@
 
 session_start();
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /*
@@ -66,15 +66,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if ($category_name === "") {
 
-        $error = "Please enter KPI Category Name.";
+        $error = "กรุณากรอกชื่อหมวดหมู่ KPI";
 
     } elseif (mb_strlen($category_name) > 100) {
 
-        $error = "KPI Category Name must not exceed 100 characters.";
+        $error = "ชื่อหมวดหมู่ KPI ต้องไม่เกิน 100 ตัวอักษร";
 
     } elseif (mb_strlen($description) > 255) {
 
-        $error = "Description must not exceed 255 characters.";
+        $error = "รายละเอียดต้องไม่เกิน 255 ตัวอักษร";
 
     } else {
 
@@ -113,7 +113,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             if ($existing) {
 
                 $error =
-                    "This KPI Category already exists.";
+                    "มีหมวดหมู่ KPI ชื่อนี้อยู่แล้ว";
 
             } else {
 
@@ -152,7 +152,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 */
 
                 $_SESSION["category_success"] =
-                    "KPI Category added successfully.";
+                    "เพิ่ม KPI Category เรียบร้อยแล้ว";
 
 
                 /*
@@ -171,10 +171,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } catch (PDOException $e) {
 
             $error =
-                "Unable to add KPI Category. Please try again.";
+                "ไม่สามารถเพิ่ม KPI Category ได้ กรุณาลองใหม่อีกครั้ง";
         }
     }
 }
+
+
+/*
+|--------------------------------------------------------------------------
+| Form
+|--------------------------------------------------------------------------
+*/
+
+$formAction = "kpi-category-add.php";
+$submitLabel = "+ เพิ่มหมวดหมู่ KPI";
 
 ?>
 
@@ -195,320 +205,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         Add KPI Category
     </title>
 
-
-    <!-- Google Font -->
-
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
 
-
-    <!-- Existing CSS -->
-
     <link
         rel="stylesheet"
-        href="../../assets/css/variables.css"
+        href="../../assets/css/kpi.css?v=category-form-1"
     >
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/responsive.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="../../assets/css/kpi.css"
-    >
-
-
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-
-        body {
-
-            margin: 0;
-
-            font-family: var(--font-family, "Kanit", sans-serif);
-
-            background: #f5f7fb;
-
-            color: #1f2937;
-        }
-
-
-        .page-container {
-
-            padding: 30px;
-
-            max-width: 900px;
-
-            margin: 0 auto;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Header
-        |--------------------------------------------------------------------------
-        */
-
-        .page-header {
-
-            margin-bottom: 25px;
-        }
-
-
-        .page-header h1 {
-
-            margin: 0;
-
-            font-size: 30px;
-
-            color: #1f2937;
-        }
-
-
-        .page-header p {
-
-            margin: 5px 0 0;
-
-            color: #6b7280;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Card
-        |--------------------------------------------------------------------------
-        */
-
-        .card {
-
-            background: #ffffff;
-
-            border-radius: 12px;
-
-            padding: 30px;
-
-            box-shadow:
-                0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Error
-        |--------------------------------------------------------------------------
-        */
-
-        .alert-error {
-
-            background: #fee2e2;
-
-            color: #991b1b;
-
-            padding: 14px 18px;
-
-            border-radius: 8px;
-
-            margin-bottom: 20px;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Form
-        |--------------------------------------------------------------------------
-        */
-
-        .form-group {
-
-            margin-bottom: 20px;
-        }
-
-
-        .form-group label {
-
-            display: block;
-
-            margin-bottom: 7px;
-
-            font-weight: 500;
-
-            color: #374151;
-        }
-
-
-        .required {
-
-            color: #dc2626;
-        }
-
-
-        .form-control {
-
-            width: 100%;
-
-            padding: 12px 14px;
-
-            border: 1px solid #d1d5db;
-
-            border-radius: 8px;
-
-            font-family: var(--font-family, "Kanit", sans-serif);
-
-            font-size: 15px;
-
-            outline: none;
-
-            transition: 0.2s;
-        }
-
-
-        .form-control:focus {
-
-            border-color: #243f8f;
-
-            box-shadow:
-                0 0 0 3px rgba(36, 63, 143, 0.1);
-        }
-
-
-        textarea.form-control {
-
-            min-height: 120px;
-
-            resize: vertical;
-        }
-
-
-        .form-help {
-
-            margin-top: 5px;
-
-            font-size: 13px;
-
-            color: #6b7280;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Buttons
-        |--------------------------------------------------------------------------
-        */
-
-        .form-actions {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            margin-top: 30px;
-
-            padding-top: 20px;
-
-            border-top: 1px solid #e5e7eb;
-        }
-
-
-        .btn {
-
-            display: inline-block;
-
-            padding: 11px 20px;
-
-            border-radius: 8px;
-
-            border: none;
-
-            text-decoration: none;
-
-            font-family: var(--font-family, "Kanit", sans-serif);
-
-            font-size: 15px;
-
-            font-weight: 500;
-
-            cursor: pointer;
-        }
-
-
-        .btn-primary {
-
-            background: #243f8f;
-
-            color: #ffffff;
-        }
-
-
-        .btn-primary:hover {
-
-            background: #1d3477;
-        }
-
-
-        .btn-secondary {
-
-            background: #e5e7eb;
-
-            color: #374151;
-        }
-
-
-        .btn-secondary:hover {
-
-            background: #d1d5db;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Responsive
-        |--------------------------------------------------------------------------
-        */
-
-        @media (max-width: 768px) {
-
-            .page-container {
-
-                padding: 15px;
-            }
-
-
-            .card {
-
-                padding: 20px;
-            }
-
-
-            .form-actions {
-
-                flex-direction: column-reverse;
-
-                align-items: stretch;
-
-                gap: 10px;
-            }
-
-
-            .form-actions .btn {
-
-                width: 100%;
-
-                text-align: center;
-            }
-
-        }
-
-    </style>
 
 </head>
 
@@ -516,41 +221,41 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <body>
 
 
-<div class="page-container">
+<div class="page-container category-page">
 
 
     <!-- =========================================================
          PAGE HEADER
     ========================================================== -->
 
-    <div class="page-header">
+    <header class="page-header">
 
-        <h1>
-            Add KPI Category
-        </h1>
+        <div class="page-title-block">
 
-        <p>
-            เพิ่มหมวดหมู่สำหรับ KPI Indicator
-        </p>
+            <h1>
+                Add KPI Category
+            </h1>
 
-    </div>
+            <p>
+                เพิ่มหมวดหมู่สำหรับ KPI Indicator
+            </p>
+
+        </div>
+
+    </header>
 
 
     <!-- =========================================================
          FORM CARD
     ========================================================== -->
 
-    <div class="card">
+    <div class="category-card">
 
-
-        <!-- =====================================================
-             ERROR MESSAGE
-        ====================================================== -->
 
         <?php if ($error !== ""): ?>
 
             <div
-                class="alert-error"
+                class="alert alert-error"
                 role="alert"
             >
 
@@ -565,120 +270,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <?php endif; ?>
 
 
-        <!-- =====================================================
-             FORM
-        ====================================================== -->
-
-        <form
-            method="POST"
-            action="kpi-categories-add.php"
-        >
-
-
-            <!-- =================================================
-                 Category Name
-            ================================================== -->
-
-            <div class="form-group">
-
-                <label for="category_name">
-
-                    Category Name
-
-                    <span class="required">
-                        *
-                    </span>
-
-                </label>
-
-
-                <input
-                    type="text"
-                    id="category_name"
-                    name="category_name"
-                    class="form-control"
-                    value="<?= htmlspecialchars(
-                        $category_name,
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>"
-                    maxlength="100"
-                    placeholder="เช่น Sales Performance"
-                    required
-                    autofocus
-                >
-
-
-                <div class="form-help">
-
-                    ชื่อหมวดหมู่ KPI ความยาวไม่เกิน 100 ตัวอักษร
-
-                </div>
-
-            </div>
-
-
-            <!-- =================================================
-                 Description
-            ================================================== -->
-
-            <div class="form-group">
-
-                <label for="description">
-
-                    Description
-
-                </label>
-
-
-                <textarea
-                    id="description"
-                    name="description"
-                    class="form-control"
-                    maxlength="255"
-                    placeholder="รายละเอียดของหมวดหมู่ KPI"
-                ><?= htmlspecialchars(
-                    $description,
-                    ENT_QUOTES,
-                    "UTF-8"
-                ) ?></textarea>
-
-
-                <div class="form-help">
-
-                    รายละเอียดเพิ่มเติม ความยาวไม่เกิน 255 ตัวอักษร
-
-                </div>
-
-            </div>
-
-
-            <!-- =================================================
-                 Buttons
-            ================================================== -->
-
-            <div class="form-actions">
-
-                <a
-                    href="../index.php?page=kpi-categories"
-                    class="btn btn-secondary"
-                >
-                    Cancel
-                </a>
-
-
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    + Add KPI Category
-                </button>
-
-
-            </div>
-
-
-        </form>
+        <?php include __DIR__ . "/kpi-category-form.php"; ?>
 
 
     </div>
@@ -687,7 +279,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 </div>
 
 
-<script src="../../assets/js/admin.js"></script>
+<script src="../../assets/js/admin.js?v=scroll-2"></script>
 
 </body>
 

@@ -70,18 +70,14 @@ $sql = "
         k.unit,
         k.max_score,
 
-        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
-        COALESCE(ep.start_date, a.start_date) AS start_date,
-        COALESCE(ep.end_date, a.end_date) AS end_date,
-        ep.status AS period_status
+        a.assignment_year,
+        COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
+        COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) AS end_date
 
     FROM kpi_assignments a
 
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
-
-    LEFT JOIN evaluation_periods ep
-        ON a.period_id = ep.period_id
 
     WHERE a.assignment_id = :assignment_id
 
@@ -133,13 +129,15 @@ if ($selectedMonth < 1 || $selectedMonth > 12) {
 }
 $performanceDateForMonth = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
 $monthEnd = date("Y-m-t", strtotime($performanceDateForMonth));
-$selectedPeriodId = (int) ($_GET["period_id"] ?? $_POST["period_id"] ?? 0);
-$periodStmt = $pdo->prepare("SELECT period_id, start_date FROM evaluation_periods WHERE period_id = :period_id AND period_year = :year AND period_month = :month LIMIT 1");
-$periodStmt->execute([":period_id" => $selectedPeriodId, ":year" => $selectedYear, ":month" => $selectedMonth]);
-$selectedPeriod = $periodStmt->fetch(PDO::FETCH_ASSOC);
+// รอบประเมินหาจากปี + เดือนที่เลือก (Assignment ไม่ผูกกับรอบประเมิน)
+$selectedPeriod = findEvaluationPeriodByMonth($pdo, $selectedYear, $selectedMonth);
+$selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
 if ($selectedPeriod) {
     $performanceDateForMonth = $selectedPeriod["start_date"];
 }
+$kpi["period_name"] = $selectedPeriod
+    ? $selectedPeriod["period_name"] . " " . $selectedYear . " (" . $selectedPeriod["quarter"] . ")"
+    : "ยังไม่มีรอบประเมินของเดือน" . monthlyPeriodMonths()[$selectedMonth] . " " . $selectedYear;
 
 
 /*
@@ -173,12 +171,12 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
         $error =
             "กรุณาเลือกวันที่";
     } elseif (
-        $performanceDate < $kpi["start_date"] ||
-        $performanceDate > $kpi["end_date"]
+        $selectedPeriod["end_date"] < $kpi["start_date"] ||
+        $selectedPeriod["start_date"] > $kpi["end_date"]
     ) {
 
         $error =
-            "วันที่บันทึกต้องอยู่ภายในช่วงของ KPI Assignment";
+            "KPI นี้ไม่ได้มีผลในเดือนที่เลือก";
     } elseif ($actual === "") {
 
         $error =
