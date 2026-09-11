@@ -11,15 +11,16 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 $auth = requireEmployeeExportAccess();
-$periodId = (int) ($_GET["period_id"] ?? 0);
-$report = loadEmployeePerformanceReport($pdo, $auth["employee_id"], $periodId);
+$year = (int) ($_GET["year"] ?? date("Y"));
+$month = (int) ($_GET["month"] ?? date("n"));
+$report = loadEmployeePerformanceReport($pdo, $auth["employee_id"], $year, $month);
 $employee = $report["employee"];
 $period = $report["period"];
 $summary = $report["summary"];
 
-if (!$period) {
+if (!$period || empty($report["kpis"])) {
     http_response_code(404);
-    exit("No evaluation period found");
+    exit("เดือนนี้ยังไม่มี KPI ที่ได้รับมอบหมาย");
 }
 
 $spreadsheet = new Spreadsheet();
@@ -95,7 +96,7 @@ foreach ($widths as $index => $width) {
 }
 $sheet->freezePane("A8");
 
-$filename = "performance-report-" . $employee["employee_code"] . "-" . $period["period_id"] . ".xlsx";
+$filename = "performance-report-" . $employee["employee_code"] . "-" . $year . "-" . $month . ".xlsx";
 header("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 header("Content-Disposition: attachment; filename=\"{$filename}\"");
 header("Cache-Control: max-age=0");

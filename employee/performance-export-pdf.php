@@ -8,15 +8,16 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 
 $auth = requireEmployeeExportAccess();
-$periodId = (int) ($_GET["period_id"] ?? 0);
-$report = loadEmployeePerformanceReport($pdo, $auth["employee_id"], $periodId);
+$year = (int) ($_GET["year"] ?? date("Y"));
+$month = (int) ($_GET["month"] ?? date("n"));
+$report = loadEmployeePerformanceReport($pdo, $auth["employee_id"], $year, $month);
 $employee = $report["employee"];
 $period = $report["period"];
 $summary = $report["summary"];
 
-if (!$period) {
+if (!$period || empty($report["kpis"])) {
     http_response_code(404);
-    exit("No evaluation period found");
+    exit("เดือนนี้ยังไม่มี KPI ที่ได้รับมอบหมาย");
 }
 
 $escape = static fn ($value): string => htmlspecialchars((string) ($value ?? "-"), ENT_QUOTES, "UTF-8");
@@ -68,4 +69,4 @@ $dompdf = new Dompdf($options);
 $dompdf->loadHtml($html, "UTF-8");
 $dompdf->setPaper("A4", "landscape");
 $dompdf->render();
-$dompdf->stream("performance-report-" . $employee["employee_code"] . "-" . $period["period_id"] . ".pdf", ["Attachment" => true]);
+$dompdf->stream("performance-report-" . $employee["employee_code"] . "-" . $year . "-" . $month . ".pdf", ["Attachment" => true]);

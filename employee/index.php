@@ -1,8 +1,11 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../config/database.php";
+require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../includes/quarter-helper.php";
 
 
 /*
@@ -468,6 +471,28 @@ if ($selectedPeriod > 0) {
 |--------------------------------------------------------------------------
 */
 
+$quarterScoreStmt = $pdo->prepare("
+        SELECT kp.performance_date, kp.score
+        FROM kpi_performances kp
+        INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+        WHERE ka.employee_id = :employee_id
+            AND ka.status = 'Active'
+            AND kp.score IS NOT NULL
+    ORDER BY kp.performance_date
+");
+$quarterScoreStmt->execute([":employee_id" => $employeeId]);
+$quarterScores = [];
+
+foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
+    $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
+    $quarter = getQuarterFromDate($quarterRow["performance_date"]);
+    $quarterScores[$year . "-" . $quarter][] = (float) $quarterRow["score"];
+}
+
+$employeeQuarterYear = $selectedPeriodData
+    ? (int) date("Y", strtotime($selectedPeriodData["start_date"]))
+    : (int) date("Y");
+
 $chartLabels = [];
 
 $chartScores = [];
@@ -543,9 +568,44 @@ $avatar =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css">
+        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
 
     <style>
+        .quarter-score-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .quarter-score-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .quarter-score-card h3 {
+            margin: 0 0 4px;
+            color: #244397;
+        }
+
+        .quarter-score-card p {
+            margin: 0 0 10px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .quarter-score-card strong {
+            font-size: 20px;
+        }
+
+        @media (max-width: 700px) {
+            .quarter-score-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .page-header {
 
             display: flex;
@@ -1475,6 +1535,23 @@ $avatar =
 
         </section>
 
+
+        <section class="quarter-score-grid">
+            <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>
+                <?php
+                $quarterValues = $quarterScores[$employeeQuarterYear . "-" . $quarter] ?? [];
+                ?>
+                <article class="quarter-score-card">
+                    <h3><?= $quarter ?></h3>
+                    <p><?= $employeeQuarterYear ?></p>
+                    <strong>
+                        <?= empty($quarterValues)
+                            ? "ยังไม่มีข้อมูล"
+                            : number_format(array_sum($quarterValues) / count($quarterValues), 2) . " / 5" ?>
+                    </strong>
+                </article>
+            <?php endforeach; ?>
+        </section>
 
         <!-- === CHARTS === -->
 

@@ -92,12 +92,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $kpi_id       = intval($_POST["kpi_id"] ?? 0);
     $employee_id  = intval($_POST["employee_id"] ?? 0);
-    $period_id    = intval($_POST["period_id"] ?? 0);
+    $period_id    = $assignment["period_id"] !== null
+        ? intval($_POST["period_id"] ?? $assignment["period_id"])
+        : null;
     $target_value = trim($_POST["target_value"] ?? "");
     $weight       = trim($_POST["weight"] ?? "");
     $start_date   = $_POST["start_date"] ?? "";
     $end_date     = $_POST["end_date"] ?? "";
     $status       = $_POST["status"] ?? "Active";
+
+    $assignment_year = (int) date(
+        "Y",
+        strtotime($start_date ?: ($assignment["start_date"] ?? "now"))
+    );
+
+    if ($start_date === "" || $end_date === "") {
+        $start_date = $assignment_year . "-01-01";
+        $end_date = $assignment_year . "-12-31";
+    }
 
 
     /* =========================
@@ -107,7 +119,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (
         $kpi_id <= 0 ||
         $employee_id <= 0 ||
-        $period_id <= 0 ||
         $target_value === "" ||
         $weight === "" ||
         $start_date === "" ||
@@ -179,7 +190,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 WHERE kpi_id = ?
                 AND employee_id = ?
-                AND period_id = ?
+                AND assignment_year = ?
                 AND assignment_id != ?
 
                 LIMIT 1
@@ -191,7 +202,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $duplicate_stmt->execute([
                 $kpi_id,
                 $employee_id,
-                $period_id,
+                $assignment_year,
                 $assignment_id
             ]);
 
@@ -227,7 +238,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ON a.kpi_id = k.kpi_id
 
                     WHERE a.employee_id = ?
-                    AND a.period_id = ?
+                    AND a.assignment_year = ?
                     AND k.kpi_type = ?
                     AND a.status = 'Active'
                     AND a.assignment_id != ?
@@ -238,7 +249,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 $weight_stmt->execute([
                     $employee_id,
-                    $period_id,
+                    $assignment_year,
                     $kpi_type,
                     $assignment_id
                 ]);
@@ -300,6 +311,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         SET
                             kpi_id = ?,
                             employee_id = ?,
+                            assignment_year = ?,
                             period_id = ?,
                             target_value = ?,
                             weight = ?,
@@ -316,6 +328,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $update_stmt->execute([
                         $kpi_id,
                         $employee_id,
+                        $assignment_year,
                         $period_id,
                         $target_value,
                         $weight,
@@ -728,7 +741,6 @@ $periods_result =
 
                     <select
                         name="period_id"
-                        required
                     >
 
                         <option value="">

@@ -5,6 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../includes/quarter-helper.php";
+require_once __DIR__ . "/../includes/monthly-period-helper.php";
 
 
 /*
@@ -45,25 +47,80 @@ $employeeCode = $_SESSION["employee_code"] ?? "-";
 
 $fullName = trim($firstName . " " . $lastName);
 
-$periodStmt = $pdo->prepare("
-    SELECT DISTINCT
-        ep.period_id,
-        ep.period_name,
-        ep.start_date,
-        ep.end_date,
-        ep.status
-    FROM evaluation_periods ep
-    INNER JOIN kpi_assignments a ON a.period_id = ep.period_id
+$thaiMonths = [
+    1 => "มกราคม", 2 => "กุมภาพันธ์", 3 => "มีนาคม", 4 => "เมษายน",
+    5 => "พฤษภาคม", 6 => "มิถุนายน", 7 => "กรกฎาคม", 8 => "สิงหาคม",
+    9 => "กันยายน", 10 => "ตุลาคม", 11 => "พฤศจิกายน", 12 => "ธันวาคม"
+];
+$currentYear = (int) date("Y");
+$currentMonth = (int) date("n");
+$selectedYear = (int) ($_GET["year"] ?? $currentYear);
+$selectedMonth = (int) ($_GET["month"] ?? $currentMonth);
+if ($selectedYear < 2000 || $selectedYear > 2100) {
+    $selectedYear = $currentYear;
+}
+if ($selectedMonth < 1 || $selectedMonth > 12) {
+    $selectedMonth = $currentMonth;
+}
+$selectedQuarter = getQuarterByMonth($selectedMonth);
+$selectedMonthStart = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
+$selectedMonthEnd = date("Y-m-t", strtotime($selectedMonthStart));
+$selectedPeriodStmt = $pdo->prepare("SELECT period_id FROM evaluation_periods WHERE period_year = :year AND period_month = :month LIMIT 1");
+$selectedPeriodStmt->execute([":year" => $selectedYear, ":month" => $selectedMonth]);
+$selectedPeriodId = (int) ($selectedPeriodStmt->fetchColumn() ?: 0);
+
+$quarterScoreStmt = $pdo->prepare("
+    SELECT
+        p.performance_date,
+        k.kpi_type,
+        p.score
+    FROM kpi_performances p
+    INNER JOIN kpi_assignments a ON a.assignment_id = p.assignment_id
+    INNER JOIN kpi_indicators k ON k.kpi_id = a.kpi_id
     WHERE a.employee_id = :employee_id
       AND a.status = 'Active'
-    ORDER BY ep.start_date DESC, ep.period_id DESC
+    AND p.score IS NOT NULL
+    ORDER BY p.performance_date
 ");
-$periodStmt->execute([":employee_id" => $employeeId]);
-$availablePeriods = $periodStmt->fetchAll(PDO::FETCH_ASSOC);
+$quarterScoreStmt->execute([":employee_id" => $employeeId]);
+$quarterScores = [];
 
-$selectedPeriod = (int) ($_GET["period_id"] ?? 0);
-if ($selectedPeriod <= 0 && !empty($availablePeriods)) {
-    $selectedPeriod = (int) $availablePeriods[0]["period_id"];
+foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
+    $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
+    $quarter = getQuarterFromDate($quarterRow["performance_date"]);
+    $key = $year . "-" . $quarter;
+
+    if (!isset($quarterScores[$key])) {
+        $quarterScores[$key] = [
+            "year" => $year,
+            "quarter" => $quarter,
+            "Performance" => [],
+            "Competency" => [],
+            "months" => []
+        ];
+    }
+
+    if (isset($quarterScores[$key][$quarterRow["kpi_type"]])) {
+        $quarterScores[$key][$quarterRow["kpi_type"]][] =
+            (float) $quarterRow["score"];
+    }
+
+    $month = (int) date("n", strtotime($quarterRow["performance_date"]));
+    $quarterScores[$key]["months"][$month][] = (float) $quarterRow["score"];
+}
+
+$yearStmt = $pdo->prepare("
+    SELECT DISTINCT
+        a.assignment_year
+    FROM kpi_assignments a
+    WHERE a.employee_id = :employee_id
+      AND a.status = 'Active'
+    ORDER BY a.assignment_year DESC
+");
+$yearStmt->execute([":employee_id" => $employeeId]);
+$availableYears = array_map("intval", array_column($yearStmt->fetchAll(PDO::FETCH_ASSOC), "assignment_year"));
+if (!in_array($selectedYear, $availableYears, true) && !empty($availableYears) && !isset($_GET["year"])) {
+    $selectedYear = $currentYear;
 }
 
 
@@ -79,8 +136,10 @@ $sql = "
         a.assignment_id,
         a.employee_id,
         a.period_id,
+        a.assignment_year,
         a.kpi_id,
         a.weight,
+        a.target_value AS assignment_target,
         a.status AS assignment_status,
 
         k.kpi_name,
@@ -89,10 +148,10 @@ $sql = "
         k.unit,
         k.max_score,
 
-        ep.period_name,
-        ep.start_date,
-        ep.end_date,
-        ep.status AS period_status,
+        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
+        COALESCE(ep.start_date, a.start_date) AS start_date,
+        COALESCE(ep.end_date, a.end_date) AS end_date,
+        COALESCE(ep.status, 'Open') AS period_status,
 
         p.performance_id,
         p.performance_date,
@@ -107,7 +166,7 @@ $sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    INNER JOIN evaluation_periods ep
+    LEFT JOIN evaluation_periods ep
         ON a.period_id = ep.period_id
 
     LEFT JOIN kpi_performances p
@@ -118,9 +177,8 @@ $sql = "
             FROM kpi_performances kp
 
             WHERE kp.assignment_id = a.assignment_id
-
             AND kp.employee_id = :employee_id_sub
-
+            AND kp.period_id = :period_id_sub
             ORDER BY kp.performance_date DESC,
                      kp.performance_id DESC
 
@@ -130,8 +188,7 @@ $sql = "
     WHERE a.employee_id = :employee_id
 
     AND a.status = 'Active'
-
-    AND a.period_id = :period_id
+    AND a.assignment_year = :assignment_year
 
     ORDER BY
         ep.start_date DESC,
@@ -145,8 +202,9 @@ try {
 
     $stmt->execute([
         ":employee_id_sub" => $employeeId,
+        ":period_id_sub" => $selectedPeriodId,
         ":employee_id" => $employeeId,
-        ":period_id" => $selectedPeriod
+        ":assignment_year" => $selectedYear
     ]);
 
     $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -185,7 +243,8 @@ $periods = [];
 
 foreach ($assignments as $assignment) {
 
-    $periodId = $assignment["period_id"];
+    $periodId = $assignment["period_id"]
+        ?? $assignment["assignment_year"];
 
 
     /*
@@ -232,7 +291,9 @@ foreach ($assignments as $assignment) {
     --------------------------------------------------------------
     */
 
-    $target = null;
+    $target = $assignment["assignment_target"] !== null
+        ? (float) $assignment["assignment_target"]
+        : null;
     $actual = null;
     $score = null;
     $progress = 0;
@@ -247,12 +308,6 @@ foreach ($assignments as $assignment) {
     if (
         !empty($assignment["performance_id"])
     ) {
-
-        $target =
-            $assignment["target"] !== null
-            ? (float) $assignment["target"]
-            : null;
-
 
         $actual =
             $assignment["actual"] !== null
@@ -443,7 +498,7 @@ if ($totalPerformanceRecords === 0) {
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css">
+        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
 
 </head>
 
@@ -675,6 +730,35 @@ if ($totalPerformanceRecords === 0) {
         margin-top: 20px;
     }
 
+    .quarter-score-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin: 20px 0;
+    }
+
+    .quarter-score-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 16px;
+    }
+
+    .quarter-score-card h3 {
+        margin: 0 0 4px;
+        color: #244397;
+    }
+
+    .quarter-score-card p {
+        margin: 0 0 12px;
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    .quarter-score-card strong {
+        font-size: 22px;
+    }
+
     .performance-export-button {
         display: inline-flex;
         align-items: center;
@@ -864,6 +948,10 @@ if ($totalPerformanceRecords === 0) {
             flex-wrap: wrap;
         }
 
+        .quarter-score-grid {
+            grid-template-columns: 1fr;
+        }
+
     }
 </style>
 
@@ -1024,38 +1112,77 @@ if ($totalPerformanceRecords === 0) {
         </section>
 
         <form method="get" class="period-filter">
-            <label for="period_id">รอบประเมิน</label>
-            <select name="period_id" id="period_id" onchange="this.form.submit()">
-                <?php if (empty($availablePeriods)): ?>
-                    <option value="0">ไม่มีรอบประเมิน</option>
-                <?php endif; ?>
-                <?php foreach ($availablePeriods as $availablePeriod): ?>
-                    <option
-                        value="<?= (int) $availablePeriod["period_id"] ?>"
-                        <?= (int) $availablePeriod["period_id"] === $selectedPeriod ? "selected" : "" ?>
-                    >
-                        <?= htmlspecialchars($availablePeriod["period_name"], ENT_QUOTES, "UTF-8") ?>
-                    </option>
+            <label for="year">ปี</label>
+            <select name="year" id="year" onchange="this.form.submit()">
+                <?php foreach (array_unique(array_merge([$currentYear], $availableYears)) as $year): ?>
+                    <option value="<?= (int) $year ?>" <?= (int) $year === $selectedYear ? "selected" : "" ?>><?= (int) $year ?></option>
                 <?php endforeach; ?>
             </select>
+            <label for="month">เดือน</label>
+            <select name="month" id="month" onchange="this.form.submit()">
+                <?php foreach ($thaiMonths as $monthNumber => $monthName): ?>
+                    <option value="<?= $monthNumber ?>" <?= $monthNumber === $selectedMonth ? "selected" : "" ?>><?= $monthName ?></option>
+                <?php endforeach; ?>
+            </select>
+            <span class="performance-month-status"><?= htmlspecialchars($thaiMonths[$selectedMonth], ENT_QUOTES, "UTF-8") ?> <?= $selectedYear ?> · <?= $selectedQuarter ?></span>
         </form>
 
-        <?php if ($selectedPeriod > 0): ?>
+        <?php if (!empty($assignments)): ?>
             <div class="performance-export-actions">
                 <a
-                    href="performance-export-pdf.php?period_id=<?= (int) $selectedPeriod ?>"
+                    href="performance-export-pdf.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                     class="performance-export-button pdf"
                 >
                     📄 Export PDF
                 </a>
                 <a
-                    href="performance-export-excel.php?period_id=<?= (int) $selectedPeriod ?>"
+                    href="performance-export-excel.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                     class="performance-export-button excel"
                 >
                     📊 Export Excel
                 </a>
             </div>
         <?php endif; ?>
+
+        <section class="quarter-score-grid">
+            <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>
+                <?php
+                $quarterKey = $selectedYear . "-" . $quarter;
+                $quarterData = $quarterScores[$quarterKey] ?? null;
+                $allScores = $quarterData
+                    ? array_merge($quarterData["Performance"], $quarterData["Competency"])
+                    : [];
+                $overallAverage = !empty($allScores)
+                    ? array_sum($allScores) / count($allScores)
+                    : null;
+                ?>
+                <article class="quarter-score-card">
+                    <h3><?= $quarter ?></h3>
+                    <p><?= $selectedYear ?></p>
+                    <?php if ($overallAverage === null): ?>
+                        <strong>ยังไม่มีข้อมูล</strong>
+                    <?php else: ?>
+                        <strong><?= number_format($overallAverage) ?> / 5</strong>
+                        <?php foreach (getQuarterMonths($quarter) as $month): ?>
+                            <?php
+                            $monthValues = $quarterData["months"][$month] ?? [];
+                            $monthAverage = !empty($monthValues)
+                                ? array_sum($monthValues) / count($monthValues)
+                                : null;
+                            ?>
+                            <p>
+                                <?= date("M", mktime(0, 0, 0, $month, 1)) ?>:
+                                <?= $monthAverage === null ? "-" : number_format($monthAverage) ?>
+                            </p>
+                        <?php endforeach; ?>
+                        <p>
+                            Performance: <?= !empty($quarterData["Performance"]) ? number_format(array_sum($quarterData["Performance"]) / count($quarterData["Performance"])) : "-" ?><br>
+                            Competency: <?= !empty($quarterData["Competency"]) ? number_format(array_sum($quarterData["Competency"]) / count($quarterData["Competency"])) : "-" ?>
+                        </p>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </section>
 
         <?php if (isset($error)): ?>
 
@@ -1165,15 +1292,16 @@ if ($totalPerformanceRecords === 0) {
             <section class="empty-card">
 
                 <div class="empty-icon">
-                    📊
+                    📋
                 </div>
 
                 <h2>
-                    ยังไม่มีข้อมูล KPI
+                    ยังไม่มี KPI ที่ได้รับมอบหมาย
                 </h2>
 
                 <p>
-                    ยังไม่มี KPI ที่ได้รับมอบหมายให้คุณ
+                    สำหรับเดือน <?= htmlspecialchars($thaiMonths[$selectedMonth], ENT_QUOTES, "UTF-8") ?> <?= $selectedYear ?><br>
+                    กรุณาติดต่อผู้ดูแลระบบหากมีข้อสงสัย
                 </p>
 
             </section>
@@ -1466,7 +1594,7 @@ if ($totalPerformanceRecords === 0) {
 
 
                                     <a
-                                        href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>"
+                                        href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>&amp;year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>&amp;period_id=<?= $selectedPeriodId ?>"
                                         class="performance-button">
 
                                         <?= !empty($kpi["performance_id"])

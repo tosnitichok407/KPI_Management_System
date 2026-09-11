@@ -3,6 +3,7 @@
 session_start();
 
 require_once "../../config/database.php";
+require_once "../../includes/monthly-period-helper.php";
 
 
 /*
@@ -33,9 +34,8 @@ $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $period_name = trim($_POST["period_name"] ?? "");
-    $start_date = $_POST["start_date"] ?? "";
-    $end_date = $_POST["end_date"] ?? "";
+    $year = (int) ($_POST["period_year"] ?? 0);
+    $month = (int) ($_POST["period_month"] ?? 0);
     $status = $_POST["status"] ?? "Open";
 
 
@@ -46,15 +46,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     */
 
     if (
-        $period_name === ""
-        || $start_date === ""
-        || $end_date === ""
+        $year < 2000 || $year > 2100 || $month < 1 || $month > 12
     ) {
 
         $error = "กรุณากรอกข้อมูลให้ครบถ้วน";
-    } elseif ($end_date < $start_date) {
-
-        $error = "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้น";
     } elseif (!in_array($status, ["Open", "Closed"])) {
 
         $error = "สถานะไม่ถูกต้อง";
@@ -68,11 +63,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         */
 
         try {
+            $period = monthlyPeriodDetails($year, $month);
 
             $stmt = $pdo->prepare("
                 INSERT INTO evaluation_periods
                 (
                     period_name,
+                    period_year,
+                    period_month,
+                    quarter,
                     start_date,
                     end_date,
                     status
@@ -80,6 +79,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 VALUES
                 (
                     :period_name,
+                    :period_year,
+                    :period_month,
+                    :quarter,
                     :start_date,
                     :end_date,
                     :status
@@ -88,11 +90,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $stmt->execute([
 
-                ":period_name" => $period_name,
-
-                ":start_date" => $start_date,
-
-                ":end_date" => $end_date,
+                ":period_name" => $period["period_name"],
+                ":period_year" => $period["year"],
+                ":period_month" => $period["month"],
+                ":quarter" => $period["quarter"],
+                ":start_date" => $period["start_date"],
+                ":end_date" => $period["end_date"],
 
                 ":status" => $status
 
@@ -111,8 +114,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             exit;
         } catch (PDOException $e) {
-
-            $error = "ไม่สามารถเพิ่มรอบการประเมินได้";
+            $error = $e->getCode() === "23000"
+                ? "มีรอบประเมินสำหรับปีและเดือนนี้แล้ว"
+                : "ไม่สามารถเพิ่มรอบการประเมินได้";
         }
     }
 }
@@ -207,69 +211,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 action="">
 
 
-                <!-- Period Name -->
-
                 <div class="form-group">
-
-                    <label for="period_name">
-                        ชื่อรอบการประเมิน
-                    </label>
-
+                    <label for="period_year">ปี</label>
                     <input
-                        type="text"
-                        id="period_name"
-                        name="period_name"
-                        placeholder="เช่น ประจำเดือน สิงหาคม 2569"
-                        value="<?= htmlspecialchars(
-                                    $_POST["period_name"] ?? "",
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>"
-                        required>
+                        type="number" id="period_year" name="period_year"
+                        value="<?= (int) ($_POST["period_year"] ?? date("Y")) ?>" min="2000" max="2100" required>
 
                 </div>
-
-
-                <!-- Start Date -->
-
                 <div class="form-group">
-
-                    <label for="start_date">
-                        วันที่เริ่มต้น
-                    </label>
-
-                    <input
-                        type="date"
-                        id="start_date"
-                        name="start_date"
-                        value="<?= htmlspecialchars(
-                                    $_POST["start_date"] ?? "",
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>"
-                        required>
-
-                </div>
-
-
-                <!-- End Date -->
-
-                <div class="form-group">
-
-                    <label for="end_date">
-                        วันที่สิ้นสุด
-                    </label>
-
-                    <input
-                        type="date"
-                        id="end_date"
-                        name="end_date"
-                        value="<?= htmlspecialchars(
-                                    $_POST["end_date"] ?? "",
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>"
-                        required>
+                    <label for="period_month">เดือน</label>
+                    <select id="period_month" name="period_month" required>
+                        <?php foreach (monthlyPeriodMonths() as $number => $name): ?>
+                            <option value="<?= $number ?>" <?= $number === (int) ($_POST["period_month"] ?? date("n")) ? "selected" : "" ?>><?= $name ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small>ระบบจะกำหนดชื่อรอบ, Quarter และช่วงวันของเดือนให้อัตโนมัติ</small>
 
                 </div>
 

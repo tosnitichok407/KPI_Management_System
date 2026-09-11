@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../includes/monthly-period-helper.php";
 
 
 /*
@@ -69,9 +70,9 @@ $sql = "
         k.unit,
         k.max_score,
 
-        ep.period_name,
-        ep.start_date,
-        ep.end_date,
+        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
+        COALESCE(ep.start_date, a.start_date) AS start_date,
+        COALESCE(ep.end_date, a.end_date) AS end_date,
         ep.status AS period_status
 
     FROM kpi_assignments a
@@ -79,7 +80,7 @@ $sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    INNER JOIN evaluation_periods ep
+    LEFT JOIN evaluation_periods ep
         ON a.period_id = ep.period_id
 
     WHERE a.assignment_id = :assignment_id
@@ -120,6 +121,26 @@ $success = "";
 
 $targetValue = (float) $kpi["target_value"];
 
+$currentYear = (int) date("Y");
+$currentMonth = (int) date("n");
+$selectedYear = (int) ($_GET["year"] ?? $_POST["year"] ?? $currentYear);
+$selectedMonth = (int) ($_GET["month"] ?? $_POST["month"] ?? $currentMonth);
+if ($selectedYear < 2000 || $selectedYear > 2100) {
+    $selectedYear = $currentYear;
+}
+if ($selectedMonth < 1 || $selectedMonth > 12) {
+    $selectedMonth = $currentMonth;
+}
+$performanceDateForMonth = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
+$monthEnd = date("Y-m-t", strtotime($performanceDateForMonth));
+$selectedPeriodId = (int) ($_GET["period_id"] ?? $_POST["period_id"] ?? 0);
+$periodStmt = $pdo->prepare("SELECT period_id, start_date FROM evaluation_periods WHERE period_id = :period_id AND period_year = :year AND period_month = :month LIMIT 1");
+$periodStmt->execute([":period_id" => $selectedPeriodId, ":year" => $selectedYear, ":month" => $selectedMonth]);
+$selectedPeriod = $periodStmt->fetch(PDO::FETCH_ASSOC);
+if ($selectedPeriod) {
+    $performanceDateForMonth = $selectedPeriod["start_date"];
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -129,8 +150,7 @@ $targetValue = (float) $kpi["target_value"];
 
 if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
-    $performanceDate =
-        $_POST["performance_date"] ?? "";
+    $performanceDate = $performanceDateForMonth;
 
     $actual =
         $_POST["actual"] ?? "";
@@ -145,10 +165,20 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
     --------------------------------------------------------------
     */
 
-    if ($performanceDate === "") {
+    if (!$selectedPeriod) {
+
+        $error = "ไม่พบรอบประเมินของเดือนที่เลือก";
+    } elseif ($performanceDate === "") {
 
         $error =
             "กรุณาเลือกวันที่";
+    } elseif (
+        $performanceDate < $kpi["start_date"] ||
+        $performanceDate > $kpi["end_date"]
+    ) {
+
+        $error =
+            "วันที่บันทึกต้องอยู่ภายในช่วงของ KPI Assignment";
     } elseif ($actual === "") {
 
         $error =
@@ -219,7 +249,9 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
                 WHERE assignment_id = :assignment_id
 
-                AND performance_date = :performance_date
+                AND employee_id = :employee_id
+
+                AND period_id = :period_id
 
                 LIMIT 1
             ");
@@ -230,16 +262,36 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                 ":assignment_id" =>
                 $assignmentId,
 
-                ":performance_date" =>
-                $performanceDate
+                ":employee_id" => $employeeId,
+
+                ":period_id" => $selectedPeriodId
 
             ]);
 
 
-            if ($check->fetch()) {
+            $existingPerformance = $check->fetch(PDO::FETCH_ASSOC);
 
-                $error =
-                    "วันที่นี้มีการบันทึกผลงานแล้ว";
+            if ($existingPerformance) {
+                try {
+                    $update = $pdo->prepare("
+                        UPDATE kpi_performances
+                        SET target = :target, actual = :actual, score = :score,
+                            comment = :comment, status = 'Submitted'
+                        WHERE performance_id = :performance_id
+                          AND employee_id = :employee_id
+                    ");
+                    $update->execute([
+                        ":target" => $targetValue,
+                        ":actual" => $actualValue,
+                        ":score" => $score,
+                        ":comment" => $comment !== "" ? $comment : null,
+                        ":performance_id" => $existingPerformance["performance_id"],
+                        ":employee_id" => $employeeId
+                    ]);
+                    $success = "อัปเดตผลงานของเดือนที่เลือกเรียบร้อยแล้ว";
+                } catch (PDOException $e) {
+                    $error = "ไม่สามารถอัปเดตผลงานได้";
+                }
             } else {
 
 
@@ -258,6 +310,7 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                         (
                             assignment_id,
                             employee_id,
+                            period_id,
                             performance_date,
                             target,
                             actual,
@@ -271,6 +324,7 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                         (
                             :assignment_id,
                             :employee_id,
+                            :period_id,
                             :performance_date,
                             :target,
                             :actual,
@@ -289,6 +343,8 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
                         ":employee_id" =>
                         $employeeId,
+
+                        ":period_id" => $selectedPeriodId,
 
                         ":performance_date" =>
                         $performanceDate,
@@ -394,7 +450,7 @@ $performances =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css">
+        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
 
     <style>
         body {
@@ -941,13 +997,14 @@ $performances =
                     <div class="form-group">
 
                         <label>
-                            วันที่
+                            เดือนที่บันทึก
                         </label>
-
-                        <input
-                            type="date"
-                            name="performance_date"
-                            required>
+                        <div class="target-value">
+                            <?= htmlspecialchars(date("F Y", strtotime($performanceDateForMonth)), ENT_QUOTES, "UTF-8") ?>
+                        </div>
+                        <input type="hidden" name="year" value="<?= $selectedYear ?>">
+                        <input type="hidden" name="month" value="<?= $selectedMonth ?>">
+                        <input type="hidden" name="period_id" value="<?= $selectedPeriodId ?>">
 
                     </div>
 
@@ -1007,7 +1064,7 @@ $performances =
                 </button>
 
                 <a
-                    href="../employee/performance.php"
+                    href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                     style="margin-left: 5px;"
                     class="btn btn-secondary">
 

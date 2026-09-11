@@ -6,6 +6,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --sidebar-width: 260px;
+}
+
 body {
   margin: 0;
 
@@ -26,7 +30,7 @@ body {
   top: 0;
   left: 0;
 
-  width: 260px;
+  width: var(--sidebar-width);
   height: 100vh;
 
   background: #ffffff;
@@ -206,7 +210,8 @@ body {
 ========================================================= */
 
 .main-content {
-  margin-left: 260px;
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
 
   min-height: 100vh;
 
@@ -1253,12 +1258,17 @@ dialog textarea:focus {
 ========================================================= */
 
 @media (max-width: 900px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+
   .sidebar {
-    width: 220px;
+    width: var(--sidebar-width);
   }
 
   .main-content {
-    margin-left: 220px;
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
 
     padding: 25px;
   }
@@ -1323,6 +1333,7 @@ dialog textarea:focus {
 
   .main-content {
     margin-left: 0;
+    width: 100%;
 
     padding: 20px;
   }

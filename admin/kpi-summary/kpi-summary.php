@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
 
 
 /* =========================================================
@@ -42,6 +43,16 @@ $filter_type =
 
 $filter_status =
     $_GET["status"] ?? "Active";
+
+$filter_year =
+    intval($_GET["year"] ?? 0);
+
+$filter_quarter =
+    $_GET["quarter"] ?? "";
+
+if (!in_array($filter_quarter, ["", "Q1", "Q2", "Q3", "Q4"], true)) {
+    $filter_quarter = "";
+}
 
 
 /* =========================================================
@@ -123,10 +134,10 @@ $summary_sql = "
         e.first_name,
         e.last_name,
 
-        p.period_id,
-        p.period_name,
-        p.start_date AS period_start_date,
-        p.end_date AS period_end_date,
+        a.assignment_year AS period_id,
+        COALESCE(p.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
+        COALESCE(p.start_date, a.start_date) AS period_start_date,
+        COALESCE(p.end_date, a.end_date) AS period_end_date,
 
         k.kpi_type,
 
@@ -148,7 +159,7 @@ $summary_sql = "
     INNER JOIN employees e
         ON a.employee_id = e.employee_id
 
-    INNER JOIN evaluation_periods p
+    LEFT JOIN evaluation_periods p
         ON a.period_id = p.period_id
 
     INNER JOIN kpi_indicators k
@@ -172,6 +183,18 @@ if ($filter_period > 0) {
     ";
 
     $params[] = $filter_period;
+}
+
+if ($filter_year > 0) {
+    $summary_sql .= " AND YEAR(COALESCE(p.start_date, a.start_date)) = ? ";
+    $params[] = $filter_year;
+}
+
+if ($filter_quarter !== "") {
+    [$quarterStart, $quarterEnd] = getQuarterMonths($filter_quarter);
+    $summary_sql .= " AND MONTH(COALESCE(p.start_date, a.start_date)) BETWEEN ? AND ? ";
+    $params[] = $quarterStart;
+    $params[] = $quarterEnd;
 }
 
 
@@ -230,6 +253,7 @@ $summary_sql .= "
         e.first_name,
         e.last_name,
 
+        a.assignment_year,
         p.period_id,
         p.period_name,
         p.start_date,
@@ -291,7 +315,7 @@ $detail_sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    INNER JOIN evaluation_periods p
+    LEFT JOIN evaluation_periods p
         ON a.period_id = p.period_id
 
     WHERE 1 = 1
@@ -312,6 +336,18 @@ if ($filter_period > 0) {
     ";
 
     $detail_params[] = $filter_period;
+}
+
+if ($filter_year > 0) {
+    $detail_sql .= " AND YEAR(COALESCE(p.start_date, a.start_date)) = ? ";
+    $detail_params[] = $filter_year;
+}
+
+if ($filter_quarter !== "") {
+    [$quarterStart, $quarterEnd] = getQuarterMonths($filter_quarter);
+    $detail_sql .= " AND MONTH(COALESCE(p.start_date, a.start_date)) BETWEEN ? AND ? ";
+    $detail_params[] = $quarterStart;
+    $detail_params[] = $quarterEnd;
 }
 
 
@@ -1102,6 +1138,26 @@ function getTypeClass($type)
                 <!-- PERIOD -->
                 <div class="form-group">
 
+                    <label>ปี</label>
+                    <input type="number" name="year" value="<?= $filter_year ?: "" ?>" min="2000" max="2100" placeholder="เช่น 2026">
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>ไตรมาส</label>
+                    <select name="quarter">
+                        <option value="">ทั้งหมด</option>
+                        <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>
+                            <option value="<?= $quarter ?>" <?= $filter_quarter === $quarter ? "selected" : "" ?>><?= $quarter ?></option>
+                        <?php endforeach; ?>
+                    </select>
+
+                </div>
+
+                <!-- EMPLOYEE -->
+                <div class="form-group">
+
                     <label>
                         รอบการประเมิน
                     </label>
@@ -1318,6 +1374,8 @@ function getTypeClass($type)
                             รอบการประเมิน
                         </th>
 
+                        <th>ไตรมาส</th>
+
                         <th>
                             ประเภท
                         </th>
@@ -1429,6 +1487,13 @@ function getTypeClass($type)
                                     $summary["period_name"]
                                 ) ?>
 
+                            </td>
+
+                            <!-- TYPE -->
+                            <td>
+                                <?= htmlspecialchars(
+                                    getQuarterFromDate($summary["period_start_date"])
+                                ) ?>
                             </td>
 
                             <!-- TYPE -->

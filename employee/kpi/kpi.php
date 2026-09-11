@@ -1,8 +1,10 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-require_once "../../config/database.php";
+require_once __DIR__ . "/../../config/database.php";
 
 
 /*
@@ -266,9 +268,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         WHERE assignment_id = :assignment_id
                           AND employee_id = :employee_id
-
-                        ORDER BY
-                            performance_id DESC
+                                                    AND performance_date = CURDATE()
 
                         LIMIT 1
                     ");
@@ -439,10 +439,10 @@ $sql = "
         k.max_score,
         k.kpi_type,
 
-        ep.period_name,
-        ep.start_date,
-        ep.end_date,
-        ep.status AS period_status,
+        COALESCE(ep.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name,
+        COALESCE(ep.start_date, a.start_date) AS start_date,
+        COALESCE(ep.end_date, a.end_date) AS end_date,
+        COALESCE(ep.status, 'Open') AS period_status,
 
         kp.performance_id,
         kp.performance_date,
@@ -457,7 +457,7 @@ $sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    INNER JOIN evaluation_periods ep
+    LEFT JOIN evaluation_periods ep
         ON a.period_id = ep.period_id
 
     LEFT JOIN kpi_performances kp
@@ -677,7 +677,7 @@ $totalCompetency =
 
     <link
         rel="stylesheet"
-        href="../../assets/css/employee-kpi.css">
+        href="../../assets/css/employee-kpi.css?v=layout-20260911-2">
 
 
     <style>

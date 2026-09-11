@@ -6,6 +6,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --sidebar-width: 264px;
+}
+
 /* Management-page layout */
 .page-container {
   width: 100%;
@@ -90,7 +94,7 @@ body {
   top: 0;
   left: 0;
 
-  width: 260px;
+  width: var(--sidebar-width);
   height: 100vh;
 
   background: #ffffff;
@@ -99,7 +103,7 @@ body {
   display: flex;
   flex-direction: column;
 
-  z-index: 100;
+  z-index: 1000;
 }
 
 /* Logo */
@@ -232,11 +236,66 @@ body {
 ========================================================= */
 
 .main-content {
-  margin-left: 100px;
+  margin-left: 264px;
+  width: calc(100% - var(--sidebar-width));
 
   min-height: 100vh;
 
   padding: 10px 15px;
+}
+
+.quarter-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.quarter-score-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.quarter-score-card h3 {
+  margin: 0 0 4px;
+  color: #244397;
+}
+
+.quarter-score-card p {
+  margin: 0 0 10px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.quarter-score-card strong {
+  font-size: 20px;
+}
+
+.quarter-period-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.quarter-period-card {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.quarter-period-card h2 {
+  margin: 0 0 6px;
+  color: #244397;
+}
+
+.quarter-period-card p {
+  margin: 0 0 8px;
+  color: #6b7280;
+  font-size: 13px;
 }
 
 /* =======================================================
@@ -565,12 +624,17 @@ body {
 }
 
 @media (max-width: 900px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+
   .sidebar {
-    width: 220px;
+    width: var(--sidebar-width);
   }
 
   .main-content {
-    margin-left: 220px;
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
   }
 
   .dashboard-grid {
@@ -579,6 +643,14 @@ body {
 
   .user-card {
     grid-template-columns: 1fr;
+  }
+
+  .quarter-score-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .quarter-period-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -632,6 +704,7 @@ body {
   /* Main */
   .main-content {
     margin-left: 0;
+    width: 100%;
     padding: 20px;
   }
 
@@ -666,6 +739,14 @@ body {
   }
 
   .user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .quarter-score-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quarter-period-grid {
     grid-template-columns: 1fr;
   }
 

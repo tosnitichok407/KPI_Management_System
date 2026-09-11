@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
 
 
 /*
@@ -48,6 +49,26 @@ $stmt->execute();
 
 $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$periodYears = [];
+foreach ($periods as $period) {
+    $year = (int) date("Y", strtotime($period["start_date"]));
+    $periodYears[$year] = true;
+}
+
+$quarterPeriods = [];
+foreach (array_keys($periodYears) as $year) {
+    foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter) {
+        [$quarterStart, $quarterEnd] = getQuarterMonths($quarter);
+        $quarterPeriods[$year . "-" . $quarter] = [
+            "year" => $year,
+            "quarter" => $quarter,
+            "start_date" => sprintf("%04d-%02d-01", $year, $quarterStart),
+            "end_date" => date("Y-m-t", strtotime(sprintf("%04d-%02d-01", $year, $quarterEnd))),
+            "status" => "Open"
+        ];
+    }
+}
+
 ?>
 
 
@@ -86,6 +107,16 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
 
     </header>
+
+    <section class="quarter-period-grid">
+        <?php foreach ($quarterPeriods as $quarterPeriod): ?>
+            <article class="quarter-period-card">
+                <h2><?= $quarterPeriod["quarter"] ?>/<?= $quarterPeriod["year"] ?></h2>
+                <p><?= $quarterPeriod["start_date"] ?> - <?= $quarterPeriod["end_date"] ?></p>
+                <strong><?= htmlspecialchars($quarterPeriod["status"], ENT_QUOTES, "UTF-8") ?></strong>
+            </article>
+        <?php endforeach; ?>
+    </section>
 
 
     <!-- =========================================================
@@ -127,6 +158,8 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>
                             วันที่เริ่มต้น
                         </th>
+
+                        <th>Q</th>
 
                         <th>
                             วันที่สิ้นสุด
@@ -206,6 +239,8 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 ) ?>
 
                             </td>
+
+                            <td><?= htmlspecialchars(getQuarterFromDate($period["start_date"])) ?></td>
 
 
                             <!-- End Date -->

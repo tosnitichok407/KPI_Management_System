@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/quarter-helper.php";
 
 
 /* =========================================================
@@ -52,13 +53,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         ?? date("Y")
     );
 
-    $assignment_month = intval(
-        $_POST["assignment_month"] ?? 0
-    );
-
-    $period_id = intval(
-        $_POST["period_id"] ?? 0
-    );
+    $assignment_month = 1;
+    $period_id = 0;
 
     $target_value = trim(
         $_POST["target_value"] ?? ""
@@ -94,10 +90,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $assignment_month
         );
 
-        $end_date = date(
-            "Y-m-t",
-            strtotime($start_date)
-        );
+        $end_date = sprintf("%04d-12-31", $assignment_year);
     }
 
 
@@ -135,9 +128,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         empty($employee_ids) ||
         $assignment_year < 2000 ||
         $assignment_year > 2100 ||
-        $assignment_month < 1 ||
-        $assignment_month > 12 ||
-        $period_id <= 0 ||
         $target_value === "" ||
         $weight === "" ||
         $start_date === "" ||
@@ -200,11 +190,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 PDO::FETCH_ASSOC
             );
 
+        if ($period_id <= 0) {
+            $period_data = [
+                "start_date" => $start_date,
+                "end_date" => $end_date
+            ];
+        }
+
 
         if (!$period_data) {
 
             $error =
                 "ไม่พบรอบการประเมินที่เลือก";
+
+        } elseif (
+            date("Y", strtotime($period_data["start_date"])) !==
+            (string) $assignment_year
+        ) {
+
+            $error =
+                "เดือน/ปีที่เลือกต้องตรงกับวันที่เริ่มต้นของรอบการประเมิน";
 
         } else {
 
@@ -266,7 +271,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         WHERE kpi_id = ?
                         AND employee_id = ?
                         AND assignment_year = ?
-                        AND period_id = ?
                         LIMIT 1
                     ";
 
@@ -294,7 +298,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         WHERE a.employee_id = ?
                         AND a.assignment_year = ?
-                        AND a.period_id = ?
                         AND k.kpi_type = ?
                         AND a.status = 'Active'
                     ";
@@ -385,8 +388,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $check_stmt->execute([
                             $kpi_id,
                             $employee_id,
-                            $assignment_year,
-                            $period_id
+                            $assignment_year
                         ]);
 
                         $existing =
@@ -410,7 +412,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $weight_stmt->execute([
                             $employee_id,
                             $assignment_year,
-                            $period_id,
                             $kpi_type
                         ]);
 
@@ -451,7 +452,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             $kpi_id,
                             $employee_id,
                             $assignment_year,
-                            $period_id,
+                            null,
                             $target_value,
                             $weight,
                             $start_date,
@@ -642,6 +643,8 @@ $filter_year =
         $_GET["year"] ?? 0
     );
 
+$filter_month = (int) ($_GET["month"] ?? 0);
+
 $filter_department =
     intval(
         $_GET["department_id"] ?? 0
@@ -685,7 +688,7 @@ $assignment_sql = "
         k.kpi_type,
         k.unit,
 
-        p.period_name
+        COALESCE(p.period_name, CONCAT('ปี ', a.assignment_year)) AS period_name
 
     FROM kpi_assignments a
 
@@ -698,7 +701,7 @@ $assignment_sql = "
     INNER JOIN kpi_indicators k
         ON a.kpi_id = k.kpi_id
 
-    INNER JOIN evaluation_periods p
+    LEFT JOIN evaluation_periods p
         ON a.period_id = p.period_id
 
     WHERE 1 = 1
@@ -720,6 +723,15 @@ if ($filter_year > 0) {
 
     $params[] =
         $filter_year;
+}
+
+if ($filter_month >= 1 && $filter_month <= 12) {
+    $assignment_sql .= "
+        AND a.start_date <= LAST_DAY(CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01'))
+        AND a.end_date >= CONCAT(a.assignment_year, '-', LPAD(?, 2, '0'), '-01')
+    ";
+    $params[] = $filter_month;
+    $params[] = $filter_month;
 }
 
 
@@ -863,11 +875,6 @@ $form_year =
         ?? date("Y")
     );
 
-$form_month =
-    intval(
-        $_POST["assignment_month"]
-        ?? date("n")
-    );
 
 ?>
 
@@ -883,6 +890,16 @@ $form_month =
             font-family: var(--font-family, "Kanit", sans-serif);
             background: #f5f7fb;
             color: #333;
+        }
+
+        .quarter-preview {
+            margin-top: 8px;
+            color: #667085;
+            font-size: 13px;
+        }
+
+        .quarter-preview strong {
+            color: #244397;
         }
 
 
@@ -1362,130 +1379,6 @@ $form_month =
 
 
                 <!-- =================================================
-                     MONTH
-                ================================================= -->
-
-                <div class="form-group">
-
-                    <label>
-                        เดือนที่ประเมิน <span>*</span>
-                    </label>
-
-
-                    <select
-                        name="assignment_month"
-                        id="assignment_month"
-                        required>
-
-                        <option value="">
-                            -- เลือกเดือน --
-                        </option>
-
-
-                        <?php
-
-                        $months = [
-                            1  => "มกราคม",
-                            2  => "กุมภาพันธ์",
-                            3  => "มีนาคม",
-                            4  => "เมษายน",
-                            5  => "พฤษภาคม",
-                            6  => "มิถุนายน",
-                            7  => "กรกฎาคม",
-                            8  => "สิงหาคม",
-                            9  => "กันยายน",
-                            10 => "ตุลาคม",
-                            11 => "พฤศจิกายน",
-                            12 => "ธันวาคม"
-                        ];
-
-                        foreach (
-                            $months
-                            as $month_number =>
-                            $month_name
-                        ):
-
-                        ?>
-
-                            <option
-                                value="<?= $month_number ?>"
-                                <?= $form_month == $month_number
-                                    ? "selected"
-                                    : "" ?>>
-
-                                <?= $month_name ?>
-
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-
-                </div>
-
-
-                <!-- =================================================
-                     PERIOD
-                ================================================= -->
-
-                <div class="form-group">
-
-                    <label>
-                        รอบการประเมิน <span>*</span>
-                    </label>
-
-
-                    <select
-                        name="period_id"
-                        id="period_id"
-                        required>
-
-                        <option value="">
-                            -- เลือกรอบการประเมิน --
-                        </option>
-
-
-                        <?php foreach (
-                            $periods
-                            as $period
-                        ): ?>
-
-                            <option
-                                value="<?= $period["period_id"] ?>">
-
-                                <?= htmlspecialchars(
-                                    $period["period_name"]
-                                ) ?>
-
-                                (
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime(
-                                        $period["start_date"]
-                                    )
-                                ) ?>
-
-                                -
-
-                                <?= date(
-                                    "d/m/Y",
-                                    strtotime(
-                                        $period["end_date"]
-                                    )
-                                ) ?>
-
-                                )
-
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-
-                </div>
-
-
-                <!-- =================================================
                      DEPARTMENT
                 ================================================= -->
 
@@ -1701,54 +1594,6 @@ $form_month =
 
 
                 <!-- =================================================
-                     START DATE
-                ================================================= -->
-
-                <div class="form-group">
-
-                    <label>
-                        วันที่เริ่มต้น
-                    </label>
-
-
-                    <input
-                        type="date"
-                        name="start_date"
-                        id="start_date"
-                        readonly>
-
-                    <div class="select-hint">
-                        ระบบกำหนดเป็นวันที่ 1 ของเดือนอัตโนมัติ
-                    </div>
-
-                </div>
-
-
-                <!-- =================================================
-                     END DATE
-                ================================================= -->
-
-                <div class="form-group">
-
-                    <label>
-                        วันที่สิ้นสุด
-                    </label>
-
-
-                    <input
-                        type="date"
-                        name="end_date"
-                        id="end_date"
-                        readonly>
-
-                    <div class="select-hint">
-                        ระบบกำหนดเป็นวันสุดท้ายของเดือนอัตโนมัติ
-                    </div>
-
-                </div>
-
-
-                <!-- =================================================
                      STATUS
                 ================================================= -->
 
@@ -1873,6 +1718,18 @@ $form_month =
 
                 </div>
 
+                <div class="form-group">
+
+                    <label>เดือน</label>
+
+                    <select name="month">
+                        <option value="0">ทั้งหมด</option>
+                        <?php foreach ([1 => "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"] as $monthNumber => $monthName): ?>
+                            <option value="<?= $monthNumber ?>" <?= $filter_month === $monthNumber ? "selected" : "" ?>><?= $monthName ?></option>
+                        <?php endforeach; ?>
+                    </select>
+
+                </div>
 
                 <div class="form-group">
 
@@ -2048,12 +1905,6 @@ $form_month =
                         <th>สถานะ</th>
                         <th>จัดการ</th>
 
-                    </tr>
-
-                </thead>
-
-
-                <tbody>
 
                 <?php if (
                     !empty(
@@ -2217,6 +2068,12 @@ $form_month =
                                     ]
                                 ) ?>
 
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars(
+                                    getQuarterFromDate($assignment["start_date"])
+                                ) ?>
                             </td>
 
 
@@ -2393,11 +2250,6 @@ const yearInput =
         "assignment_year"
     );
 
-const monthInput =
-    document.getElementById(
-        "assignment_month"
-    );
-
 const departmentSelect =
     document.getElementById(
         "department_select"
@@ -2412,104 +2264,6 @@ const selectedCount =
     document.getElementById(
         "selected_count"
     );
-
-const startDate =
-    document.getElementById(
-        "start_date"
-    );
-
-const endDate =
-    document.getElementById(
-        "end_date"
-    );
-
-
-/* =========================================================
-   SET DATE FROM YEAR + MONTH
-========================================================= */
-
-function setMonthDates() {
-
-    const year =
-        parseInt(
-            yearInput.value
-        );
-
-    const month =
-        parseInt(
-            monthInput.value
-        );
-
-
-    if (
-        !year ||
-        !month ||
-        year < 2000 ||
-        year > 2100 ||
-        month < 1 ||
-        month > 12
-    ) {
-
-        startDate.value = "";
-        endDate.value = "";
-
-        return;
-    }
-
-
-    /* =====================================================
-       วันที่ 1 ของเดือน
-    ===================================================== */
-
-    const monthText =
-        String(month).padStart(
-            2,
-            "0"
-        );
-
-
-    startDate.value =
-        `${year}-${monthText}-01`;
-
-
-    /* =====================================================
-       วันสุดท้ายของเดือน
-       new Date(year, month, 0)
-       จะคืนวันสุดท้ายของเดือนที่เลือก
-    ===================================================== */
-
-    const lastDay =
-        new Date(
-            year,
-            month,
-            0
-        ).getDate();
-
-
-    endDate.value =
-        `${year}-${monthText}-${String(lastDay).padStart(2, "0")}`;
-}
-
-
-/* =========================================================
-   YEAR CHANGE
-========================================================= */
-
-yearInput.addEventListener(
-    "change",
-    setMonthDates
-);
-
-
-/* =========================================================
-   MONTH CHANGE
-========================================================= */
-
-monthInput.addEventListener(
-    "change",
-    setMonthDates
-);
-
 
 /* =========================================================
    DEPARTMENT -> EMPLOYEE FILTER
@@ -2621,8 +2375,6 @@ document
 
                     updateSelectedCount();
 
-                    setMonthDates();
-
                 },
                 0
             );
@@ -2712,12 +2464,9 @@ filterDepartment.addEventListener(
    INITIAL
 ========================================================= */
 
-setMonthDates();
 
 updateSelectedCount();
 
 filterEmployeeList();
 
 </script>
-
-

@@ -397,7 +397,7 @@ $highPerformance = count(
 
     <link
         rel="stylesheet"
-        href="../assets/css/manager.css">
+        href="../assets/css/manager.css?v=layout-20260911-2">
 
 </head>
 
@@ -451,7 +451,11 @@ $highPerformance = count(
             <a
                 href="../logout.php"
                 class="logout-button">
+
+                <span>↪</span>
+
                 <span>ออกจากระบบ</span>
+
             </a>
 
         </div>
@@ -829,9 +833,11 @@ $highPerformance = count(
 
                 </article>
 
+
             </div>
 
         </section>
+
 
         <!-- =====================================================
          DEPARTMENT
@@ -1520,27 +1526,7 @@ $highPerformance = count(
 
             });
 
-        const navItems = document.querySelectorAll(".nav-item");
-
-        navItems.forEach(item => {
-
-            item.addEventListener("click", function() {
-
-                // เอา active ออกจากเมนูเดิม
-
-                navItems.forEach(nav => {
-
-                    nav.classList.remove("active");
-
-                });
-
-                // เพิ่ม active ให้เมนูที่กด
-
-                this.classList.add("active");
-
-            });
-
-        });
+        
     </script>
 
 </body>

@@ -1,8 +1,11 @@
 <?php
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../includes/quarter-helper.php";
 
 
 /*
@@ -142,6 +145,28 @@ $kpiScores = [];
 
 
 if ($page === "home") {
+
+    $quarterScoreStmt = $pdo->query("
+                SELECT kp.performance_date, ki.kpi_type, kp.score
+                FROM kpi_performances kp
+                INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                WHERE ka.status = 'Active'
+                    AND kp.score IS NOT NULL
+        ORDER BY kp.performance_date
+    ");
+    $quarterScores = [];
+
+    foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
+        $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
+        $quarter = getQuarterFromDate($quarterRow["performance_date"]);
+        $key = $year . "-" . $quarter;
+        $quarterScores[$key][] = (float) $quarterRow["score"];
+    }
+
+    $selectedDashboardYear = !empty($periods)
+        ? (int) date("Y", strtotime($periods[0]["start_date"]))
+        : (int) date("Y");
 
 
     /*
@@ -587,7 +612,7 @@ if ($page === "home") {
 
     <link
         rel="stylesheet"
-        href="../assets/css/admin.css">
+        href="../assets/css/admin.css?v=layout-20260911-2">
 
     <link rel="stylesheet" href="../assets/css/variables.css">
     <link rel="stylesheet" href="../assets/css/components.css">
@@ -1285,6 +1310,25 @@ if ($page === "home") {
                         </div>
 
 
+                    </div>
+
+
+                    <div class="quarter-score-grid">
+                        <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>
+                            <?php
+                            $quarterValues = $quarterScores[$selectedDashboardYear . "-" . $quarter] ?? [];
+                            $quarterAverage = !empty($quarterValues)
+                                ? array_sum($quarterValues) / count($quarterValues)
+                                : null;
+                            ?>
+                            <div class="quarter-score-card">
+                                <h3><?= $quarter ?></h3>
+                                <p><?= $selectedDashboardYear ?></p>
+                                <strong>
+                                    <?= $quarterAverage === null ? "ยังไม่มีข้อมูล" : number_format($quarterAverage, 2) . " / 5" ?>
+                                </strong>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
 
 
