@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
+require_once __DIR__ . "/includes/layout.php";
 
 
 /*
@@ -568,7 +569,7 @@ $avatar =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
+        href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
     <style>
         .quarter-score-grid {
@@ -1052,60 +1053,6 @@ $avatar =
 
         @media (max-width: 700px) {
 
-            .sidebar {
-
-                transform:
-                    translateX(-100%);
-
-                transition:
-                    transform .25s;
-
-            }
-
-
-            .sidebar.mobile-open {
-
-                transform:
-                    translateX(0);
-
-            }
-
-
-            .main-content {
-
-                margin-left: 0;
-
-            }
-
-
-            .mobile-menu-button {
-
-                display: flex;
-
-            }
-
-
-            .mobile-menu-overlay.active {
-
-                display: block;
-
-                position: fixed;
-
-                inset: 0;
-
-                background:
-                    rgba(0, 0, 0, .35);
-
-                z-index: 900;
-
-            }
-
-
-            .topbar {
-
-                padding: 0 18px;
-
-            }
 
 
             .dashboard-content {
@@ -1168,141 +1115,8 @@ $avatar =
 </head>
 
 <body>
-    <!-- === SIDEBAR === -->
-    <aside class="sidebar">
 
-        <div class="sidebar-logo">
-
-            <img
-                src="../assets/images/Advance-Logo.png"
-                alt="Advance Asia Group Logo">
-
-            <div>
-
-                <h2>
-                    KPI System
-                </h2>
-
-                <span>
-                    Employee
-                </span>
-
-            </div>
-
-        </div>
-
-        <nav class="sidebar-nav">
-
-            <a
-                href="../employee/index.php"
-                class="nav-item active">
-
-                <span class="nav-icon">
-                    🏠
-                </span>
-
-                <span>
-                    หน้าแรก
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/kpi/kpi.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    🎯
-                </span>
-
-                <span>
-                    KPI ของฉัน
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/performance.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    📊
-                </span>
-
-                <span>
-                    ผลการปฏิบัติงาน
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/profile.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    👤
-                </span>
-
-                <span>
-                    ข้อมูลส่วนตัว
-                </span>
-
-            </a>
-
-        </nav>
-
-        <div class="sidebar-bottom">
-
-            <a
-                href="../logout.php"
-                class="logout-button">
-
-                ออกจากระบบ
-
-            </a>
-
-        </div>
-
-    </aside>
-
-    <div
-        class="mobile-menu-overlay"
-        id="mobileMenuOverlay"></div>
-
-    <!-- === MAIN === -->
-
-    <main class="main-content">
-        <section id="overview">
-
-            <!-- เนื้อหาภาพรวม -->
-
-        </section>
-
-        <section id="departments">
-
-            <!-- ผลรายแผนก -->
-
-        </section>
-
-        <section id="employees">
-
-            <!-- ผลงานพนักงาน -->
-
-        </section>
-
-        <!-- TOPBAR -->
-
-        <header class="topbar">
-
-            <button
-                type="button"
-                class="mobile-menu-button"
-                id="mobileMenuButton">
-                ☰
-
-            </button>
-
-        </header>
+    <?php employeeLayoutStart("home", "../"); ?>
 
         <!-- PAGE HEADER -->
 
@@ -1961,7 +1775,7 @@ $avatar =
 
         </section>
 
-    </main>
+    <?php employeeLayoutEnd("../"); ?>
 
 
     <!-- =========================================================
@@ -2144,114 +1958,6 @@ $avatar =
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | Mobile Menu
-        |--------------------------------------------------------------------------
-        */
-
-        const mobileMenuButton =
-            document.getElementById(
-                "mobileMenuButton"
-            );
-
-        const sidebar =
-            document.querySelector(
-                ".sidebar"
-            );
-
-        const mobileMenuOverlay =
-            document.getElementById(
-                "mobileMenuOverlay"
-            );
-
-
-        function openMobileMenu() {
-
-            sidebar.classList.add(
-                "mobile-open"
-            );
-
-            mobileMenuOverlay.classList.add(
-                "active"
-            );
-
-        }
-
-
-        function closeMobileMenu() {
-
-            sidebar.classList.remove(
-                "mobile-open"
-            );
-
-            mobileMenuOverlay.classList.remove(
-                "active"
-            );
-
-        }
-
-
-        mobileMenuButton.addEventListener(
-            "click",
-            function() {
-
-                if (
-                    sidebar.classList.contains(
-                        "mobile-open"
-                    )
-                ) {
-
-                    closeMobileMenu();
-
-                } else {
-
-                    openMobileMenu();
-
-                }
-
-            }
-        );
-
-
-        mobileMenuOverlay.addEventListener(
-            "click",
-            closeMobileMenu
-        );
-
-
-        window.addEventListener(
-            "resize",
-            function() {
-
-                if (
-                    window.innerWidth > 700
-                ) {
-
-                    closeMobileMenu();
-
-                }
-
-            }
-        );
-
-        const navItems = document.querySelectorAll(".nav-item");
-
-        navItems.forEach(item => {
-
-            item.addEventListener("click", function() {
-
-                // เอา active ออกจากเมนูเดิม
-                navItems.forEach(nav => {
-                    nav.classList.remove("active");
-                });
-
-                // เพิ่ม active ให้เมนูที่กด
-                this.classList.add("active");
-
-            });
-
-        });
     </script>
 
 

@@ -67,7 +67,7 @@
         }
 
         const url = new URL(link.href, window.location.origin);
-        if (!isSameOrigin(url) || url.pathname.indexOf("/admin/") === -1) {
+        if (!isSameOrigin(url) || !/\/(admin|employee|manager)\//.test(url.pathname)) {
             return;
         }
 

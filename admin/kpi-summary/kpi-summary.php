@@ -5,8 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . "/../../config/database.php";
-require_once __DIR__ . "/../../includes/quarter-helper.php";
-require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/kpi-summary-data.php";
+require_once __DIR__ . "/../../includes/period-picker.php";
 
 
 /* =========================================================
@@ -30,77 +30,45 @@ if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
 
 
 /* =========================================================
-   FILTER
+   FILTER + REPORT
    ปี | เดือน | พนักงาน | ประเภท KPI | สถานะ
 ========================================================= */
 
-$current_year = (int) date("Y");
+$filters = kpiSummaryFilters($_GET);
 
-$filter_year =
-    intval($_GET["year"] ?? $current_year);
-
-$filter_month =
-    intval($_GET["month"] ?? 0);
-
-$filter_employee =
-    intval($_GET["employee_id"] ?? 0);
-
-$filter_type =
-    $_GET["kpi_type"] ?? "";
-
-$filter_status =
-    $_GET["status"] ?? "Active";
-
-
-/* =========================================================
-   VALIDATE FILTER
-========================================================= */
-
-if ($filter_year < 2000 || $filter_year > 2100) {
-    $filter_year = $current_year;
-}
-
-if ($filter_month < 1 || $filter_month > 12) {
-    $filter_month = 0;
-}
-
-if (!in_array($filter_type, ["Competency", "Performance"], true)) {
-    $filter_type = "";
-}
-
-if (!in_array($filter_status, ["", "Active", "Inactive"], true)) {
-    $filter_status = "Active";
-}
-
+$filter_year = $filters["year"];
+$filter_month = $filters["month"];
+$filter_employee = $filters["employee_id"];
+$filter_type = $filters["kpi_type"];
+$filter_status = $filters["status"];
 $filter_has_month = $filter_month > 0;
 
+$report = loadKpiSummaryReport($pdo, $filters);
+
+$employee_summaries = $report["employees"];
+$totals = $report["totals"];
+$filter_period = $report["period"];
+$filter_label = $report["label"];
+
 $month_names = monthlyPeriodMonths();
+$month_stats = periodPickerMonthStats($pdo, $filter_year);
 
-/* รอบประเมินของเดือนที่เลือก (ถ้ามี) */
-$filter_period = $filter_has_month
-    ? findEvaluationPeriodByMonth($pdo, $filter_year, $filter_month)
-    : null;
+$current_year = (int) date("Y");
+$current_month = (int) date("n");
 
-$filter_label = $filter_has_month
-    ? $month_names[$filter_month] . " " . $filter_year . " (" . getQuarterByMonth($filter_month) . ")"
-    : "ปี " . $filter_year . " (ทุกเดือน)";
+$has_filter =
+    $filter_year !== $current_year ||
+    $filter_has_month ||
+    $filter_employee > 0 ||
+    $filter_type !== "" ||
+    $filter_status !== "Active";
 
 
-/* =========================================================
-   GET YEARS (สำหรับ dropdown)
-========================================================= */
-
-$years_stmt = $pdo->query("
-    SELECT DISTINCT assignment_year
-    FROM kpi_assignments
-    ORDER BY assignment_year DESC
-");
-
-$years = array_map("intval", $years_stmt->fetchAll(PDO::FETCH_COLUMN));
-$years[] = $current_year;
-$years[] = $filter_year;
-$years = array_unique($years);
-rsort($years);
+/* ลิงก์ของหน้านี้ (คง filter เดิม) */
+function summaryPageUrl(array $filters, array $overrides = []): string
+{
+    return "index.php?page=summary&" . kpiSummaryQuery($filters, $overrides);
+}
 
 
 /* =========================================================
@@ -120,247 +88,6 @@ $employees = $pdo->query("
 
     ORDER BY first_name ASC, last_name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
-
-
-/* =========================================================
-   GET KPI DETAIL + ผลประเมิน
-   - Assignment ใช้ได้ทั้งปี (1 แถว = KPI 1 ตัวของพนักงาน 1 คน)
-   - ผลประเมิน (kpi_performances) ผูกกับรอบประเมินรายเดือน
-     เลือกเดือน  -> ผลของเดือนนั้น (ไม่เกิน 1 รายการต่อ KPI)
-     ไม่เลือก    -> รวมทุกเดือนในปี (จำนวนเดือนที่ประเมิน + คะแนนเฉลี่ย)
-========================================================= */
-
-$perf_where = " ep.period_year = ? ";
-$perf_params = [$filter_year];
-
-if ($filter_has_month) {
-    $perf_where .= " AND ep.period_month = ? ";
-    $perf_params[] = $filter_month;
-}
-
-$detail_sql = "
-    SELECT
-
-        a.assignment_id,
-        a.employee_id,
-        a.kpi_id,
-        a.assignment_year,
-        a.target_value,
-        a.weight,
-        COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
-        COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) AS end_date,
-        a.status,
-
-        e.employee_code,
-        e.first_name,
-        e.last_name,
-        d.department_name,
-
-        k.kpi_name,
-        k.kpi_type,
-        k.unit,
-        COALESCE(k.max_score, 5) AS max_score,
-
-        COALESCE(perf.eval_count, 0) AS eval_count,
-        perf.avg_score,
-        perf.last_actual,
-        perf.last_status
-
-    FROM kpi_assignments a
-
-    INNER JOIN employees e
-        ON a.employee_id = e.employee_id
-
-    LEFT JOIN departments d
-        ON e.department_id = d.department_id
-
-    INNER JOIN kpi_indicators k
-        ON a.kpi_id = k.kpi_id
-
-    LEFT JOIN (
-        SELECT
-            kp.assignment_id,
-            COUNT(kp.performance_id) AS eval_count,
-            AVG(kp.score) AS avg_score,
-            MAX(kp.actual) AS last_actual,
-            MAX(kp.status) AS last_status
-        FROM kpi_performances kp
-        INNER JOIN evaluation_periods ep
-            ON ep.period_id = kp.period_id
-        WHERE kp.score IS NOT NULL
-          AND {$perf_where}
-        GROUP BY kp.assignment_id
-    ) perf
-        ON perf.assignment_id = a.assignment_id
-
-    WHERE a.assignment_year = ?
-";
-
-$detail_params = array_merge($perf_params, [$filter_year]);
-
-
-/* เดือนที่เลือก: เฉพาะ KPI ที่มีผลในเดือนนั้น */
-
-if ($filter_has_month) {
-
-    $month_start = sprintf("%04d-%02d-01", $filter_year, $filter_month);
-    $month_end = date("Y-m-t", strtotime($month_start));
-
-    $detail_sql .= "
-        AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= ?
-        AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= ?
-    ";
-
-    $detail_params[] = $month_end;
-    $detail_params[] = $month_start;
-}
-
-
-if ($filter_employee > 0) {
-    $detail_sql .= " AND a.employee_id = ? ";
-    $detail_params[] = $filter_employee;
-}
-
-
-if ($filter_type !== "") {
-    $detail_sql .= " AND k.kpi_type = ? ";
-    $detail_params[] = $filter_type;
-}
-
-
-if ($filter_status !== "") {
-    $detail_sql .= " AND a.status = ? ";
-    $detail_params[] = $filter_status;
-}
-
-
-$detail_sql .= "
-    ORDER BY
-        e.first_name ASC,
-        e.last_name ASC,
-        a.employee_id ASC,
-        FIELD(k.kpi_type, 'Performance', 'Competency'),
-        k.kpi_name ASC
-";
-
-
-$detail_stmt = $pdo->prepare($detail_sql);
-$detail_stmt->execute($detail_params);
-
-$details = $detail_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-/* =========================================================
-   GROUP BY EMPLOYEE
-   สรุป 1 แถวต่อพนักงาน + รายการ KPI ใต้กลุ่ม
-========================================================= */
-
-$employee_summaries = [];
-
-foreach ($details as $row) {
-
-    $employee_id = (int) $row["employee_id"];
-
-    if (!isset($employee_summaries[$employee_id])) {
-
-        $employee_summaries[$employee_id] = [
-            "employee_id" => $employee_id,
-            "employee_code" => $row["employee_code"],
-            "first_name" => $row["first_name"],
-            "last_name" => $row["last_name"],
-            "department_name" => $row["department_name"],
-            "kpis" => [],
-
-            "count" => ["Performance" => 0, "Competency" => 0],
-            "weight" => ["Performance" => 0.0, "Competency" => 0.0],
-
-            "evaluated" => 0,
-            "score_sum" => 0.0,
-            "weighted_sum" => 0.0,
-            "weighted_weight" => 0.0
-        ];
-    }
-
-    $summary = &$employee_summaries[$employee_id];
-
-    $type = $row["kpi_type"];
-    $weight = (float) $row["weight"];
-
-    $summary["kpis"][] = $row;
-
-    if (isset($summary["count"][$type])) {
-        $summary["count"][$type]++;
-        $summary["weight"][$type] += $weight;
-    }
-
-
-    /* ผลประเมิน: นับเฉพาะ KPI ที่มีคะแนนแล้ว */
-
-    if ($row["avg_score"] !== null) {
-
-        $score = (float) $row["avg_score"];
-        $max_score = (float) $row["max_score"] ?: 5;
-
-        $summary["evaluated"]++;
-        $summary["score_sum"] += $score;
-
-        // ถ่วงน้ำหนัก: สูตรเดียวกับ Dashboard (score/max × weight)
-        $summary["weighted_sum"] += ($score / $max_score) * $weight;
-        $summary["weighted_weight"] += $weight;
-    }
-
-    unset($summary);
-}
-
-
-/* =========================================================
-   TOTALS (การ์ดด้านบน)
-========================================================= */
-
-$total_employees = count($employee_summaries);
-$total_kpi = count($details);
-$total_performance = 0;
-$total_competency = 0;
-$total_evaluated = 0;
-$overall_score_sum = 0.0;
-
-foreach ($employee_summaries as $summary) {
-
-    $total_performance += $summary["count"]["Performance"];
-    $total_competency += $summary["count"]["Competency"];
-    $total_evaluated += $summary["evaluated"];
-    $overall_score_sum += $summary["score_sum"];
-}
-
-$overall_avg_score = $total_evaluated > 0
-    ? $overall_score_sum / $total_evaluated
-    : null;
-
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function summaryTypeClass(string $type): string
-{
-    return strtolower($type) === "performance" ? "performance" : "";
-}
-
-function summaryWeightClass(float $total): string
-{
-    if ($total > 100) {
-        return "over";
-    }
-
-    return $total == 100 ? "full" : "";
-}
-
-$has_filter =
-    $filter_year !== $current_year ||
-    $filter_has_month ||
-    $filter_employee > 0 ||
-    $filter_type !== "" ||
-    $filter_status !== "Active";
 
 ?>
 
@@ -387,6 +114,10 @@ $has_filter =
     .page-header p {
         margin: 5px 0 0;
         color: #6b7280;
+    }
+
+    .btn-export {
+        gap: 6px;
     }
 
 
@@ -435,7 +166,7 @@ $has_filter =
 
 
     /* =================================================
-       CARD / FILTER
+       CARD
     ================================================= */
 
     .card {
@@ -463,36 +194,42 @@ $has_filter =
         font-weight: 400;
     }
 
-    .filter-grid {
+
+    /* =================================================
+       OTHER FILTERS (เปลี่ยนแล้วโหลดใหม่ทันที)
+    ================================================= */
+
+    .filter-row {
         display: grid;
-        grid-template-columns: repeat(5, 1fr) auto;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
         gap: 15px;
         align-items: end;
     }
 
-    .filter-grid .form-group {
+    .filter-row .form-group {
         display: flex;
         flex-direction: column;
     }
 
-    .filter-grid label {
+    .filter-row label {
         margin-bottom: 7px;
         font-size: 14px;
         font-weight: 500;
     }
 
-    .filter-grid select {
+    .filter-row select {
         width: 100%;
-        padding: 11px 13px;
+        height: 42px;
+        padding: 0 12px;
         border: 1px solid #d8dce5;
-        border-radius: 7px;
+        border-radius: 8px;
         background: #fff;
         font-family: inherit;
         font-size: 14px;
         outline: none;
     }
 
-    .filter-grid select:focus {
+    .filter-row select:focus {
         border-color: #244397;
     }
 
@@ -503,7 +240,7 @@ $has_filter =
     }
 
     .filter-note {
-        margin-top: 12px;
+        margin-top: 14px;
         color: #667085;
         font-size: 13px;
     }
@@ -574,7 +311,7 @@ $has_filter =
     }
 
 
-    /* พนักงาน (ใช้ทั้ง 2 ตาราง) */
+    /* พนักงาน */
 
     .employee-cell {
         display: flex;
@@ -686,11 +423,6 @@ $has_filter =
     .badge-draft {
         background: #fff4df;
         color: #a16207;
-    }
-
-    .badge-pending {
-        background: #f1f1f1;
-        color: #777;
     }
 
     .weight-chip {
@@ -848,8 +580,12 @@ $has_filter =
             grid-template-columns: repeat(2, 1fr);
         }
 
-        .filter-grid {
+        .filter-row {
             grid-template-columns: 1fr 1fr;
+        }
+
+        .picker-legend {
+            margin-left: 0;
         }
 
     }
@@ -857,7 +593,7 @@ $has_filter =
     @media (max-width: 650px) {
 
         .summary-cards,
-        .filter-grid {
+        .filter-row {
             grid-template-columns: 1fr;
         }
 
@@ -868,6 +604,10 @@ $has_filter =
 
         .card {
             padding: 18px;
+        }
+
+        .month-track {
+            flex-wrap: wrap;
         }
 
     }
@@ -899,6 +639,15 @@ $has_filter =
         <div class="header-actions">
 
             <a
+                href="kpi-summary/kpi-summary-export-pdf.php?<?= htmlspecialchars(kpiSummaryQuery($filters)) ?>"
+                class="btn btn-secondary btn-export"
+                target="_blank"
+                rel="noopener"
+                data-no-scroll-save>
+                📄 Export PDF
+            </a>
+
+            <a
                 href="index.php?page=kpi-assignment"
                 class="btn btn-primary">
                 มอบหมาย KPI
@@ -922,7 +671,7 @@ $has_filter =
             </div>
 
             <div class="summary-card-value">
-                <?= $total_employees ?>
+                <?= $totals["employees"] ?>
             </div>
 
             <div class="summary-card-note">
@@ -939,11 +688,11 @@ $has_filter =
             </div>
 
             <div class="summary-card-value">
-                <?= $total_kpi ?>
+                <?= $totals["kpi"] ?>
             </div>
 
             <div class="summary-card-note">
-                Performance <?= $total_performance ?> · Competency <?= $total_competency ?>
+                Performance <?= $totals["performance"] ?> · Competency <?= $totals["competency"] ?>
             </div>
 
         </div>
@@ -956,8 +705,8 @@ $has_filter =
             </div>
 
             <div class="summary-card-value">
-                <?= $total_evaluated ?>
-                <small>/ <?= $total_kpi ?> KPI</small>
+                <?= $totals["evaluated"] ?>
+                <small>/ <?= $totals["kpi"] ?> KPI</small>
             </div>
 
             <div class="summary-card-note">
@@ -975,10 +724,10 @@ $has_filter =
 
             <div class="summary-card-value">
 
-                <?php if ($overall_avg_score === null): ?>
+                <?php if ($totals["avg_score"] === null): ?>
                     -
                 <?php else: ?>
-                    <?= number_format($overall_avg_score, 2) ?>
+                    <?= number_format($totals["avg_score"], 2) ?>
                     <small>/ 5</small>
                 <?php endif; ?>
 
@@ -999,125 +748,101 @@ $has_filter =
 
     <div class="card">
 
-        <h2 class="card-title">
-            Filter
-        </h2>
 
-        <form method="GET" action="index.php">
+        <!-- ปี + เดือน (คลิกแล้วโหลดทันที) -->
+
+        <?php
+        renderPeriodPicker([
+            "year" => $filter_year,
+            "month" => $filter_month,
+            "stats" => $month_stats,
+            "show_all" => true,
+            "css" => "../assets/css/period-picker.css?v=1",
+            "url" => fn(int $year, int $month): string => summaryPageUrl($filters, ["year" => $year, "month" => $month])
+        ]);
+        ?>
+        <!-- พนักงาน / ประเภท / สถานะ (เปลี่ยนแล้วโหลดทันที) -->
+
+        <form method="GET" action="index.php" class="filter-row">
 
             <!-- ต้องส่ง page กลับไปด้วย ไม่งั้น index.php จะเด้งไปหน้า home -->
             <input type="hidden" name="page" value="summary">
+            <input type="hidden" name="year" value="<?= $filter_year ?>">
 
-            <div class="filter-grid">
-
-
-                <div class="form-group">
-
-                    <label>ปี</label>
-
-                    <select name="year">
-                        <?php foreach ($years as $year): ?>
-                            <option value="<?= $year ?>" <?= $year === $filter_year ? "selected" : "" ?>>
-                                <?= $year ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-
-                </div>
+            <?php if ($filter_has_month): ?>
+                <input type="hidden" name="month" value="<?= $filter_month ?>">
+            <?php endif; ?>
 
 
-                <div class="form-group">
+            <div class="form-group">
 
-                    <label>เดือน</label>
+                <label for="summary_employee">พนักงาน</label>
 
-                    <select name="month">
+                <select name="employee_id" id="summary_employee" onchange="this.form.submit()">
 
-                        <option value="0">ทั้งปี</option>
+                    <option value="0">ทั้งหมด</option>
 
-                        <?php foreach ($month_names as $month_number => $month_name): ?>
-                            <option value="<?= $month_number ?>" <?= $month_number === $filter_month ? "selected" : "" ?>>
-                                <?= $month_name ?> (<?= getQuarterByMonth($month_number) ?>)
-                            </option>
-                        <?php endforeach; ?>
+                    <?php foreach ($employees as $employee): ?>
 
-                    </select>
+                        <option
+                            value="<?= (int) $employee["employee_id"] ?>"
+                            <?= $filter_employee === (int) $employee["employee_id"] ? "selected" : "" ?>>
 
-                </div>
+                            <?= htmlspecialchars($employee["employee_code"]) ?>
+                            -
+                            <?= htmlspecialchars($employee["first_name"]) ?>
+                            <?= htmlspecialchars($employee["last_name"]) ?>
 
+                        </option>
 
-                <div class="form-group">
+                    <?php endforeach; ?>
 
-                    <label>พนักงาน</label>
+                </select>
 
-                    <select name="employee_id">
-
-                        <option value="0">ทั้งหมด</option>
-
-                        <?php foreach ($employees as $employee): ?>
-
-                            <option
-                                value="<?= (int) $employee["employee_id"] ?>"
-                                <?= $filter_employee === (int) $employee["employee_id"] ? "selected" : "" ?>>
-
-                                <?= htmlspecialchars($employee["employee_code"]) ?>
-                                -
-                                <?= htmlspecialchars($employee["first_name"]) ?>
-                                <?= htmlspecialchars($employee["last_name"]) ?>
-
-                            </option>
-
-                        <?php endforeach; ?>
-
-                    </select>
-
-                </div>
+            </div>
 
 
-                <div class="form-group">
+            <div class="form-group">
 
-                    <label>ประเภท KPI</label>
+                <label for="summary_type">ประเภท KPI</label>
 
-                    <select name="kpi_type">
-                        <option value="">ทั้งหมด</option>
-                        <option value="Performance" <?= $filter_type === "Performance" ? "selected" : "" ?>>Performance</option>
-                        <option value="Competency" <?= $filter_type === "Competency" ? "selected" : "" ?>>Competency</option>
-                    </select>
+                <select name="kpi_type" id="summary_type" onchange="this.form.submit()">
+                    <option value="">ทั้งหมด</option>
+                    <option value="Performance" <?= $filter_type === "Performance" ? "selected" : "" ?>>Performance</option>
+                    <option value="Competency" <?= $filter_type === "Competency" ? "selected" : "" ?>>Competency</option>
+                </select>
 
-                </div>
-
-
-                <div class="form-group">
-
-                    <label>สถานะ</label>
-
-                    <select name="status">
-                        <option value="Active" <?= $filter_status === "Active" ? "selected" : "" ?>>Active</option>
-                        <option value="Inactive" <?= $filter_status === "Inactive" ? "selected" : "" ?>>Inactive</option>
-                        <option value="" <?= $filter_status === "" ? "selected" : "" ?>>ทั้งหมด</option>
-                    </select>
-
-                </div>
+            </div>
 
 
-                <div class="filter-actions">
+            <div class="form-group">
 
-                    <button
-                        type="submit"
-                        class="btn btn-primary">
-                        ค้นหา
-                    </button>
+                <label for="summary_status">สถานะ</label>
 
-                    <?php if ($has_filter): ?>
+                <select name="status" id="summary_status" onchange="this.form.submit()">
+                    <option value="Active" <?= $filter_status === "Active" ? "selected" : "" ?>>Active</option>
+                    <option value="Inactive" <?= $filter_status === "Inactive" ? "selected" : "" ?>>Inactive</option>
+                    <option value="" <?= $filter_status === "" ? "selected" : "" ?>>ทั้งหมด</option>
+                </select>
 
-                        <a
-                            href="index.php?page=summary"
-                            class="btn btn-secondary">
-                            ล้างตัวกรอง
-                        </a>
+            </div>
 
-                    <?php endif; ?>
 
-                </div>
+            <div class="filter-actions">
+
+                <noscript>
+                    <button type="submit" class="btn btn-primary">ค้นหา</button>
+                </noscript>
+
+                <?php if ($has_filter): ?>
+
+                    <a
+                        href="index.php?page=summary"
+                        class="btn btn-secondary">
+                        ล้างตัวกรอง
+                    </a>
+
+                <?php endif; ?>
 
             </div>
 
@@ -1162,7 +887,7 @@ $has_filter =
             สรุปรายพนักงาน
 
             <span class="count">
-                <?= $total_employees ?> คน
+                <?= $totals["employees"] ?> คน
             </span>
 
         </h2>
@@ -1205,23 +930,6 @@ $has_filter =
                     <?php $no = 1; ?>
 
                     <?php foreach ($employee_summaries as $summary): ?>
-
-                        <?php
-                        $kpi_total = count($summary["kpis"]);
-                        $total_weight = $summary["weight"]["Performance"] + $summary["weight"]["Competency"];
-
-                        $evaluated_ratio = $kpi_total > 0
-                            ? $summary["evaluated"] / $kpi_total
-                            : 0;
-
-                        $avg_score = $summary["evaluated"] > 0
-                            ? $summary["score_sum"] / $summary["evaluated"]
-                            : null;
-
-                        $weighted_percent = $summary["weighted_weight"] > 0
-                            ? $summary["weighted_sum"] / $summary["weighted_weight"] * 100
-                            : null;
-                        ?>
 
                         <tr>
 
@@ -1285,8 +993,8 @@ $has_filter =
 
                             <td>
 
-                                <span class="weight-chip <?= summaryWeightClass($total_weight) ?>">
-                                    <strong><?= number_format($total_weight) ?>%</strong>
+                                <span class="weight-chip <?= summaryWeightClass($summary["total_weight"]) ?>">
+                                    <strong><?= number_format($summary["total_weight"]) ?>%</strong>
                                     <small>/ 100%</small>
                                 </span>
 
@@ -1296,11 +1004,11 @@ $has_filter =
                             <td>
 
                                 <div class="stat-main">
-                                    <?= $summary["evaluated"] ?> / <?= $kpi_total ?> KPI
+                                    <?= $summary["evaluated"] ?> / <?= $summary["kpi_total"] ?> KPI
                                 </div>
 
-                                <div class="progress <?= $evaluated_ratio >= 1 ? "done" : "" ?>">
-                                    <span style="width: <?= round($evaluated_ratio * 100) ?>%"></span>
+                                <div class="progress <?= $summary["evaluated_ratio"] >= 1 ? "done" : "" ?>">
+                                    <span style="width: <?= round($summary["evaluated_ratio"] * 100) ?>%"></span>
                                 </div>
 
                             </td>
@@ -1308,18 +1016,18 @@ $has_filter =
 
                             <td>
 
-                                <?php if ($avg_score === null): ?>
+                                <?php if ($summary["avg_score"] === null): ?>
 
                                     <span class="result-none">ยังไม่ประเมิน</span>
 
                                 <?php else: ?>
 
                                     <div class="stat-main">
-                                        <?= number_format($avg_score, 2) ?> / 5
+                                        <?= number_format($summary["avg_score"], 2) ?> / 5
                                     </div>
 
                                     <div class="stat-sub">
-                                        ถ่วงน้ำหนัก <?= number_format($weighted_percent, 1) ?>%
+                                        ถ่วงน้ำหนัก <?= number_format($summary["weighted_percent"], 1) ?>%
                                     </div>
 
                                 <?php endif; ?>
@@ -1363,7 +1071,7 @@ $has_filter =
             รายละเอียด KPI
 
             <span class="count">
-                <?= $total_kpi ?> KPI
+                <?= $totals["kpi"] ?> KPI
             </span>
 
         </h2>
@@ -1405,11 +1113,6 @@ $has_filter =
 
                     <?php foreach ($employee_summaries as $summary): ?>
 
-                        <?php
-                        $kpi_total = count($summary["kpis"]);
-                        $total_weight = $summary["weight"]["Performance"] + $summary["weight"]["Competency"];
-                        ?>
-
 
                         <!-- =========================================
                              EMPLOYEE GROUP HEADER
@@ -1437,7 +1140,7 @@ $has_filter =
                                             <div class="employee-meta">
                                                 <?= htmlspecialchars($summary["employee_code"]) ?>
                                                 · <?= htmlspecialchars($summary["department_name"] ?? "ไม่ระบุแผนก") ?>
-                                                · <?= $kpi_total ?> KPI
+                                                · <?= $summary["kpi_total"] ?> KPI
                                                 · ประเมินแล้ว <?= $summary["evaluated"] ?>
                                             </div>
 
@@ -1448,9 +1151,9 @@ $has_filter =
 
                                     <div class="group-summary">
 
-                                        <span class="weight-chip <?= summaryWeightClass($total_weight) ?>">
+                                        <span class="weight-chip <?= summaryWeightClass($summary["total_weight"]) ?>">
                                             Weight รวม
-                                            <strong><?= number_format($total_weight) ?>%</strong>
+                                            <strong><?= number_format($summary["total_weight"]) ?>%</strong>
                                             <small>/ 100%</small>
                                         </span>
 
@@ -1469,17 +1172,7 @@ $has_filter =
 
                         <?php foreach ($summary["kpis"] as $index => $kpi): ?>
 
-                            <?php
-                            $period_label = $filter_has_month
-                                ? $month_names[$filter_month]
-                                : assignmentMonthRangeLabel($kpi["start_date"], $kpi["end_date"]);
-
-                            $quarter_label = $filter_has_month
-                                ? getQuarterByMonth($filter_month)
-                                : assignmentQuarterRangeLabel($kpi["start_date"], $kpi["end_date"]);
-
-                            $result_status = strtolower((string) ($kpi["last_status"] ?? ""));
-                            ?>
+                            <?php $result_status = strtolower((string) ($kpi["last_status"] ?? "")); ?>
 
                             <tr class="<?= $kpi["status"] === "Active" ? "" : "row-inactive" ?>">
 
@@ -1524,11 +1217,11 @@ $has_filter =
 
                                     <div class="period-main">
 
-                                        <?= htmlspecialchars($period_label) ?>
+                                        <?= htmlspecialchars($kpi["period_label"]) ?>
                                         <?= (int) $kpi["assignment_year"] ?>
 
                                         <span class="badge badge-quarter">
-                                            <?= htmlspecialchars($quarter_label) ?>
+                                            <?= htmlspecialchars($kpi["quarter_label"]) ?>
                                         </span>
 
                                     </div>

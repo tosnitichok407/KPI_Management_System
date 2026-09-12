@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../includes/layout.php";
 
 
 /*
@@ -749,7 +750,7 @@ $totalCompetency =
 
     <link
         rel="stylesheet"
-        href="../../assets/css/employee-kpi.css?v=layout-20260911-2">
+        href="../../assets/css/employee-kpi.css?v=layout-employee-2">
 
 
     <style>
@@ -1237,149 +1238,7 @@ $totalCompetency =
 
 <body>
 
-
-    <!-- =========================================================
-     SIDEBAR
-========================================================= -->
-
-    <aside class="sidebar">
-
-        <div class="sidebar-logo">
-
-            <img
-                src="../../assets/images/Advance-Logo.png"
-                alt="Advance Asia Group Logo">
-
-            <div>
-
-                <h2>
-                    KPI System
-                </h2>
-
-                <span>
-                    Employee
-                </span>
-            </div>
-        </div>
-
-        <nav class="sidebar-nav">
-            <a
-                href="../index.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    🏠
-                </span>
-
-                <span>
-                    หน้าแรก
-                </span>
-            </a>
-
-            <a
-                href="kpi.php"
-                class="nav-item active">
-
-                <span class="nav-icon">
-                    🎯
-                </span>
-
-                <span>
-                    KPI ของฉัน
-                </span>
-            </a>
-
-            <a
-                href="../../employee/performance.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    📊
-                </span>
-
-                <span>
-                    ผลการปฏิบัติงาน
-                </span>
-            </a>
-
-            <a
-                href="../profile.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    👤
-                </span>
-
-                <span>
-                    ข้อมูลส่วนตัว
-                </span>
-            </a>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <a
-                href="../../logout.php"
-                class="logout-button">
-
-                ออกจากระบบ
-
-            </a>
-        </div>
-    </aside>
-
-    <!-- === MAIN === -->
-    <main class="main-content">
-        <header class="topbar">
-            <button
-                type="button"
-                class="mobile-menu-button"
-                id="mobileMenuButton">
-
-                ☰
-            </button>
-
-            <div class="user-info">
-                <div class="user-avatar">
-                    <?= htmlspecialchars(
-                            mb_substr(
-                                $firstName,
-                                0,
-                                1,
-                                'UTF-8'
-                            ),
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>
-
-                </div>
-
-                <div class="user-detail">
-
-                    <strong>
-
-                        <?= htmlspecialchars(
-                            $fullName,
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-
-                    </strong>
-
-                    <span>
-
-                        <?= htmlspecialchars(
-                            $_SESSION["employee_code"] ?? "-",
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-
-                    </span>
-
-                </div>
-
-            </div>
-
-        </header>
+    <?php employeeLayoutStart("kpi", "../../"); ?>
 
 
         <!-- PAGE HEADER -->
@@ -1952,38 +1811,7 @@ $totalCompetency =
 
         <?php endif; ?>
 
-    </main>
-
-    <script>
-        const mobileMenuButton =
-            document.getElementById(
-                "mobileMenuButton"
-            );
-
-        const sidebar =
-            document.querySelector(
-                ".sidebar"
-            );
-
-
-        if (
-            mobileMenuButton &&
-            sidebar
-        ) {
-
-            mobileMenuButton.addEventListener(
-                "click",
-                function() {
-
-                    sidebar.classList.toggle(
-                        "mobile-open"
-                    );
-
-                }
-            );
-
-        }
-    </script>
+    <?php employeeLayoutEnd("../../"); ?>
 
 
 </body>

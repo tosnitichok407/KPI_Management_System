@@ -354,7 +354,7 @@ $submitLabel = "Save Changes";
 
 </div>
 
-<script src="../../assets/js/admin.js?v=scroll-2"></script>
+<script src="../../assets/js/admin.js?v=scroll-3"></script>
 
 </body>
 

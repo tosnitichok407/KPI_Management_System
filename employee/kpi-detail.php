@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
+require_once __DIR__ . "/includes/layout.php";
 
 
 /*
@@ -448,30 +449,16 @@ $performances =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
+        href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
     <style>
-        body {
-
-            margin: 0;
-
-            font-family: Kanit, sans-serif;
-
-            background: #f5f7fb;
-
-            color: #111827;
-
-        }
 
 
+        /* ขนาดมาจาก page-container ของ layout (เหมือน Admin) */
         .container {
-
-            max-width: 1100px;
-
-            margin: 40px auto;
-
-            padding: 0 20px;
-
+            max-width: none;
+            margin: 0;
+            padding: 0;
         }
 
         .target-value {
@@ -794,6 +781,7 @@ $performances =
 
 <body>
 
+    <?php employeeLayoutStart("performance", "../"); ?>
 
     <div class="container">
         <!-- =====================================================
@@ -1242,6 +1230,8 @@ $performances =
 
     </div>
 
+
+    <?php employeeLayoutEnd("../"); ?>
 
 </body>
 

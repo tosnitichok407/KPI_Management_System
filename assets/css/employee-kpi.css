@@ -319,8 +319,8 @@ tbody tr:hover {
   border-bottom: 1px solid #e5e7eb;
 }
 
-.employee-profile__avatar,
-.user-avatar {
+/* avatar ใน topbar ใช้ .user-avatar ของ admin.css (ไม่ override ที่นี่) */
+.employee-profile__avatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -392,31 +392,8 @@ tbody tr:hover {
   overflow-wrap: anywhere;
 }
 
+/* sidebar / main-content / topbar บนมือถือ ใช้ breakpoint เดียวกับ admin.css (650px) */
 @media (max-width: 800px) {
-  .sidebar {
-    transform: translateX(-100%);
-
-    transition: 0.25s;
-  }
-
-  .sidebar.mobile-open {
-    transform: translateX(0);
-  }
-
-  .main-content {
-    margin-left: 0;
-
-    padding: 20px;
-  }
-
-  .topbar {
-    justify-content: space-between;
-  }
-
-  .mobile-menu-button {
-    display: flex;
-  }
-
   .summary-grid {
     grid-template-columns: 1fr;
   }

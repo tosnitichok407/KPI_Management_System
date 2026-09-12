@@ -1,0 +1,180 @@
+/* =========================================================
+   PERIOD PICKER (ปี + เดือน แบบปุ่ม)
+   ใช้กับ includes/period-picker.php
+========================================================= */
+
+.period-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 22px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eef0f4;
+}
+
+.picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.picker-label {
+  padding-left: 2px;
+  color: #98a2b3;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ปี ‹ 2026 › */
+
+.year-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  height: 40px;
+  border: 1px solid #d8dce5;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.year-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  color: #244397;
+  font-size: 20px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.year-step:hover {
+  background: #eef2ff;
+}
+
+.year-step.is-disabled {
+  color: #d0d5dd;
+  pointer-events: none;
+}
+
+.year-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  border-left: 1px solid #eef0f4;
+  border-right: 1px solid #eef0f4;
+  color: #1f2937;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* เดือน */
+
+.month-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.month-track {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #f2f4f7;
+}
+
+.month-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.month-chip:hover {
+  background: #fff;
+  color: #244397;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
+}
+
+.month-chip.is-current {
+  box-shadow: inset 0 0 0 1px #c7d2fe;
+}
+
+.month-chip.no-period {
+  color: #b0b7c3;
+}
+
+.month-chip.is-active {
+  background: #244397;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(36, 67, 151, 0.35);
+}
+
+.month-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3eaa65;
+}
+
+.month-chip.is-active .month-dot {
+  background: #a7f3c0;
+}
+
+/* คำอธิบาย */
+
+.picker-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-left: auto;
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.picker-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3eaa65;
+}
+
+.legend-muted {
+  color: #b0b7c3;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .picker-legend {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 650px) {
+  .month-track {
+    flex-wrap: wrap;
+  }
+}

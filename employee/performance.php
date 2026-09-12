@@ -7,6 +7,8 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../includes/period-picker.php";
+require_once __DIR__ . "/includes/layout.php";
 
 
 /*
@@ -67,6 +69,9 @@ $selectedMonthStart = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
 $selectedMonthEnd = date("Y-m-t", strtotime($selectedMonthStart));
 $selectedPeriod = findEvaluationPeriodByMonth($pdo, $selectedYear, $selectedMonth);
 $selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
+
+/* ปุ่มเดือน: รอบประเมิน + จำนวนผลงานของพนักงานคนนี้ในแต่ละเดือน */
+$monthStats = periodPickerMonthStats($pdo, $selectedYear, $employeeId);
 
 $quarterScoreStmt = $pdo->prepare("
     SELECT
@@ -495,7 +500,7 @@ if ($totalPerformanceRecords === 0) {
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi.css?v=layout-20260911-2">
+        href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
 </head>
 
@@ -876,41 +881,6 @@ if ($totalPerformanceRecords === 0) {
 
     @media (max-width: 700px) {
 
-        .sidebar {
-
-            transform: translateX(-100%);
-
-            transition: .25s;
-
-        }
-
-        .sidebar.mobile-open {
-
-            transform: translateX(0);
-
-        }
-
-        .main-content {
-
-            margin-left: 0;
-
-            padding: 20px;
-
-        }
-
-        .mobile-menu-button {
-
-            display: block;
-
-        }
-
-        .topbar {
-
-            justify-content:
-
-                space-between;
-
-        }
 
         .performance-summary {
 
@@ -950,149 +920,49 @@ if ($totalPerformanceRecords === 0) {
         }
 
     }
+
+    /* =========================================================
+       FILTER (ปี + เดือน) + EXPORT
+    ========================================================= */
+
+    .filter-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 22px 25px;
+        margin: 0 0 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+    }
+
+    .filter-card .period-picker {
+        padding-bottom: 18px;
+        margin-bottom: 16px;
+    }
+
+    .filter-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px 20px;
+    }
+
+    .filter-note {
+        color: #667085;
+        font-size: 13px;
+    }
+
+    .filter-note strong {
+        color: #244397;
+    }
+
+    .filter-footer .performance-export-actions {
+        margin: 0;
+    }
 </style>
 
 <body>
 
-    <!-- === SIDEBAR === -->
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-
-            <img
-                src="../assets/images/Advance-Logo.png"
-                alt="Advance Asia Group Logo">
-
-            <div>
-
-                <h2>
-                    KPI System
-                </h2>
-
-                <span>
-                    Employee
-                </span>
-
-            </div>
-
-        </div>
-
-        <nav class="sidebar-nav">
-
-            <a
-                href="../employee/index.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    🏠
-                </span>
-
-                <span>
-                    หน้าแรก
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/kpi/kpi.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    🎯
-                </span>
-
-                <span>
-                    KPI ของฉัน
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/performance.php"
-                class="nav-item active">
-
-                <span class="nav-icon">
-                    📊
-                </span>
-
-                <span>
-                    ผลการปฏิบัติงาน
-                </span>
-
-            </a>
-
-            <a
-                href="../employee/profile.php"
-                class="nav-item">
-
-                <span class="nav-icon">
-                    👤
-                </span>
-
-                <span>
-                    ข้อมูลส่วนตัว
-                </span>
-
-            </a>
-        </nav>
-
-        <div class="sidebar-bottom">
-
-            <a
-                href="../logout.php"
-                class="logout-button">
-
-                ออกจากระบบ
-
-            </a>
-        </div>
-    </aside>
-
-    <!-- === MAIN === -->
-    <main class="main-content">
-        <header class="topbar">
-            <button
-                type="button"
-                class="mobile-menu-button"
-                id="mobileMenuButton">
-                ☰
-            </button>
-
-            <div class="user-info">
-                <div class="user-avatar">
-                    <?= htmlspecialchars(
-                            mb_substr(
-                                $firstName,
-                                0,
-                                1,
-                                'UTF-8'
-                            ),
-                        ENT_QUOTES,
-                        "UTF-8"
-                    ) ?>
-                </div>
-
-                <div class="user-detail">
-                    <strong>
-                        <?= htmlspecialchars(
-                            $fullName,
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-                    </strong>
-
-                    <span>
-
-                        <?= htmlspecialchars(
-                            $_SESSION["employee_code"] ??
-                                "-",
-                            ENT_QUOTES,
-                            "UTF-8"
-                        ) ?>
-
-                    </span>
-                </div>
-            </div>
-        </header>
+    <?php employeeLayoutStart("performance", "../"); ?>
 
         <!-- === PAGE HEADER === -->
         <section class="page-header">
@@ -1108,38 +978,69 @@ if ($totalPerformanceRecords === 0) {
 
         </section>
 
-        <form method="get" class="period-filter">
-            <label for="year">ปี</label>
-            <select name="year" id="year" onchange="this.form.submit()">
-                <?php foreach (array_unique(array_merge([$currentYear], $availableYears)) as $year): ?>
-                    <option value="<?= (int) $year ?>" <?= (int) $year === $selectedYear ? "selected" : "" ?>><?= (int) $year ?></option>
-                <?php endforeach; ?>
-            </select>
-            <label for="month">เดือน</label>
-            <select name="month" id="month" onchange="this.form.submit()">
-                <?php foreach ($thaiMonths as $monthNumber => $monthName): ?>
-                    <option value="<?= $monthNumber ?>" <?= $monthNumber === $selectedMonth ? "selected" : "" ?>><?= $monthName ?></option>
-                <?php endforeach; ?>
-            </select>
-            <span class="performance-month-status"><?= htmlspecialchars($thaiMonths[$selectedMonth], ENT_QUOTES, "UTF-8") ?> <?= $selectedYear ?> · <?= $selectedQuarter ?></span>
-        </form>
+        <!-- === ปี + เดือน (คลิกแล้วโหลดทันที) + Export === -->
 
-        <?php if (!empty($assignments)): ?>
-            <div class="performance-export-actions">
-                <a
-                    href="performance-export-pdf.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
-                    class="performance-export-button pdf"
-                >
-                    📄 Export PDF
-                </a>
-                <a
-                    href="performance-export-excel.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
-                    class="performance-export-button excel"
-                >
-                    📊 Export Excel
-                </a>
+        <section class="filter-card">
+
+            <?php
+            renderPeriodPicker([
+                "year" => $selectedYear,
+                "month" => $selectedMonth,
+                "stats" => $monthStats,
+                "show_all" => false,
+                "css" => "../assets/css/period-picker.css?v=1",
+                "dot_label" => "มีผลงานที่บันทึกแล้ว",
+                "url" => fn(int $year, int $month): string => "performance.php?year={$year}&month={$month}"
+            ]);
+            ?>
+
+            <div class="filter-footer">
+
+                <div class="filter-note">
+
+                    <?php if ($selectedPeriod): ?>
+
+                        รอบประเมิน:
+                        <strong><?= htmlspecialchars($selectedPeriod["period_name"], ENT_QUOTES, "UTF-8") ?> <?= $selectedYear ?></strong>
+                        · <?= htmlspecialchars($selectedPeriod["quarter"], ENT_QUOTES, "UTF-8") ?>
+                        · <?= date("d/m/Y", strtotime($selectedPeriod["start_date"])) ?>
+                        - <?= date("d/m/Y", strtotime($selectedPeriod["end_date"])) ?>
+                        · <?= htmlspecialchars($selectedPeriod["status"], ENT_QUOTES, "UTF-8") ?>
+
+                    <?php else: ?>
+
+                        <?= htmlspecialchars($thaiMonths[$selectedMonth], ENT_QUOTES, "UTF-8") ?> <?= $selectedYear ?>
+                        (<?= $selectedQuarter ?>) · ยังไม่มีรอบประเมินของเดือนนี้
+
+                    <?php endif; ?>
+
+                </div>
+
+                <?php if ($selectedPeriod && !empty($assignments)): ?>
+
+                    <div class="performance-export-actions">
+
+                        <a
+                            href="performance-export-pdf.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
+                            class="performance-export-button pdf"
+                            target="_blank"
+                            rel="noopener">
+                            📄 Export PDF
+                        </a>
+
+                        <a
+                            href="performance-export-excel.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
+                            class="performance-export-button excel">
+                            📊 Export Excel
+                        </a>
+
+                    </div>
+
+                <?php endif; ?>
+
             </div>
-        <?php endif; ?>
+
+        </section>
 
         <section class="quarter-score-grid">
             <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>
@@ -1623,43 +1524,7 @@ if ($totalPerformanceRecords === 0) {
         <?php endif; ?>
 
 
-    </main>
-
-
-    <script>
-        const mobileMenuButton =
-            document.getElementById(
-                "mobileMenuButton"
-            );
-
-
-        const sidebar =
-            document.querySelector(
-                ".sidebar"
-            );
-
-
-        if (
-            mobileMenuButton &&
-            sidebar
-        ) {
-
-            mobileMenuButton.addEventListener(
-
-                "click",
-
-                function() {
-
-                    sidebar.classList.toggle(
-                        "mobile-open"
-                    );
-
-                }
-
-            );
-
-        }
-    </script>
+    <?php employeeLayoutEnd("../"); ?>
 
 
 </body>

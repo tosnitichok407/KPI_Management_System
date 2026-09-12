@@ -3,6 +3,7 @@
 session_start();
 
 require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/includes/layout.php";
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: ../login.php");
@@ -87,49 +88,14 @@ function profileValue(?string $value): string
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ข้อมูลส่วนตัว | KPI Management System</title>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/css/employee-kpi.css?v=layout-20260911-2">
+    <link rel="stylesheet" href="../assets/css/employee-kpi.css?v=layout-employee-2">
 </head>
 <body>
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <img src="../assets/images/Advance-Logo.png" alt="Advance Asia Group Logo">
-            <div>
-                <h2>KPI System</h2>
-                <span>Employee</span>
-            </div>
-        </div>
 
-        <nav class="sidebar-nav">
-            <a href="index.php" class="nav-item">
-                <span class="nav-icon">🏠</span>
-                <span>หน้าแรก</span>
-            </a>
-            <a href="kpi/kpi.php" class="nav-item">
-                <span class="nav-icon">🎯</span>
-                <span>KPI ของฉัน</span>
-            </a>
-            <a href="performance.php" class="nav-item">
-                <span class="nav-icon">📊</span>
-                <span>ผลการปฏิบัติงาน</span>
-            </a>
-            <a href="profile.php" class="nav-item active">
-                <span class="nav-icon">👤</span>
-                <span>ข้อมูลส่วนตัว</span>
-            </a>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <a href="../logout.php" class="logout-button">ออกจากระบบ</a>
-        </div>
-    </aside>
-
-    <main class="main-content">
-        <header class="topbar">
-            <button type="button" class="mobile-menu-button" id="mobileMenuButton" aria-label="เปิดเมนู">☰</button>
-        </header>
+    <?php employeeLayoutStart("profile", "../"); ?>
 
         <section class="page-header">
-            <div>
+            <div class="page-title-block">
                 <h1>ข้อมูลส่วนตัว</h1>
                 <p>ข้อมูลพนักงานของคุณ</p>
             </div>
@@ -174,26 +140,8 @@ function profileValue(?string $value): string
                 </div>
             </div>
         </section>
-    </main>
 
-    <div class="mobile-menu-overlay" id="mobileMenuOverlay"></div>
+    <?php employeeLayoutEnd("../"); ?>
 
-    <script>
-        const mobileMenuButton = document.getElementById("mobileMenuButton");
-        const sidebar = document.querySelector(".sidebar");
-        const mobileMenuOverlay = document.getElementById("mobileMenuOverlay");
-
-        function closeMobileMenu() {
-            sidebar.classList.remove("mobile-open");
-            mobileMenuOverlay.classList.remove("active");
-        }
-
-        mobileMenuButton.addEventListener("click", () => {
-            sidebar.classList.toggle("mobile-open");
-            mobileMenuOverlay.classList.toggle("active");
-        });
-
-        mobileMenuOverlay.addEventListener("click", closeMobileMenu);
-    </script>
 </body>
 </html>
