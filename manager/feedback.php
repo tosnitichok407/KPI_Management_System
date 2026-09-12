@@ -61,6 +61,20 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") !== "POST" || $employeeId <= 0 || $per
 
 try {
 
+    /* ต้องเป็นรอบประเมินที่มีอยู่จริง และพนักงานที่ยัง Active */
+    $checkStmt = $pdo->prepare("
+        SELECT
+            (SELECT COUNT(*) FROM evaluation_periods WHERE period_id = :period_id) AS period_ok,
+            (SELECT COUNT(*) FROM employees WHERE employee_id = :employee_id AND status = 'Active') AS employee_ok
+    ");
+    $checkStmt->execute([":period_id" => $periodId, ":employee_id" => $employeeId]);
+    $check = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!(int) $check["period_ok"] || !(int) $check["employee_ok"]) {
+        header("Location: {$redirect}&saved=0");
+        exit;
+    }
+
     $stmt = $pdo->prepare("
         INSERT INTO manager_feedback (manager_id, employee_id, period_id, evaluation_score, feedback)
         VALUES (:manager_id, :employee_id, :period_id, :evaluation_score, :feedback)

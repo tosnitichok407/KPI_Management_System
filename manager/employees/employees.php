@@ -109,8 +109,31 @@ if ($selectedEmployee !== null) {
     }
 }
 
-/* Feedback ให้ได้เฉพาะเดือนที่มีรอบประเมิน */
-$canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
+/*
+| Feedback รายเดือน: ปุ่มแสดงทุกครั้งที่ปีนี้มีรอบประเมิน และเลือกเดือนในฟอร์มได้
+| เดือนเริ่มต้น = เดือนที่กรอง > เดือนปัจจุบัน > เดือนล่าสุดที่มีรอบ
+*/
+$feedbackPeriods = $yearData["periods"];
+$canFeedback = !empty($feedbackPeriods);
+
+if ($filterMonth > 0 && isset($feedbackPeriods[$filterMonth])) {
+    $feedbackDefaultMonth = $filterMonth;
+} elseif ($filterYear === (int) date("Y") && isset($feedbackPeriods[(int) date("n")])) {
+    $feedbackDefaultMonth = (int) date("n");
+} else {
+    $feedbackDefaultMonth = $feedbackPeriods ? max(array_keys($feedbackPeriods)) : 0;
+}
+
+/* Feedback ที่ให้แล้วของพนักงาน {เดือน: {score, feedback}} ใช้เติมฟอร์มเมื่อเปลี่ยนเดือน */
+$feedbackMap = static function (int $employeeId) use ($yearData): string {
+    $map = [];
+
+    foreach ($yearData["feedback"][$employeeId] ?? [] as $month => $row) {
+        $map[$month] = ["score" => (float) $row["evaluation_score"], "feedback" => $row["feedback"]];
+    }
+
+    return htmlspecialchars(json_encode((object) $map, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8");
+};
 
 ?>
 
@@ -155,9 +178,9 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
         <div class="filter-note">
 
             <?php if ($filterMonth > 0 && !$selectedPeriod): ?>
-                ยังไม่ได้สร้างรอบประเมินของเดือน<?= $monthNames[$filterMonth] ?> <?= $filterYear ?> จึงยังไม่มีผลประเมินและให้ Feedback ไม่ได้
+                ยังไม่ได้สร้างรอบประเมินของเดือน<?= $monthNames[$filterMonth] ?> <?= $filterYear ?> จึงยังไม่มีผลประเมินของเดือนนี้
             <?php elseif ($filterMonth === 0): ?>
-                เลือก <strong>เดือน</strong> เพื่อดูผลของเดือนนั้นและให้ Feedback ประจำเดือน
+                เลือก <strong>เดือน</strong> เพื่อดูผลของเดือนนั้น · กดปุ่ม <strong>Feedback</strong> เพื่อส่ง Feedback รายเดือนถึงพนักงาน
             <?php else: ?>
                 รอบประเมิน: <strong><?= htmlspecialchars($selectedPeriod["period_name"], ENT_QUOTES, "UTF-8") ?> <?= $filterYear ?></strong>
                 · <?= htmlspecialchars($selectedPeriod["quarter"], ENT_QUOTES, "UTF-8") ?>
@@ -229,9 +252,9 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
                         class="btn btn-primary feedback-btn"
                         data-id="<?= $filterEmployee ?>"
                         data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
-                        data-score="<?= htmlspecialchars((string) ($yearData["feedback"][$filterEmployee][$filterMonth]["evaluation_score"] ?? ""), ENT_QUOTES, "UTF-8") ?>"
-                        data-feedback="<?= htmlspecialchars((string) ($yearData["feedback"][$filterEmployee][$filterMonth]["feedback"] ?? ""), ENT_QUOTES, "UTF-8") ?>">
-                        ✎ Feedback เดือน<?= $monthNames[$filterMonth] ?>
+                        data-month="<?= $feedbackDefaultMonth ?>"
+                        data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
+                        ✎ ให้ Feedback
                     </button>
                 <?php endif; ?>
 
@@ -318,7 +341,18 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
 
                             <td>
                                 <?php if ($row["period"]): ?>
-                                    <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit">ดูเดือนนี้</a>
+                                    <div class="action-buttons">
+                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit">ดูเดือนนี้</a>
+                                        <button
+                                            type="button"
+                                            class="btn-small feedback-btn"
+                                            data-id="<?= $filterEmployee ?>"
+                                            data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
+                                            data-month="<?= $month ?>"
+                                            data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
+                                            Feedback
+                                        </button>
+                                    </div>
                                 <?php endif; ?>
                             </td>
 
@@ -543,8 +577,8 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
                                                 class="btn-small feedback-btn"
                                                 data-id="<?= (int) $employee["employee_id"] ?>"
                                                 data-name="<?= htmlspecialchars($employee["first_name"] . " " . $employee["last_name"], ENT_QUOTES, "UTF-8") ?>"
-                                                data-score="<?= htmlspecialchars((string) ($row["feedback"]["evaluation_score"] ?? ""), ENT_QUOTES, "UTF-8") ?>"
-                                                data-feedback="<?= htmlspecialchars((string) ($row["feedback"]["feedback"] ?? ""), ENT_QUOTES, "UTF-8") ?>">
+                                                data-month="<?= $feedbackDefaultMonth ?>"
+                                                data-feedback-map="<?= $feedbackMap((int) $employee["employee_id"]) ?>">
                                                 Feedback
                                             </button>
                                         <?php endif; ?>
@@ -584,16 +618,28 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
 
             <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด">×</button>
 
-            <h2>Feedback ประจำเดือน<?= $monthNames[$filterMonth] ?> <?= $filterYear ?></h2>
+            <h2>Feedback ถึงพนักงาน</h2>
 
             <p class="dialog-person" id="dialogPerson"></p>
 
             <input type="hidden" name="employee_id" id="feedbackEmployeeId">
-            <input type="hidden" name="period_id" value="<?= (int) $selectedPeriod["period_id"] ?>">
             <input type="hidden" name="year" value="<?= $filterYear ?>">
             <input type="hidden" name="month" value="<?= $filterMonth ?>">
             <input type="hidden" name="department_id" value="<?= $filterDepartment ?>">
             <input type="hidden" name="return_employee_id" value="<?= $filterEmployee ?>">
+
+            <label>
+                รอบประเมิน (เดือน)
+                <select name="period_id" id="feedbackPeriod" required>
+                    <?php foreach ($feedbackPeriods as $periodMonth => $period): ?>
+                        <option value="<?= (int) $period["period_id"] ?>" data-month="<?= (int) $periodMonth ?>">
+                            <?= $monthNames[$periodMonth] ?> <?= $filterYear ?> (<?= htmlspecialchars($period["quarter"], ENT_QUOTES, "UTF-8") ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+
+            <p class="dialog-status" id="feedbackStatus"></p>
 
             <label>
                 คะแนนประเมินจากหัวหน้า (0-100)
@@ -607,7 +653,7 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
 
             <div class="dialog-actions">
                 <button type="button" class="btn btn-secondary" onclick="feedbackDialog.close()">ยกเลิก</button>
-                <button type="submit" class="btn btn-primary">บันทึก Feedback</button>
+                <button type="submit" class="btn btn-primary">ส่ง Feedback</button>
             </div>
 
         </form>
@@ -615,15 +661,56 @@ $canFeedback = $filterMonth > 0 && $selectedPeriod !== null;
     </dialog>
 
     <script>
-        document.querySelectorAll(".feedback-btn").forEach(function (button) {
-            button.addEventListener("click", function () {
-                document.getElementById("feedbackEmployeeId").value = button.dataset.id;
-                document.getElementById("dialogPerson").textContent = button.dataset.name;
-                document.getElementById("feedbackScore").value = button.dataset.score || "";
-                document.getElementById("feedbackText").value = button.dataset.feedback || "";
-                document.getElementById("feedbackDialog").showModal();
+        (function () {
+
+            const dialog = document.getElementById("feedbackDialog");
+            const periodSelect = document.getElementById("feedbackPeriod");
+            const scoreInput = document.getElementById("feedbackScore");
+            const textInput = document.getElementById("feedbackText");
+            const status = document.getElementById("feedbackStatus");
+
+            let feedbackMap = {};
+
+            /* เติมคะแนน/ข้อความเดิมของเดือนที่เลือก (ถ้าเคยให้แล้ว) */
+            function fillForm() {
+                const option = periodSelect.options[periodSelect.selectedIndex];
+                const saved = option ? feedbackMap[option.dataset.month] : null;
+
+                scoreInput.value = saved ? saved.score : "";
+                textInput.value = saved ? saved.feedback : "";
+                status.textContent = saved
+                    ? "เดือนนี้ให้ Feedback แล้ว · ส่งอีกครั้งเพื่อแก้ไข"
+                    : "เดือนนี้ยังไม่ได้ให้ Feedback";
+                status.classList.toggle("is-saved", Boolean(saved));
+            }
+
+            periodSelect.addEventListener("change", fillForm);
+
+            document.querySelectorAll(".feedback-btn").forEach(function (button) {
+                button.addEventListener("click", function () {
+
+                    document.getElementById("feedbackEmployeeId").value = button.dataset.id;
+                    document.getElementById("dialogPerson").textContent = button.dataset.name;
+
+                    try {
+                        feedbackMap = JSON.parse(button.dataset.feedbackMap || "{}");
+                    } catch (error) {
+                        feedbackMap = {};
+                    }
+
+                    const option = periodSelect.querySelector('option[data-month="' + button.dataset.month + '"]');
+
+                    if (option) {
+                        periodSelect.value = option.value;
+                    }
+
+                    fillForm();
+                    dialog.showModal();
+                    textInput.focus();
+                });
             });
-        });
+
+        })();
     </script>
 
 <?php endif; ?>

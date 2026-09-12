@@ -9,6 +9,7 @@ require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/period-picker.php";
 require_once __DIR__ . "/includes/layout.php";
+require_once __DIR__ . "/includes/feedback.php";
 
 
 /*
@@ -72,6 +73,11 @@ $selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
 
 /* ปุ่มเดือน: รอบประเมิน + จำนวนผลงานของพนักงานคนนี้ในแต่ละเดือน */
 $monthStats = periodPickerMonthStats($pdo, $selectedYear, $employeeId);
+
+/* Feedback จากหัวหน้าของเดือนที่เลือก */
+$monthFeedback = $selectedPeriodId > 0
+    ? employeeFeedbackList($pdo, $employeeId, ["period_id" => $selectedPeriodId])
+    : [];
 
 $quarterScoreStmt = $pdo->prepare("
     SELECT
@@ -1041,6 +1047,20 @@ if ($totalPerformanceRecords === 0) {
             </div>
 
         </section>
+
+        <!-- === FEEDBACK จากหัวหน้า (เดือนที่เลือก) === -->
+
+        <?php
+        renderFeedbackCard($monthFeedback, [
+            "root" => "../",
+            "title" => "💬 Feedback จากหัวหน้า",
+            "subtitle" => "ประจำเดือน" . $thaiMonths[$selectedMonth] . " " . $selectedYear,
+            "link" => ["href" => "feedback.php?year=" . $selectedYear, "label" => "ดูทั้งหมด →"],
+            "empty" => $selectedPeriod
+                ? "หัวหน้ายังไม่ได้ให้ Feedback ของเดือนนี้"
+                : "ยังไม่มีรอบประเมินของเดือนนี้"
+        ]);
+        ?>
 
         <section class="quarter-score-grid">
             <?php foreach (["Q1", "Q2", "Q3", "Q4"] as $quarter): ?>

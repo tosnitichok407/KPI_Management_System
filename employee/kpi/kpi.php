@@ -8,6 +8,7 @@ require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/layout.php";
+require_once __DIR__ . "/../performance-export-data.php";
 
 
 /*
@@ -119,14 +120,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $assignmentId = (int) ($_POST["assignment_id"] ?? 0);
 
+    // Actual ใช้เฉพาะ Performance KPI (Competency เลือกคะแนน 1-5 แทน)
     $actual = trim($_POST["actual"] ?? "");
-    if ($actual === "" || !ctype_digit($actual)) {
-
-        $error = "กรุณากรอกผลที่ทำได้เป็นจำนวนเต็ม";
-    } else {
-
-        $actual = (int) $actual;
-    }
 
     $score = trim($_POST["score"] ?? "");
     $comment = trim($_POST["comment"] ?? "");
@@ -217,9 +212,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     if ($actual === "") {
 
                         $error = "กรุณากรอก Actual";
-                    } elseif (!is_numeric($actual)) {
+                    } elseif (!ctype_digit($actual)) {
 
-                        $error = "Actual ต้องเป็นตัวเลข";
+                        $error = "กรุณากรอกผลที่ทำได้เป็นจำนวนเต็ม";
                     } elseif (
                         $assignment["target_value"] === null ||
                         $assignment["target_value"] === ""
@@ -269,9 +264,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     /*
                     |--------------------------------------------------------------------------
-                    | ต้องเลือกคะแนน 1 - 5
+                    | ต้องเลือกคะแนน 1 - 5 (ไม่มี Actual)
                     |--------------------------------------------------------------------------
                     */
+
+                    $actual = "";
 
                     if ($score === "") {
 
@@ -509,6 +506,11 @@ $sql = "
         k.unit,
         k.max_score,
         k.kpi_type,
+        k.score_5,
+        k.score_4,
+        k.score_3,
+        k.score_2,
+        k.score_1,
 
         a.assignment_year,
         a.start_date,
@@ -603,6 +605,14 @@ foreach ($assignments as $assignment) {
 
         $competencyKpis[] = $assignment;
     }
+}
+
+
+/* เกณฑ์ระดับผลงาน 5..1 ของ Competency (แหล่งเดียวกับแบบฟอร์ม Excel/PDF) */
+try {
+    $competencyCriteria = loadKpiScoreCriteria($pdo, $competencyKpis);
+} catch (PDOException $e) {
+    $competencyCriteria = [];
 }
 
 
@@ -1050,6 +1060,92 @@ $totalCompetency =
 
             color: #244397;
 
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Competency: เลือกระดับผลงาน 5..1
+        |--------------------------------------------------------------------------
+        */
+
+        .competency-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* ปุ่มบันทึกขนาดเท่าฝั่ง Performance (ไม่ยืดเต็มความกว้าง) */
+        .competency-form .save-button {
+            align-self: flex-start;
+            margin-top: 0;
+        }
+
+        .level-options {
+            display: grid;
+            gap: 8px;
+        }
+
+        .level-options .level-option {
+            display: grid;
+            grid-template-columns: auto 34px 1fr;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #fff;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        .level-options .level-option:hover {
+            border-color: #244397;
+            background: #f8fafc;
+        }
+
+        .level-options .level-option input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            accent-color: #244397;
+        }
+
+        .level-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #eff6ff;
+            color: #244397;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .level-text {
+            line-height: 1.5;
+        }
+
+        .level-option.is-empty .level-text {
+            color: #94a3b8;
+        }
+
+        .level-options .level-option:has(input:checked) {
+            border-color: #244397;
+            background: #eff6ff;
+            box-shadow: inset 0 0 0 1px #244397;
+        }
+
+        .level-option:has(input:checked) .level-number {
+            background: #244397;
+            color: #fff;
         }
 
 
@@ -1795,7 +1891,132 @@ $totalCompetency =
                                     $kpiId =
                                         (int) $kpi["kpi_id"];
 
+                                    $levels = $competencyCriteria[$kpiId] ?? [];
+
+                                    $currentScore = ($kpi["score"] !== null && $kpi["score"] !== "")
+                                        ? (int) round((float) $kpi["score"])
+                                        : 0;
+
+                                    $realScore = (float) ($kpi["weight"] ?? 0) * $currentScore;
+
                                     ?>
+
+                                    <tr>
+
+                                        <!-- LEFT -->
+
+                                        <td>
+
+                                            <div class="kpi-title">
+                                                <?= htmlspecialchars($kpi["kpi_name"], ENT_QUOTES, "UTF-8") ?>
+                                            </div>
+
+                                            <div class="kpi-meta">
+
+                                                <span class="kpi-badge">
+                                                    Weight: <?= (int) ($kpi["weight"] ?? 0) ?>%
+                                                </span>
+
+                                                <span class="kpi-badge">
+                                                    คะแนน 1 - 5
+                                                </span>
+
+                                            </div>
+
+                                            <?php if ($currentScore > 0): ?>
+
+                                                <div class="score-display">
+                                                    คะแนนที่บันทึก: <?= $currentScore ?> / 5
+                                                    · คะแนนจริง <?= number_format($realScore, floor($realScore) == $realScore ? 0 : 2) ?>
+                                                </div>
+
+                                            <?php endif; ?>
+
+                                        </td>
+
+                                        <!-- RIGHT -->
+
+                                        <td>
+
+                                            <form
+                                                method="POST"
+                                                class="competency-form"
+                                                action="kpi.php?tab=competency&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>">
+
+                                                <input
+                                                    type="hidden"
+                                                    name="assignment_id"
+                                                    value="<?= (int) $kpi["assignment_id"] ?>">
+
+                                                <div class="input-group">
+
+                                                    <label>ตัวชี้วัดผลงาน</label>
+
+                                                    <div class="target-display">
+                                                        <?= htmlspecialchars($kpi["description"] ?? "", ENT_QUOTES, "UTF-8") ?>
+                                                    </div>
+
+                                                </div>
+
+                                                <div class="input-group">
+
+                                                    <label>ระดับผลงาน (เลือกคะแนน 1 - 5)</label>
+
+                                                    <div class="level-options">
+
+                                                        <?php for ($level = 5; $level >= 1; $level--): ?>
+
+                                                            <?php $levelText = $levels[$level] ?? ""; ?>
+
+                                                            <label class="level-option<?= $levelText === "" ? " is-empty" : "" ?>">
+
+                                                                <input
+                                                                    type="radio"
+                                                                    name="score"
+                                                                    value="<?= $level ?>"
+                                                                    <?= $currentScore === $level ? "checked" : "" ?>
+                                                                    required>
+
+                                                                <span class="level-number"><?= $level ?></span>
+
+                                                                <span class="level-text">
+                                                                    <?= $levelText !== ""
+                                                                        ? htmlspecialchars($levelText, ENT_QUOTES, "UTF-8")
+                                                                        : "ไม่มีเกณฑ์กำหนดในระดับนี้" ?>
+                                                                </span>
+
+                                                            </label>
+
+                                                        <?php endfor; ?>
+
+                                                    </div>
+
+                                                    <div
+                                                        style="
+                                                            margin-top:8px;
+                                                            font-size:13px;
+                                                            color:#64748b;
+                                                        ">
+
+                                                        คะแนนจริง = Weight × คะแนนที่เลือก
+
+                                                    </div>
+
+                                                </div>
+
+                                                <button
+                                                    type="submit"
+                                                    class="save-button">
+
+                                                    บันทึกข้อมูล
+
+                                                </button>
+
+                                            </form>
+
+                                        </td>
+
+                                    </tr>
 
                                 <?php endforeach; ?>
 

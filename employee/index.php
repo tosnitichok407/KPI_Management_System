@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/includes/layout.php";
+require_once __DIR__ . "/includes/feedback.php";
 
 
 /*
@@ -118,6 +119,9 @@ if (!$employee) {
 
 
 $employeeId = (int) $employee["employee_id"];
+
+/* Feedback ล่าสุดจากหัวหน้า (3 รายการ) */
+$latestFeedback = employeeFeedbackList($pdo, $employeeId, ["limit" => 3]);
 
 
 /*
@@ -1366,6 +1370,17 @@ $avatar =
                 </article>
             <?php endforeach; ?>
         </section>
+
+        <!-- === FEEDBACK จากหัวหน้า (ล่าสุด) === -->
+
+        <?php
+        renderFeedbackCard($latestFeedback, [
+            "root" => "../",
+            "title" => "💬 Feedback จากหัวหน้า",
+            "subtitle" => "ข้อความล่าสุดจากหัวหน้างานของคุณ",
+            "link" => ["href" => "feedback.php", "label" => "ดูทั้งหมด →"]
+        ]);
+        ?>
 
         <!-- === CHARTS === -->
 

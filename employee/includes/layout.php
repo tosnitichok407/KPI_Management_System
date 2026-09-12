@@ -32,6 +32,7 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
         "home" => ["employee/index.php", "🏠", "หน้าแรก"],
         "kpi" => ["employee/kpi/kpi.php", "🎯", "KPI ของฉัน"],
         "performance" => ["employee/performance.php", "📊", "ผลการปฏิบัติงาน"],
+        "feedback" => ["employee/feedback.php", "💬", "Feedback จากหัวหน้า"],
         "profile" => ["employee/profile.php", "👤", "ข้อมูลส่วนตัว"]
     ];
 

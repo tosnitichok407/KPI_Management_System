@@ -172,7 +172,7 @@ $flash = $_GET["saved"] ?? "";
     <link rel="stylesheet" href="../assets/css/forms.css">
     <link rel="stylesheet" href="../assets/css/tables.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
-    <link rel="stylesheet" href="../assets/css/manager.css?v=manager-v2">
+    <link rel="stylesheet" href="../assets/css/manager.css?v=manager-v3">
 
 
     <?php if ($page === "home"): ?>
@@ -265,7 +265,7 @@ $flash = $_GET["saved"] ?? "";
 
                     <div class="alert <?= $flash === "1" ? "alert-success" : "alert-error" ?>">
                         <?= $flash === "1"
-                            ? "บันทึก Feedback เรียบร้อยแล้ว"
+                            ? "ส่ง Feedback เรียบร้อยแล้ว · พนักงานจะเห็นในเมนู \"Feedback จากหัวหน้า\""
                             : "ไม่สามารถบันทึก Feedback ได้ กรุณาตรวจสอบข้อมูลอีกครั้ง" ?>
                     </div>
 
