@@ -608,114 +608,21 @@ foreach ($assignments as $assignment) {
 }
 
 
-/* เกณฑ์ระดับผลงาน 5..1 ของ Competency (แหล่งเดียวกับแบบฟอร์ม Excel/PDF) */
-try {
-    $competencyCriteria = loadKpiScoreCriteria($pdo, $competencyKpis);
-} catch (PDOException $e) {
-    $competencyCriteria = [];
-}
-
-
 /*
 |--------------------------------------------------------------------------
-| Get Score Levels + Criteria
+| เกณฑ์ระดับผลงาน 5..1 ของทุก KPI (Performance + Competency)
 |--------------------------------------------------------------------------
 |
-| เก็บตาม kpi_id
-|--------------------------------------------------------------------------
+| แหล่งเดียวกับแบบฟอร์ม Excel/PDF:
+| kpi_score_criteria > kpi_score_levels > kpi_indicators.score_5..score_1
+|
 */
 
-$scoreLevels = [];
-
-$scoreCriteria = [];
-
-
 try {
-
-    /*
-    |--------------------------------------------------------------------------
-    | kpi_score_levels
-    |--------------------------------------------------------------------------
-    */
-
-    $levelStmt = $pdo->query("
-        SELECT
-            score_level_id,
-            kpi_id,
-            score,
-            criteria
-
-        FROM kpi_score_levels
-
-        ORDER BY
-            kpi_id ASC,
-            score DESC
-    ");
-
-
-    $levelRows =
-        $levelStmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    foreach ($levelRows as $level) {
-
-        $kpiId = (int) $level["kpi_id"];
-
-        if (!isset($scoreLevels[$kpiId])) {
-            $scoreLevels[$kpiId] = [];
-        }
-
-        $scoreLevels[$kpiId][] = $level;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | kpi_score_criteria
-    |--------------------------------------------------------------------------
-    */
-
-    $criteriaStmt = $pdo->query("
-        SELECT
-            criteria_id,
-            kpi_id,
-            score_level,
-            criteria
-
-        FROM kpi_score_criteria
-
-        ORDER BY
-            kpi_id ASC,
-            score_level DESC
-    ");
-
-
-    $criteriaRows =
-        $criteriaStmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    foreach ($criteriaRows as $criteria) {
-
-        $kpiId = (int) $criteria["kpi_id"];
-
-        if (!isset($scoreCriteria[$kpiId])) {
-            $scoreCriteria[$kpiId] = [];
-        }
-
-        $scoreCriteria[$kpiId][] = $criteria;
-    }
+    $kpiCriteria = loadKpiScoreCriteria($pdo, $assignments);
 } catch (PDOException $e) {
-
-    /*
-    |--------------------------------------------------------------------------
-    | ถ้าตารางเกณฑ์มีปัญหา
-    | ไม่ให้ทั้งหน้า KPI พัง
-    |--------------------------------------------------------------------------
-    */
-
-    $scoreLevels = [];
-
-    $scoreCriteria = [];
+    // ถ้าตารางเกณฑ์มีปัญหา ไม่ให้ทั้งหน้า KPI พัง
+    $kpiCriteria = [];
 }
 
 
@@ -1051,6 +958,38 @@ $totalCompetency =
 
             border-bottom: none;
 
+        }
+
+
+        /* ระดับที่ได้ตามคะแนนที่บันทึก */
+        .criteria-item.is-current {
+            margin: 2px -8px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #eff6ff;
+            color: #244397;
+            font-weight: 600;
+        }
+
+        .criteria-item.is-empty {
+            color: #94a3b8;
+        }
+
+        .criteria-current {
+            margin-left: 6px;
+            padding: 1px 8px;
+            border-radius: 999px;
+            background: #244397;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* KPI ที่ Admin ยังไม่ได้กำหนดเกณฑ์ */
+        .criteria-note {
+            margin-bottom: 6px;
+            color: #b45309;
+            font-size: 12px;
         }
 
 
@@ -1637,58 +1576,54 @@ $totalCompetency =
 
                                             </div>
 
-                                            <!-- SCORE CRITERIA -->
+                                            <!-- ระดับผลงาน 5..1 (แสดงทุก KPI) · ไฮไลต์ระดับของคะแนนที่บันทึก -->
 
                                             <?php
 
                                             $kpiId =
                                                 (int) $kpi["kpi_id"];
 
+                                            $levels = $kpiCriteria[$kpiId] ?? [];
+
+                                            $currentLevel = ($kpi["score"] !== null && $kpi["score"] !== "")
+                                                ? (int) round((float) $kpi["score"])
+                                                : 0;
+
                                             ?>
 
-                                            <?php if (!empty($scoreLevels[$kpiId])): ?>
+                                            <div class="criteria-box">
 
-                                                <div class="criteria-box">
+                                                <div class="criteria-title">
+                                                    ระดับผลงาน (Criteria)
+                                                </div>
 
-                                                    <div class="criteria-title">
+                                                <?php if (empty($levels)): ?>
 
-                                                        ระดับผลงาน (Criteria)
+                                                    <div class="criteria-note">
+                                                        ยังไม่ได้กำหนดเกณฑ์ระดับผลงานของ KPI นี้ · ติดต่อผู้ดูแลระบบ
+                                                    </div>
+
+                                                <?php endif; ?>
+
+                                                <?php for ($level = 5; $level >= 1; $level--): ?>
+
+                                                    <?php $levelText = $levels[$level] ?? ""; ?>
+
+                                                    <div class="criteria-item<?= $level === $currentLevel ? " is-current" : "" ?><?= $levelText === "" ? " is-empty" : "" ?>">
+
+                                                        <span class="criteria-score"><?= $level ?></span>
+                                                        :
+                                                        <?= $levelText !== "" ? htmlspecialchars($levelText, ENT_QUOTES, "UTF-8") : "-" ?>
+
+                                                        <?php if ($level === $currentLevel): ?>
+                                                            <span class="criteria-current">ระดับที่ได้</span>
+                                                        <?php endif; ?>
 
                                                     </div>
 
+                                                <?php endfor; ?>
 
-                                                    <?php foreach (
-                                                        $scoreLevels[$kpiId]
-                                                        as $level
-                                                    ): ?>
-
-                                                        <div class="criteria-item">
-
-                                                            <span class="criteria-score">
-
-                                                                <?= htmlspecialchars(
-                                                                    (int) $level["score"],
-                                                                    ENT_QUOTES,
-                                                                    "UTF-8"
-                                                                ) ?>
-
-                                                            </span>
-
-                                                            :
-
-                                                            <?= htmlspecialchars(
-                                                                $level["criteria"] ?? "-",
-                                                                ENT_QUOTES,
-                                                                "UTF-8"
-                                                            ) ?>
-
-                                                        </div>
-
-                                                    <?php endforeach; ?>
-
-                                                </div>
-
-                                            <?php endif; ?>
+                                            </div>
 
                                         </td>
 
@@ -1891,7 +1826,7 @@ $totalCompetency =
                                     $kpiId =
                                         (int) $kpi["kpi_id"];
 
-                                    $levels = $competencyCriteria[$kpiId] ?? [];
+                                    $levels = $kpiCriteria[$kpiId] ?? [];
 
                                     $currentScore = ($kpi["score"] !== null && $kpi["score"] !== "")
                                         ? (int) round((float) $kpi["score"])

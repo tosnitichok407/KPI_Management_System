@@ -257,7 +257,8 @@ $flash = $_GET["saved"] ?? "";
          CONTENT
     ====================================================== -->
 
-        <section class="page-content">
+        <!-- section.page-container > div.page-container เหมือน admin/index.php และ employee layout (padding เท่ากันทุก role) -->
+        <section class="page-container">
 
             <?php if ($flash !== ""): ?>
 
