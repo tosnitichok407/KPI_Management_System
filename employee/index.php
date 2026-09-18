@@ -3,6 +3,8 @@
 require_once __DIR__ . "/../includes/security.php";
 
 require_once __DIR__ . "/../config/database.php";
+
+/** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/includes/layout.php";
 require_once __DIR__ . "/includes/feedback.php";

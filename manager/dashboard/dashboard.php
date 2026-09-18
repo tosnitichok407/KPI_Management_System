@@ -15,6 +15,17 @@ if (!isset($yearData)) {
     exit;
 }
 
+/* ค่าจาก manager/index.php (ประกาศค่าเริ่มต้นให้ editor/static analyzer เห็นว่าตัวแปรถูกกำหนด) */
+$filterYear = (int) ($filterYear ?? date("Y"));
+$filterMonth = (int) ($filterMonth ?? 0);
+$filterDepartment = (int) ($filterDepartment ?? 0);
+$filterLabel = (string) ($filterLabel ?? "");
+$monthNames = $monthNames ?? monthlyPeriodMonths();
+$selectedPeriod = $selectedPeriod ?? null;
+/** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก manager/index.php */
+
+
+
 $shortMonths = managerShortMonths();
 $colors = managerChartColors();
 $monthLabels = array_values($shortMonths);

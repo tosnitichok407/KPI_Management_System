@@ -17,6 +17,14 @@ if (!isset($formAction)) {
     exit;
 }
 
+/* ค่าจากหน้าเพิ่ม / แก้ไข (ประกาศค่าเริ่มต้นให้ editor/static analyzer เห็นว่าตัวแปรถูกกำหนด) */
+$formYear = (int) ($formYear ?? date("Y"));
+$formMonth = (int) ($formMonth ?? date("n"));
+$formStatus = $formStatus ?? "Open";
+$existingMonths = $existingMonths ?? [];
+$lockPeriod = (bool) ($lockPeriod ?? false);
+$submitLabel = $submitLabel ?? "Save";
+
 $monthNames = monthlyPeriodMonths();
 
 $currentYear = (int) date("Y");

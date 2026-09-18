@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . "/../config/database.php";
+
+/** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../vendor/autoload.php";
 require_once __DIR__ . "/../includes/pdf-helper.php";
 require_once __DIR__ . "/performance-export-data.php";

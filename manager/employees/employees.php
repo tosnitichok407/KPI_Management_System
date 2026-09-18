@@ -15,6 +15,15 @@ if (!isset($yearData)) {
     exit;
 }
 
+/* ค่าจาก manager/index.php (ประกาศค่าเริ่มต้นให้ editor/static analyzer เห็นว่าตัวแปรถูกกำหนด) */
+$filterYear = (int) ($filterYear ?? date("Y"));
+$filterMonth = (int) ($filterMonth ?? 0);
+$filterDepartment = (int) ($filterDepartment ?? 0);
+$filterLabel = (string) ($filterLabel ?? "");
+$monthNames = $monthNames ?? monthlyPeriodMonths();
+$selectedPeriod = $selectedPeriod ?? null;
+
+
 $filterEmployee = (int) ($_GET["employee_id"] ?? 0);
 
 $selectedEmployee = $yearData["employees"][$filterEmployee] ?? null;

@@ -27,6 +27,13 @@ if (PHP_SAPI !== "cli") {
 
 require __DIR__ . "/../../config/database.php";
 
+/** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
+/** @var string $host */
+/** @var string $username */
+/** @var string $password */
+
+/** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
+
 $options = getopt("", ["db:", "rollback"]);
 
 if (!empty($options["db"])) {

@@ -17,6 +17,10 @@ if (!isset($formAction)) {
     exit;
 }
 
+/* ค่าจากหน้าเพิ่ม / แก้ไข (ประกาศค่าเริ่มต้นให้ editor/static analyzer เห็นว่าตัวแปรถูกกำหนด) */
+$category_name = (string) ($category_name ?? "");
+$description = (string) ($description ?? "");
+$submitLabel = $submitLabel ?? "บันทึก";
 $usedKpis = $usedKpis ?? null;
 
 ?>
