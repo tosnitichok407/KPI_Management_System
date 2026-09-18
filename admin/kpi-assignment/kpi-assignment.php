@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
@@ -23,12 +21,8 @@ if (!isset($_SESSION["user_id"])) {
    CHECK ADMIN
 ========================================================= */
 
-if (
-    !isset($_SESSION["role_id"]) ||
-    $_SESSION["role_id"] != 1
-){
-    header("Location: ../dashboard.php");
-    exit;
+if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
+    redirectToRoleHome("../");
 }
 
 $message = "";
@@ -124,7 +118,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
        VALIDATION
     ===================================================== */
 
-    if (
+        if (!csrfVerify()) {
+
+        $error =
+            "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+
+    } elseif (
         $kpi_id <= 0 ||
         empty($employee_ids) ||
         $assignment_year < 2000 ||
@@ -137,6 +136,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $error =
             "กรุณากรอกข้อมูลให้ครบถ้วน";
+
+    } elseif ($status !== "Active" && $status !== "Inactive") {
+
+        $error =
+            "สถานะไม่ถูกต้อง";
 
     } elseif (
         !is_numeric($weight) ||
@@ -499,7 +503,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
 
 
+                                } catch (PDOException $e) {
+
+                    /* error ของฐานข้อมูล: ไม่แสดงรายละเอียดให้ผู้ใช้ */
+
+                    if (
+                        $pdo->inTransaction()
+                    ) {
+
+                        $pdo->rollBack();
+                    }
+
+                    error_log("Assign KPI failed: " . $e->getMessage());
+
+                    $error =
+                        "เกิดข้อผิดพลาด: ไม่สามารถบันทึก KPI Assignment ได้";
+
                 } catch (Exception $e) {
+
+                    /* กฎธุรกิจ (เช่น Weight เกิน 100%) แสดงข้อความได้ */
 
                     if (
                         $pdo->inTransaction()
@@ -922,547 +944,6 @@ $form_year =
 
 ?>
 
-<style>
-
-        .quarter-preview {
-            margin-top: 8px;
-            color: #667085;
-            font-size: 13px;
-        }
-
-        .quarter-preview strong {
-            color: #244397;
-        }
-
-
-        /* .page-container ใช้ขนาดเดียวกับหน้าอื่นจาก assets/css/admin.css */
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-
-        .page-header h1 {
-            margin: 0;
-            font-size: 32px;
-            font-weight: 600;
-        }
-
-
-        .page-header p {
-            margin: 5px 0 0;
-            color: #6b7280;
-        }
-
-
-        .header-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
-        }
-
-
-        .card-title {
-            margin: 0 0 20px;
-            color: #244397;
-            font-size: 20px;
-            font-weight: 500;
-        }
-
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 18px;
-        }
-
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-
-        .form-group.full {
-            grid-column: span 2;
-        }
-
-
-        label {
-            font-size: 14px;
-            margin-bottom: 7px;
-            font-weight: 500;
-        }
-
-
-        label span {
-            color: #e53935;
-        }
-
-
-        input,
-        select {
-            width: 100%;
-            padding: 11px 13px;
-            border: 1px solid #d8dce5;
-            border-radius: 7px;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            font-size: 14px;
-            outline: none;
-            background: #fff;
-        }
-
-
-        input:focus,
-        select:focus {
-            border-color: #244397;
-        }
-
-
-        .employee-select {
-            min-height: 220px;
-        }
-
-
-        .department-select {
-            margin-bottom: 8px;
-        }
-
-
-        .select-hint {
-            margin-top: 6px;
-            font-size: 12px;
-            color: #777;
-        }
-
-
-        .selected-count {
-            margin-top: 7px;
-            font-size: 13px;
-            color: #244397;
-            font-weight: 500;
-        }
-
-
-        .button-row {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-
-        .btn {
-            border: none;
-            padding: 10px 22px;
-            border-radius: 7px;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            font-size: 14px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-
-        .btn-primary {
-            background: #244397;
-            color: #fff;
-        }
-
-
-        .btn-primary:hover {
-            background: #244397;
-        }
-
-
-        .btn-secondary {
-            background: #e9edf5;
-            color: #444;
-        }
-
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-
-        .alert-success {
-            background: #e7f7ed;
-            color: #237a42;
-        }
-
-
-        .alert-error {
-            background: #fdecec;
-            color: #b42323;
-        }
-
-
-        .filter-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(5, 1fr)
-                auto;
-
-            gap: 15px;
-            align-items: end;
-        }
-
-        .filter-actions {
-            display: flex;
-            gap: 8px;
-            white-space: nowrap;
-        }
-
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px;
-        }
-
-
-        /* =================================================
-           ASSIGNMENT TABLE (จัดกลุ่มตามพนักงาน)
-        ================================================= */
-
-        .table-summary {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px 22px;
-            margin-bottom: 16px;
-            color: #667085;
-            font-size: 14px;
-        }
-
-        .table-summary strong {
-            color: #244397;
-        }
-
-        .assignment-table .col-index {
-            width: 44px;
-            color: #98a2b3;
-            text-align: center;
-        }
-
-        .assignment-table .col-number {
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .assignment-table .group-row td {
-            padding: 0;
-            border-top: 1px solid #dfe4ee;
-            border-bottom: 1px solid #dfe4ee;
-            background: #f4f6fb;
-        }
-
-        .assignment-table .group-row:first-child td {
-            border-top: 0;
-        }
-
-        .assignment-table .group-row:hover td {
-            background: #f4f6fb;
-        }
-
-        .group-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            padding: 12px 14px;
-        }
-
-        .group-employee {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .group-employee strong {
-            font-size: 15px;
-            color: #1f2937;
-        }
-
-        .group-avatar {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            background: #244397;
-            color: #fff;
-            font-weight: 600;
-            flex-shrink: 0;
-        }
-
-        .group-meta {
-            margin-top: 2px;
-            color: #667085;
-            font-size: 13px;
-        }
-
-        .group-weights {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .weight-chip {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 5px;
-            padding: 5px 11px;
-            border: 1px solid #dfe4ee;
-            border-radius: 20px;
-            background: #fff;
-            color: #667085;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .weight-chip strong {
-            color: #1f2937;
-            font-size: 14px;
-        }
-
-        .weight-chip small {
-            color: #98a2b3;
-        }
-
-        .weight-chip.full {
-            border-color: #bfe3cb;
-            background: #eefaf2;
-        }
-
-        .weight-chip.full strong {
-            color: #237a42;
-        }
-
-        .weight-chip.over {
-            border-color: #f5c2c2;
-            background: #fff0f0;
-        }
-
-        .weight-chip.over strong {
-            color: #c62828;
-        }
-
-        .kpi-name {
-            font-weight: 500;
-            color: #1f2937;
-        }
-
-        .kpi-unit {
-            margin-top: 2px;
-            color: #98a2b3;
-            font-size: 12px;
-        }
-
-        .assignment-table .col-period {
-            min-width: 250px;
-        }
-
-        .period-main {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        .period-dates {
-            margin-top: 3px;
-            color: #98a2b3;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-
-        .badge-quarter {
-            background: #eef2ff;
-            color: #244397;
-            font-weight: 500;
-        }
-
-        .row-inactive td {
-            color: #98a2b3;
-        }
-
-        .row-inactive .kpi-name {
-            color: #98a2b3;
-        }
-
-
-        th {
-            background: #f1f4f9;
-            color: #444;
-            font-size: 14px;
-            font-weight: 500;
-            padding: 13px 12px;
-            text-align: left;
-            white-space: nowrap;
-        }
-
-
-        td {
-            padding: 13px 12px;
-            border-bottom: 1px solid #edf0f5;
-            font-size: 14px;
-            vertical-align: middle;
-        }
-
-
-        tr:hover td {
-            background: #fafbfe;
-        }
-
-
-        .badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-        }
-
-
-        .badge-active {
-            background: #e5f7eb;
-            color: #237a42;
-        }
-
-
-        .badge-inactive {
-            background: #f1f1f1;
-            color: #777;
-        }
-
-
-        .badge-type {
-            background: #edf2ff;
-            color: #244397;
-        }
-
-
-        .badge-type.performance {
-            background: #fff4df;
-            color: #a16207;
-        }
-
-
-        .badge-department {
-            background: #f0f4ff;
-            color: #244397;
-        }
-
-
-        .action-buttons {
-            display: flex;
-            gap: 7px;
-        }
-
-
-        .btn-small {
-            padding: 6px 11px;
-            border-radius: 6px;
-            font-size: 12px;
-            text-decoration: none;
-        }
-
-
-        .btn-edit {
-            background: #eef3ff;
-            color: #244397;
-        }
-
-
-        .btn-delete {
-            background: #fff0f0;
-            color: #c62828;
-        }
-
-
-        .empty {
-            text-align: center;
-            padding: 35px;
-            color: #888;
-        }
-
-
-        @media (max-width: 1100px) {
-
-            .filter-grid {
-                grid-template-columns:
-                    1fr
-                    1fr;
-            }
-
-        }
-
-
-        @media (max-width: 900px) {
-
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-
-            .form-group.full {
-                grid-column: span 1;
-            }
-
-
-            .filter-grid {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
-
-        @media (max-width: 600px) {
-
-            .card {
-                padding: 18px;
-            }
-
-
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-
-            .button-row {
-                flex-direction: column;
-            }
-
-
-            .button-row .btn {
-                width: 100%;
-            }
-
-        }
-
-    </style>
 
 
 <div class="page-container">
@@ -1531,10 +1012,11 @@ $form_year =
         </h2>
 
 
-        <form
+                <form
             method="POST"
             id="assignmentForm">
 
+            <?= csrfField() ?>
 
             <div class="form-grid">
 
@@ -1595,7 +1077,7 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= $department["department_id"] ?>">
+                                value="<?= (int) $department["department_id"] ?>">
 
                                 <?= htmlspecialchars(
                                     $department["department_name"]
@@ -1606,7 +1088,6 @@ $form_year =
                         <?php endforeach; ?>
 
                     </select>
-
 
                     <div class="select-hint">
 
@@ -1642,8 +1123,8 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= $employee["employee_id"] ?>"
-                                data-department="<?= $employee["department_id"] ?>">
+                                value="<?= (int) $employee["employee_id"] ?>"
+                                data-department="<?= (int) $employee["department_id"] ?>">
 
                                 <?= htmlspecialchars(
                                     $employee["employee_code"]
@@ -1712,7 +1193,7 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= $kpi["kpi_id"] ?>">
+                                value="<?= (int) $kpi["kpi_id"] ?>">
 
                                 [<?= htmlspecialchars(
                                     $kpi["kpi_type"]
@@ -1832,7 +1313,7 @@ $form_year =
                     type="submit"
                     class="btn btn-primary">
 
-                    + Assign KPI
+                    + เพิ่ม KPI
 
                 </button>
 
@@ -1946,7 +1427,7 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= $department["department_id"] ?>"
+                                value="<?= (int) $department["department_id"] ?>"
 
                                 <?= $filter_department ==
                                     $department["department_id"]
@@ -1988,9 +1469,9 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= $employee["employee_id"] ?>"
+                                value="<?= (int) $employee["employee_id"] ?>"
 
-                                data-department="<?= $employee["department_id"] ?>"
+                                data-department="<?= (int) $employee["department_id"] ?>"
 
                                 <?= $filter_employee ==
                                     $employee["employee_id"]
@@ -2389,12 +1870,17 @@ $form_year =
                                             แก้ไข
                                         </a>
 
-                                        <a
-                                            href="kpi-assignment/kpi-assignment-delete.php?id=<?= (int) $assignment["assignment_id"] ?>"
-                                            class="btn-small btn-delete"
-                                            onclick="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
-                                            ลบ
-                                        </a>
+                                        <form
+                                            method="POST"
+                                            action="kpi-assignment/kpi-assignment-delete.php"
+                                            class="inline-form"
+                                            onsubmit="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
+                                            <?= csrfField() ?>
+                                            <input type="hidden" name="id" value="<?= (int) $assignment["assignment_id"] ?>">
+                                            <button type="submit" class="btn-small btn-delete">
+                                                ลบ
+                                            </button>
+                                        </form>
 
                                     </div>
 

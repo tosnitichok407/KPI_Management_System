@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 require_once __DIR__ . "/../../config/database.php";
 
 /*
@@ -14,8 +14,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 /*
@@ -24,7 +23,9 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 |--------------------------------------------------------------------------
 */
 
-$user_id = (int) ($_GET["id"] ?? 0);
+csrfRequirePost("../index.php?page=accounts");
+
+$user_id = (int) ($_POST["id"] ?? 0);
 
 if ($user_id <= 0) {
     header("Location: ../index.php?page=accounts");
@@ -115,6 +116,8 @@ try {
 
 
 } catch (PDOException $e) {
+
+    error_log("Toggle account status failed: " . $e->getMessage());
 
     $_SESSION["user_error"] =
         "ไม่สามารถเปลี่ยนสถานะ Account ได้";

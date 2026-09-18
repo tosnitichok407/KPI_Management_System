@@ -614,7 +614,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
     <dialog id="feedbackDialog" class="feedback-dialog">
 
-        <form method="POST" action="feedback.php">
+                <form method="POST" action="feedback.php">
+
+            <?= csrfField() ?>
 
             <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด">×</button>
 

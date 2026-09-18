@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -18,8 +16,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -176,7 +173,7 @@ try {
                 <div class="form-group">
 
                     <label for="search">
-                        Search Employee
+                        ค้นหา
                     </label>
 
                     <input
@@ -184,7 +181,7 @@ try {
                         id="search"
                         name="search"
                         value="<?= htmlspecialchars($search) ?>"
-                        placeholder="Employee ID, name or email">
+                        placeholder="รหัสพนักงาน, ชื่อ, นามสกุล, อีเมล">
 
                 </div>
 
@@ -257,7 +254,7 @@ try {
             </div>
 
 
-            <?php if (isset($_GET["delete"]) && $_GET["deleted"] === "1"): ?>
+            <?php if (($_GET["deleted"] ?? "") === "1"): ?>
 
                 <div class="alert alert-success">
                     ลบพนักงานเรียบร้อยแล้ว
@@ -429,32 +426,48 @@ try {
                                             <!-- Activate / Deactivate -->
                                             <?php if ($employee["status"] === "Active"): ?>
 
-                                                <a
-                                                    href="employees/employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=deactivate"
-                                                    class="btn-small danger"
-                                                    onclick="return confirm('Deactivate this employee?');">
-                                                    Deactivate
-                                                </a>
+                                                <form
+                                                    method="POST"
+                                                    action="employees/employee-toggle.php"
+                                                    class="inline-form"
+                                                    onsubmit="return confirm('Deactivate this employee?');">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
+                                                    <input type="hidden" name="action" value="deactivate">
+                                                    <button type="submit" class="btn-small danger">
+                                                        Deactivate
+                                                    </button>
+                                                </form>
 
                                             <?php else: ?>
 
-                                                <a
-                                                    href="employees/employee-toggle.php?id=<?= (int) $employee["employee_id"] ?>&action=activate"
-                                                    class="btn-small activate"
-                                                    onclick="return confirm('Activate this employee?');">
-                                                    Activate
-                                                </a>
+                                                <form
+                                                    method="POST"
+                                                    action="employees/employee-toggle.php"
+                                                    class="inline-form"
+                                                    onsubmit="return confirm('Activate this employee?');">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
+                                                    <input type="hidden" name="action" value="activate">
+                                                    <button type="submit" class="btn-small activate">
+                                                        Activate
+                                                    </button>
+                                                </form>
 
                                             <?php endif; ?>
 
-
                                             <!-- Delete -->
-                                            <a
-                                                href="employees/employee-delete.php?id=<?= (int) $employee["employee_id"] ?>"
-                                                class="btn-small danger"
-                                                onclick="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้? ข้อมูลจะถูกลบถาวร');">
-                                                ลบ
-                                            </a>
+                                            <form
+                                                method="POST"
+                                                action="employees/employee-delete.php"
+                                                class="inline-form"
+                                                onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้? ข้อมูลจะถูกลบถาวร');">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
+                                                <button type="submit" class="btn-small danger">
+                                                    ลบ
+                                                </button>
+                                            </form>
 
                                         </div>
                                     </td>

@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../includes/security.php";
 
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
@@ -164,7 +162,13 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
     --------------------------------------------------------------
     */
 
-    if (!$selectedPeriod) {
+        if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+    } elseif (mb_strlen($comment) > 5000) {
+
+        $error = "รายละเอียดผลงานยาวเกินกำหนด";
+    } elseif (!$selectedPeriod) {
 
         $error = "ไม่พบรอบประเมินของเดือนที่เลือก";
     } elseif ($performanceDate === "") {
@@ -288,7 +292,8 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                         ":employee_id" => $employeeId
                     ]);
                     $success = "อัปเดตผลงานของเดือนที่เลือกเรียบร้อยแล้ว";
-                } catch (PDOException $e) {
+                                } catch (PDOException $e) {
+                    error_log("Update KPI performance failed: " . $e->getMessage());
                     $error = "ไม่สามารถอัปเดตผลงานได้";
                 }
             } else {
@@ -367,7 +372,9 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
                     $success =
                         "บันทึกผลงานเรียบร้อยแล้ว";
-                } catch (PDOException $e) {
+                                } catch (PDOException $e) {
+
+                    error_log("Insert KPI performance failed: " . $e->getMessage());
 
                     $error =
                         "ไม่สามารถบันทึกผลงานได้";
@@ -451,330 +458,9 @@ $performances =
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
-    <style>
-
-
-        /* ขนาดมาจาก page-container ของ layout (เหมือน Admin) */
-        .container {
-            max-width: none;
-            margin: 0;
-            padding: 0;
-        }
-
-        .target-value {
-            display: flex;
-            align-items: center;
-            min-height: 42px;
-            padding: 0 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 7px;
-            background: #f3f4f6;
-            color: #244397;
-            font-weight: 600;
-        }
-
-
-        .back {
-
-            display: inline-block;
-
-            margin-bottom: 20px;
-
-            color: #1e3a8a;
-
-            text-decoration: none;
-
-        }
-
-
-        .header-card {
-
-            background: white;
-
-            border-radius: 12px;
-
-            padding: 25px;
-
-            box-shadow:
-                0 3px 12px rgba(0, 0, 0, .06);
-
-            margin-bottom: 20px;
-
-        }
-
-
-        .header-top {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            gap: 20px;
-
-        }
-
-
-        .header-card h1 {
-
-            margin: 0;
-
-            font-size: 28px;
-
-        }
-
-
-        .description {
-
-            margin-top: 8px;
-
-            color: #6b7280;
-
-        }
-
-
-        .weight {
-
-            background: #eff6ff;
-
-            color: #1e3a8a;
-
-            padding: 8px 14px;
-
-            border-radius: 20px;
-
-        }
-
-
-        .info-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(4, 1fr);
-
-            gap: 15px;
-
-            margin-top: 25px;
-
-        }
-
-
-        .info-box {
-
-            background: #f8fafc;
-
-            padding: 15px;
-
-            border-radius: 8px;
-
-        }
-
-
-        .info-box span {
-
-            display: block;
-
-            color: #6b7280;
-
-            font-size: 13px;
-
-        }
-
-
-        .info-box strong {
-
-            display: block;
-
-            margin-top: 5px;
-
-        }
-
-
-        .card {
-
-            background: white;
-
-            border-radius: 12px;
-
-            padding: 25px;
-
-            box-shadow:
-                0 3px 12px rgba(0, 0, 0, .06);
-
-            margin-bottom: 20px;
-
-        }
-
-
-        .card h2 {
-
-            margin-top: 0;
-
-        }
-
-
-        .form-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(2, 1fr);
-
-            gap: 18px;
-
-        }
-
-
-        .form-group {
-
-            margin-bottom: 15px;
-
-        }
-
-
-        label {
-
-            display: block;
-
-            margin-bottom: 6px;
-
-            font-weight: 500;
-
-        }
-
-
-        input,
-        textarea {
-
-            width: 100%;
-
-            box-sizing: border-box;
-
-            padding: 11px;
-
-            border: 1px solid #d1d5db;
-
-            border-radius: 7px;
-
-            font-family: inherit;
-
-            font-size: 15px;
-
-        }
-
-
-        textarea {
-
-            min-height: 100px;
-
-            resize: vertical;
-
-        }
-
-
-        .full {
-
-            grid-column: 1 / -1;
-
-        }
-
-
-        .submit-button {
-
-            background: #1e3a8a;
-
-            color: white;
-
-            border: none;
-
-            padding: 11px 22px;
-
-            border-radius: 7px;
-
-            font-family: inherit;
-
-            cursor: pointer;
-
-        }
-
-
-        .submit-button:hover {
-
-            background: #172e6d;
-
-        }
-
-
-        .alert {
-
-            padding: 12px 15px;
-
-            border-radius: 7px;
-
-            margin-bottom: 20px;
-
-        }
-
-
-        .error {
-
-            background: #fee2e2;
-
-            color: #991b1b;
-
-        }
-
-
-        .success {
-
-            background: #dcfce7;
-
-            color: #166534;
-
-        }
-
-        .score {
-
-            font-weight: 700;
-
-            color: #1e3a8a;
-
-        }
-
-
-        .status {
-
-            padding: 5px 10px;
-
-            border-radius: 15px;
-
-            font-size: 12px;
-
-            background: #eff6ff;
-
-            color: #1e3a8a;
-
-        }
-
-
-        @media (max-width: 700px) {
-
-            .info-grid,
-            .form-grid {
-
-                grid-template-columns: 1fr;
-
-            }
-
-
-            .header-top {
-
-                flex-direction: column;
-
-            }
-
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="../assets/css/employee-kpi-detail.css">
 
 </head>
 
@@ -973,9 +659,10 @@ $performances =
             </h2>
 
 
-            <form
+                        <form
                 method="POST">
 
+                <?= csrfField() ?>
 
                 <div class="form-grid">
 
@@ -1051,8 +738,7 @@ $performances =
 
                 <a
                     href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
-                    style="margin-left: 5px;"
-                    class="btn btn-secondary">
+                    class="btn btn-secondary back-button">
 
                     ย้อนกลับ
 

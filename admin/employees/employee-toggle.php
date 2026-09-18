@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 require_once __DIR__ . "/../../config/database.php";
 
 /*
@@ -14,13 +14,14 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
-$id = (int) ($_GET["id"] ?? 0);
-$action = $_GET["action"] ?? "";
+csrfRequirePost("../index.php?page=employees");
+
+$id = (int) ($_POST["id"] ?? 0);
+$action = $_POST["action"] ?? "";
 
 
 if ($id <= 0) {
@@ -60,6 +61,7 @@ try {
 } catch (PDOException $e) {
 
     // กลับหน้ารายการหากเกิดข้อผิดพลาด
+    error_log("Toggle employee status failed: " . $e->getMessage());
 }
 
 

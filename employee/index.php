@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../includes/security.php";
 
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
@@ -36,7 +34,7 @@ if ($roleId !== 3) {
     if ($roleId === 1) {
         header("Location: ../admin/index.php");
     } else {
-        header("Location: ../dashboard.php");
+        redirectToRoleHome("../");
     }
 
     exit;
@@ -575,546 +573,13 @@ $avatar =
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
-    <style>
-        .quarter-score-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin: 20px 0;
-        }
-
-        .quarter-score-card {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 16px;
-        }
-
-        .quarter-score-card h3 {
-            margin: 0 0 4px;
-            color: #244397;
-        }
-
-        .quarter-score-card p {
-            margin: 0 0 10px;
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .quarter-score-card strong {
-            font-size: 20px;
-        }
-
-        @media (max-width: 700px) {
-            .quarter-score-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .page-header {
-
-            display: flex;
-
-            justify-content:
-                space-between;
-
-            align-items: center;
-
-            gap: 20px;
-
-            margin-bottom: 25px;
-
-        }
-
-
-        .page-header h2 {
-
-            margin: 0;
-
-            font-size: 27px;
-
-        }
-
-
-        .page-header p {
-
-            margin: 5px 0 0;
-
-            color: #6b7280;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Period
-        |--------------------------------------------------------------------------
-        */
-
-        .period-form select {
-
-            padding: 10px 14px;
-
-            border:
-                1px solid #d1d5db;
-
-            border-radius: 8px;
-
-            background: white;
-
-            font-family: inherit;
-
-            min-width: 210px;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Profile Card
-        |--------------------------------------------------------------------------
-        */
-
-        .profile-card {
-
-            background:
-                linear-gradient(135deg,
-                    #1e3a8a,
-                    #244397);
-
-            color: white;
-
-            border-radius: 14px;
-
-            padding: 25px;
-
-            margin-bottom: 22px;
-
-            display: flex;
-
-            justify-content:
-                space-between;
-
-            align-items: center;
-
-            gap: 20px;
-
-        }
-
-
-        .profile-left {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 18px;
-
-        }
-
-
-        .profile-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: white;
-            color: #1e3a8a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            font-weight: 700;
-        }
-
-        .profile-name {
-            font-size: 23px;
-            font-weight: 600;
-        }
-
-        .profile-code {
-
-            opacity: .85;
-
-            font-size: 14px;
-
-        }
-
-
-        .profile-meta {
-
-            display: flex;
-
-            gap: 25px;
-
-            text-align: right;
-
-        }
-
-
-        .profile-meta span {
-
-            display: block;
-
-            opacity: .75;
-
-            font-size: 12px;
-
-        }
-
-
-        .profile-meta strong {
-
-            display: block;
-
-            font-size: 15px;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Stats
-        |--------------------------------------------------------------------------
-        */
-
-        .stats-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(4, 1fr);
-
-            gap: 18px;
-
-            margin-bottom: 22px;
-
-        }
-
-
-        .stat-card {
-
-            background: white;
-
-            padding: 20px;
-
-            border-radius: 13px;
-
-            border:
-                1px solid #eef0f4;
-
-            box-shadow:
-                0 4px 15px rgba(0, 0, 0, .05);
-
-        }
-
-
-        .stat-title {
-
-            color: #6b7280;
-
-            font-size: 13px;
-
-        }
-
-
-        .stat-value {
-
-            margin-top: 8px;
-
-            font-size: 28px;
-
-            font-weight: 700;
-
-            color: #111827;
-
-        }
-
-
-        .stat-value small {
-
-            font-size: 14px;
-
-            font-weight: 400;
-
-            color: #6b7280;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Charts
-        |--------------------------------------------------------------------------
-        */
-
-        .chart-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                2fr 1fr;
-
-            gap: 20px;
-
-            margin-bottom: 20px;
-
-        }
-
-
-        .chart-card {
-
-            background: white;
-
-            border-radius: 13px;
-
-            padding: 22px;
-
-            border:
-                1px solid #eef0f4;
-
-            box-shadow:
-                0 4px 15px rgba(0, 0, 0, .05);
-
-        }
-
-
-        .chart-card h3 {
-
-            margin: 0;
-
-            font-size: 18px;
-
-        }
-
-
-        .chart-card p {
-
-            margin: 4px 0 18px;
-
-            color: #6b7280;
-
-            font-size: 13px;
-
-        }
-
-
-        .chart-container {
-
-            position: relative;
-
-            height: 310px;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | KPI Table
-        |--------------------------------------------------------------------------
-        */
-
-        .table-card {
-
-            background: white;
-
-            border-radius: 13px;
-
-            padding: 22px;
-
-            border:
-                1px solid #eef0f4;
-
-            box-shadow:
-                0 4px 15px rgba(0, 0, 0, .05);
-
-        }
-
-
-        .table-header {
-
-            margin-bottom: 15px;
-
-        }
-
-
-        .table-header h3 {
-
-            margin: 0;
-
-        }
-
-
-        .table-wrapper {
-
-            overflow-x: auto;
-
-        }
-
-
-        table {
-
-            width: 100%;
-
-            border-collapse:
-                collapse;
-
-        }
-
-
-        th {
-
-            background: #f8fafc;
-
-            color: #475569;
-
-            font-size: 13px;
-
-            font-weight: 500;
-
-            padding: 13px;
-
-            text-align: left;
-
-            white-space: nowrap;
-
-        }
-
-
-        td {
-
-            padding: 13px;
-
-            border-top:
-                1px solid #f1f5f9;
-
-            font-size: 14px;
-
-        }
-
-
-        .badge {
-
-            display: inline-block;
-
-            padding: 4px 9px;
-
-            border-radius: 20px;
-
-            font-size: 11px;
-
-        }
-
-
-        .badge-performance {
-
-            background: #dbeafe;
-
-            color: #1d4ed8;
-
-        }
-
-
-        .badge-competency {
-
-            background: #ede9fe;
-
-            color: #6d28d9;
-
-        }
-
-
-        .score {
-
-            font-weight: 700;
-
-        }
-
-
-        .score-empty {
-
-            color: #9ca3af;
-
-        }
-
-        @media (max-width: 1100px) {
-
-            .stats-grid {
-
-                grid-template-columns:
-                    repeat(2, 1fr);
-
-            }
-
-
-            .chart-grid {
-
-                grid-template-columns: 1fr;
-
-            }
-
-        }
-
-
-        @media (max-width: 700px) {
-
-
-
-            .dashboard-content {
-
-                padding: 18px;
-
-            }
-
-
-            .page-header {
-
-                flex-direction: column;
-
-                align-items: flex-start;
-
-            }
-
-
-            .period-form {
-
-                width: 100%;
-
-            }
-
-
-            .period-form select {
-
-                width: 100%;
-
-            }
-
-
-            .profile-card {
-
-                flex-direction: column;
-
-                align-items: flex-start;
-
-            }
-
-
-            .profile-meta {
-
-                text-align: left;
-
-                flex-wrap: wrap;
-
-            }
-
-
-            .stats-grid {
-
-                grid-template-columns: 1fr;
-
-            }
-
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="../assets/css/employee-feedback.css?v=1">
+
+    <link
+        rel="stylesheet"
+        href="../assets/css/employee-dashboard.css">
 
 </head>
 
@@ -1410,14 +875,7 @@ $avatar =
 
                     <?php else: ?>
 
-                        <div
-                            style="
-                                display:flex;
-                                align-items:center;
-                                justify-content:center;
-                                height:100%;
-                                color:#9ca3af;
-                            ">
+                        <div class="chart-empty">
 
                             ยังไม่มีข้อมูล KPI
 
@@ -1457,14 +915,7 @@ $avatar =
 
                     <?php else: ?>
 
-                        <div
-                            style="
-                                display:flex;
-                                align-items:center;
-                                justify-content:center;
-                                height:100%;
-                                color:#9ca3af;
-                            ">
+                        <div class="chart-empty">
 
                             ยังไม่มีข้อมูล
 
@@ -1547,11 +998,7 @@ $avatar =
 
                                 <td
                                     colspan="7"
-                                    style="
-                                        text-align:center;
-                                        padding:35px;
-                                        color:#9ca3af;
-                                    ">
+                                    class="table-empty">
 
                                     ยังไม่มี KPI ที่ได้รับมอบหมาย
 
@@ -1809,10 +1256,10 @@ $avatar =
 |--------------------------------------------------------------------------
 */
 
-        const kpiLabels =
+                const kpiLabels =
             <?= json_encode(
                 $chartLabels,
-                JSON_UNESCAPED_UNICODE
+                JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
             ) ?>;
 
 
@@ -1901,10 +1348,10 @@ $avatar =
         |--------------------------------------------------------------------------
         */
 
-        const typeLabels =
+                const typeLabels =
             <?= json_encode(
                 $typeLabels,
-                JSON_UNESCAPED_UNICODE
+                JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
             ) ?>;
 
 

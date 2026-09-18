@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,20 +17,54 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
-$id = (int) ($_GET["kpi_id"] ?? 0);
+/*
+| รับเฉพาะ POST + CSRF token (เดิมเป็นลิงก์ GET และอ่าน kpi_id ผิดชื่อพารามิเตอร์)
+*/
+
+csrfRequirePost("../index.php?page=kpi-management");
+
+$id = (int) ($_POST["id"] ?? 0);
 
 if ($id <= 0) {
     header("Location: ../index.php?page=kpi-management");
     exit;
 }
 
-
 try {
+
+    /*
+    |--------------------------------------------------------------------------
+    | If KPI is being used
+    |--------------------------------------------------------------------------
+    |
+    | kpi_assignments / kpi_performances เป็น ON DELETE CASCADE
+    | จึงตรวจก่อนเพื่อไม่ให้ผลงานของพนักงานถูกลบตามไปโดยไม่ตั้งใจ
+    |
+    */
+
+    $usage = $pdo->prepare("
+        SELECT
+            (SELECT COUNT(*) FROM kpi_assignments WHERE kpi_id = :kpi_id_a)
+            + (SELECT COUNT(*) FROM employee_kpi WHERE kpi_id = :kpi_id_b)
+    ");
+
+    $usage->execute([
+        ":kpi_id_a" => $id,
+        ":kpi_id_b" => $id
+    ]);
+
+    if ((int) $usage->fetchColumn() > 0) {
+
+        $_SESSION["kpi_error"] =
+            "ไม่สามารถลบ KPI นี้ได้ เนื่องจาก KPI ถูกใช้งานอยู่ในระบบ";
+
+        header("Location: ../index.php?page=kpi-management");
+        exit;
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -46,13 +80,12 @@ try {
     $stmt->execute([
         ":kpi_id" => $id
     ]);
+
+    $_SESSION["kpi_success"] = "ลบ KPI เรียบร้อยแล้ว";
+
 } catch (PDOException $e) {
 
-    /*
-    |--------------------------------------------------------------------------
-    | If KPI is being used
-    |--------------------------------------------------------------------------
-    */
+    error_log("Delete KPI failed: " . $e->getMessage());
 
     $_SESSION["kpi_error"] =
         "ไม่สามารถลบ KPI นี้ได้ เนื่องจาก KPI ถูกใช้งานอยู่ในระบบ";

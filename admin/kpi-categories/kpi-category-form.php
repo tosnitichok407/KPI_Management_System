@@ -11,6 +11,12 @@
 |
 */
 
+if (!isset($formAction)) {
+    // ไฟล์นี้เป็น partial ต้อง include จากหน้าเพิ่ม / แก้ไขเท่านั้น
+    http_response_code(404);
+    exit;
+}
+
 $usedKpis = $usedKpis ?? null;
 
 ?>
@@ -64,9 +70,10 @@ $usedKpis = $usedKpis ?? null;
 <form
     method="POST"
     action="<?= htmlspecialchars($formAction, ENT_QUOTES, "UTF-8") ?>"
-    class="category-form"
+        class="category-form"
 >
 
+    <?= csrfField() ?>
 
     <!-- =================================================
          Category Name

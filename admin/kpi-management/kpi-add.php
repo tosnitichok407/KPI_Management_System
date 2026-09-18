@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -10,8 +10,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 $error = "";
@@ -43,21 +42,35 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $category_id = $_POST["category_id"] ?? "";
+        $category_id = trim($_POST["category_id"] ?? "");
     $kpi_name = trim($_POST["kpi_name"] ?? "");
     $description = trim($_POST["description"] ?? "");
-    $weight = $_POST["weight"] ?? "";
+    $weight = trim($_POST["weight"] ?? "");
     $unit = trim($_POST["unit"] ?? "");
-    $max_score = $_POST["max_score"] ?? 5;
+    $max_score = trim($_POST["max_score"] ?? "5");
 
+    if (!csrfVerify()) {
 
-    if (
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+    } elseif (
         $category_id === "" ||
         $kpi_name === "" ||
         $weight === ""
     ) {
 
         $error = "กรุณากรอกข้อมูลที่จำเป็นให้ครบ";
+    } elseif (!ctype_digit($category_id)) {
+
+        $error = "หมวดหมู่ KPI ไม่ถูกต้อง";
+    } elseif (mb_strlen($kpi_name) > 255 || mb_strlen($unit) > 50) {
+
+        $error = "ข้อมูลยาวเกินกำหนด";
+    } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
+
+        $error = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
+    } elseif ($max_score === "" || !is_numeric($max_score) || $max_score < 1 || $max_score > 5) {
+
+        $error = "คะแนนสูงสุดต้องเป็นตัวเลขระหว่าง 1 - 5";
     } else {
 
         try {
@@ -147,7 +160,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             exit;
         } catch (PDOException $e) {
 
-            $error = "ไม่สามารถเพิ่ม KPI ได้: " . $e->getMessage();
+                        error_log("Add KPI failed: " . $e->getMessage());
+
+            $error = "ไม่สามารถเพิ่ม KPI ได้ กรุณาลองใหม่อีกครั้ง";
         }
     }
 }
@@ -176,84 +191,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
         href="../../assets/css/kpi.css?v=category-form-1">
 
-    <style>
-        body {
-            margin: 0;
-            background: #f5f7fb;
-            font-family: var(--font-family, "Kanit", sans-serif);
-        }
-
-        .container {
-            width: 90%;
-            max-width: 900px;
-            margin: 40px auto;
-        }
-
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 3px 15px rgba(0, 0, 0, .06);
-        }
-
-        h1 {
-            margin-top: 0;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: 500;
-        }
-
-        input,
-        select,
-        textarea {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #d1d5db;
-            border-radius: 7px;
-            font-family: inherit;
-            font-size: 15px;
-        }
-
-        textarea {
-            min-height: 120px;
-            resize: vertical;
-        }
-
-        .btn {
-            border: none;
-            padding: 11px 20px;
-            border-radius: 7px;
-            cursor: pointer;
-            text-decoration: none;
-            font-family: inherit;
-            font-size: 15px;
-        }
-
-        .btn-primary {
-            background: #24449b;
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 7px;
-            margin-bottom: 20px;
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="../../assets/css/admin-kpi-add.css">
 
 </head>
 
@@ -281,8 +221,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <?php endif; ?>
 
 
-            <form method="POST">
+                        <form method="POST">
 
+                <?= csrfField() ?>
 
                 <div class="form-group">
 
@@ -301,7 +242,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         <?php foreach ($categories as $category): ?>
 
                             <option
-                                value="<?= $category["category_id"] ?>">
+                                value="<?= (int) $category["category_id"] ?>">
 
                                 <?= htmlspecialchars(
                                     $category["category_name"]

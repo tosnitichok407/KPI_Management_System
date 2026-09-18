@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -19,9 +19,8 @@ if (!isset($_SESSION["user_id"])) {
    CHECK ADMIN
 ========================= */
 
-if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
-    header("Location: ../dashboard.php");
-    exit;
+if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
+    redirectToRoleHome("../");
 }
 
 
@@ -116,7 +115,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
        VALIDATION
     ========================= */
 
-    if (
+        if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+
+    } elseif (
         $kpi_id <= 0 ||
         $employee_id <= 0 ||
         $target_value === "" ||
@@ -126,6 +129,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ) {
 
         $error = "กรุณากรอกข้อมูลให้ครบถ้วน";
+
+    } elseif (
+        !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date) ||
+        !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date) ||
+        strtotime($start_date) === false ||
+        strtotime($end_date) === false
+    ) {
+
+        $error = "รูปแบบวันที่ไม่ถูกต้อง";
 
     } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
 
@@ -472,195 +484,10 @@ $kpis_result =
     >
 
 
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-
-        body {
-            margin: 0;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            background: #f5f7fb;
-            color: #333;
-        }
-
-
-        .page-container {
-            width: 100%;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 40px;
-        }
-
-
-        .page-header {
-            margin-bottom: 30px;
-        }
-
-
-        .page-header h1 {
-            margin: 0;
-            font-size: 30px;
-            font-weight: 600;
-        }
-
-
-        .page-header p {
-            margin: 5px 0 0;
-            color: #6b7280;
-        }
-
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow:
-                0 2px 10px
-                rgba(0, 0, 0, .05);
-        }
-
-
-        .card-title {
-            margin: 0 0 25px;
-            color: #244397;
-            font-size: 20px;
-            font-weight: 500;
-        }
-
-
-        .form-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(2, 1fr);
-            gap: 20px;
-        }
-
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-
-        .form-group.full {
-            grid-column: span 2;
-        }
-
-
-        label {
-            font-size: 14px;
-            margin-bottom: 7px;
-            font-weight: 500;
-        }
-
-
-        label span {
-            color: #e53935;
-        }
-
-
-        input,
-        select {
-            width: 100%;
-            padding: 11px 13px;
-            border: 1px solid #d8dce5;
-            border-radius: 7px;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            font-size: 14px;
-            outline: none;
-            background: #fff;
-        }
-
-
-        input:focus,
-        select:focus {
-            border-color: #244397;
-        }
-
-
-        .button-row {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-
-        .btn {
-            border: none;
-            padding: 10px 22px;
-            border-radius: 7px;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            font-size: 14px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-
-        .btn-primary {
-            background: #244397;
-            color: #fff;
-        }
-
-
-        .btn-secondary {
-            background: #e9edf5;
-            color: #444;
-        }
-
-
-        .alert {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-
-        .alert-error {
-            background: #fdecec;
-            color: #b42323;
-        }
-
-
-        @media (max-width: 700px) {
-
-            .page-container {
-                padding: 20px;
-            }
-
-
-            .card {
-                padding: 20px;
-            }
-
-
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-
-            .form-group.full {
-                grid-column: span 1;
-            }
-
-
-            .button-row {
-                flex-direction: column-reverse;
-            }
-
-
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
-
-        }
-
-    </style>
+    <link
+        rel="stylesheet"
+        href="../../assets/css/admin-kpi-assignment-edit.css"
+    >
 
 </head>
 
@@ -708,11 +535,11 @@ $kpis_result =
         </h2>
 
 
-        <form method="POST">
+                <form method="POST">
 
+            <?= csrfField() ?>
 
             <div class="form-grid">
-
 
                 <!-- EMPLOYEE -->
 
@@ -739,7 +566,7 @@ $kpis_result =
                         ): ?>
 
                             <option
-                                value="<?= $employee["employee_id"] ?>"
+                                value="<?= (int) $employee["employee_id"] ?>"
 
                                 <?= $assignment["employee_id"] ==
                                     $employee["employee_id"]
@@ -795,7 +622,7 @@ $kpis_result =
                         ): ?>
 
                             <option
-                                value="<?= $kpi["kpi_id"] ?>"
+                                value="<?= (int) $kpi["kpi_id"] ?>"
 
                                 <?= $assignment["kpi_id"] ==
                                     $kpi["kpi_id"]
@@ -920,7 +747,7 @@ $kpis_result =
                         required
                     >
 
-                    <small style="display:block;margin-top:6px;color:#667085;">
+                    <small class="field-hint">
                         KPI จะแสดงให้ประเมินได้ทุกเดือนที่อยู่ในช่วงวันที่นี้ (ภายในปีเดียวกัน)
                     </small>
 

@@ -12,9 +12,11 @@
 |       "stats" => periodPickerMonthStats(...),
 |       "url" => fn(int $year, int $month): string => "...",
 |       "show_all" => true,                         // แสดงปุ่ม "ทั้งปี"
-|       "css" => "../assets/css/period-picker.css",
 |       "dot_label" => "มีผลประเมิน"
 |   ]);
+|
+| CSS: หน้าที่เรียกใช้ <link> assets/css/period-picker.css ใน <head> เอง
+| (option "css" ยังใช้ได้ถ้าต้องการให้ฟังก์ชัน echo <link> เอง แต่ไม่จำเป็นแล้ว)
 |
 */
 

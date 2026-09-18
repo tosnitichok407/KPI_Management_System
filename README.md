@@ -300,12 +300,16 @@ KPI-System/
 │   ├── performance-export-excel.php  # Export Excel
 │   └── performance-export-pdf.php    # Export PDF
 ├── includes/
+│   ├── security.php              # เริ่ม session (HttpOnly/SameSite/strict mode), CSRF token, redirect ตามบทบาท
 │   ├── monthly-period-helper.php # ชื่อเดือน / รายละเอียดรอบรายเดือน / ค้นหารอบ
 │   ├── quarter-helper.php        # Quarter จากเดือน/วันที่
 │   ├── period-picker.php         # ตัวเลือกปี + เดือนแบบปุ่ม (Admin Summary, Employee)
 │   └── pdf-helper.php            # Dompdf + ฟอนต์ไทย + ตัดบรรทัดไทย + เลขหน้า
 ├── assets/
-│   ├── css/                      # admin.css (โครงหน้าหลัก), manager.css, employee-*.css, period-picker.css ฯลฯ
+│   ├── css/                      # admin.css (โครงหน้าหลัก), manager.css, employee-*.css, period-picker.css
+│   │                             # + CSS เฉพาะหน้า: admin-dashboard / admin-kpi-assignment(-edit) / admin-kpi-summary /
+│   │                             #   admin-kpi-add / admin-kpi-edit / admin-user-account-edit / employee-dashboard /
+│   │                             #   employee-my-kpi / employee-kpi-detail / employee-performance / login-test
 │   ├── js/                       # admin.js (คงตำแหน่ง scroll เมื่อเปลี่ยนหน้า/ส่งฟอร์ม) · dashboard.js (ยังไม่มีหน้าใดเรียกใช้)
 │   ├── fonts/                    # TH Sarabun New สำหรับ PDF
 │   └── images/
@@ -323,6 +327,8 @@ KPI-System/
 ### แนวทางโค้ด
 
 - ทุกไฟล์ include ด้วย `__DIR__` (ไม่ขึ้นกับ working directory)
+- ทุกหน้า `require_once includes/security.php` แทน `session_start()` — ฟอร์ม POST ใส่ `<?= csrfField() ?>` และตรวจด้วย `csrfVerify()` / ไฟล์ action (ลบ, เปิด-ปิด) ใช้ `csrfRequirePost()`
+- ไม่มี `<style>` / `style="..."` ในหน้า PHP — CSS อยู่ใน `assets/css/` (CSS เฉพาะหน้า admin โหลดตาม `?page=` ใน `admin/index.php`; progress bar ที่ความกว้างมาจากข้อมูลยังเป็น inline style)
 - ทุก query ใช้ PDO prepared statements
 - Admin และ Manager ใช้ router `index.php?page=` ส่วน Employee เป็นหน้าแยกที่ใช้ `employeeLayoutStart()` / `employeeLayoutEnd()`
 - โครงหน้าทุกบทบาทใช้ `section.page-container > div.page-container` จาก `admin.css` จึงมีขนาดและ padding เท่ากัน
@@ -336,15 +342,21 @@ KPI-System/
 - รหัสผ่านเก็บด้วย `password_hash()` และตรวจด้วย `password_verify()`
 - `session_regenerate_id()` หลังเข้าสู่ระบบสำเร็จ และ `logout.php` ล้าง session + cookie
 - ตรวจสถานะบัญชีและสถานะพนักงานก่อนเข้าสู่ระบบ บันทึกทุกความพยายามลง `login_logs`
-- หน้า Admin และ Manager ตรวจ `role_id` ก่อนแสดงผล
+- หน้า Admin และ Manager ตรวจ `role_id` ก่อนแสดงผล ผู้ใช้บทบาทอื่นถูกส่งกลับหน้าแรกของบทบาทตัวเอง
 - หน้าพนักงานและไฟล์ Export ใช้ `employee_id` จาก session จึงแสดงเฉพาะข้อมูลของผู้ที่ login อยู่ (หน้าแรกและข้อมูลส่วนตัวตรวจ `role_id = 3` เพิ่ม ส่วนหน้าอื่นตรวจเพียงว่า login และมี `employee_id`)
-- Output ถูก escape ด้วย `htmlspecialchars()`
+- Output ถูก escape ด้วย `htmlspecialchars()` และข้อมูลที่ฝังใน `<script>` ใช้ `json_encode` พร้อม `JSON_HEX_TAG`
+- CSRF token ในทุกฟอร์ม POST (`includes/security.php`) และการลบ / เปิด-ปิดสถานะทำผ่าน POST เท่านั้น
+- Session cookie เป็น `HttpOnly` + `SameSite=Lax` (+ `Secure` อัตโนมัติเมื่อใช้ HTTPS) และเปิด `session.use_strict_mode`
+- Login ถูกจำกัดชั่วคราวเมื่อล้มเหลวเกิน 10 ครั้งใน 15 นาที (นับจาก `login_logs` ต่อ username / IP)
+- ข้อความ error ของฐานข้อมูลไม่แสดงให้ผู้ใช้ (บันทึกลง error log ของ PHP แทน)
+- `config/`, `includes/`, `database/`, `vendor/` มี `.htaccess` ปิดการเข้าถึงผ่าน URL โดยตรง
+- `login-test.php` เปิดได้เฉพาะจาก localhost (127.0.0.1 / ::1)
 
 ก่อนใช้งานจริง
 
 - ลบ `login-test.php`
 - เปลี่ยนบัญชีฐานข้อมูลใน `config/database.php` (ไม่ใช้ `root` ที่ไม่มีรหัสผ่าน)
-- ปิด `display_errors` และบันทึก error ลง log, ใช้ HTTPS และตั้ง session cookie เป็น `Secure` / `HttpOnly`
+- ปิด `display_errors` และบันทึก error ลง log, ใช้ HTTPS (session cookie จะเป็น `Secure` ให้อัตโนมัติ)
 - สำรองฐานข้อมูลเป็นประจำ
 
 ---
@@ -353,7 +365,8 @@ KPI-System/
 
 | เรื่อง | รายละเอียด |
 | --- | --- |
-| Redirect ไป `dashboard.php` ที่ไม่มีอยู่ | `login.php` (เมื่อพนักงานที่ login อยู่แล้วเปิดหน้า login), หน้าใน `admin/` (เมื่อผู้ใช้ที่ไม่ใช่ Admin เปิด) และ `employee/index.php` (เมื่อ Manager เปิด) จะพาไปหน้า 404 แทนหน้าของบทบาทนั้น |
+| ลบ KPI | ปุ่มลบในหน้าจัดการ KPI จะปฏิเสธเมื่อ KPI ถูกมอบหมายแล้ว (`kpi_assignments` / `employee_kpi`) เพราะการลบจะ CASCADE ไปถึงผลงานของพนักงาน |
+
 | ไม่มี schema ตั้งต้นใน repository | ติดตั้งเครื่องใหม่ต้องใช้ไฟล์ dump จากผู้พัฒนา |
 | เกณฑ์คะแนนบันทึกคนละที่ | หน้าเพิ่ม KPI บันทึกใน `kpi_score_criteria` แต่หน้าแก้ไข KPI อ่าน/บันทึกที่ `score_5..score_1` — KPI ที่มีเกณฑ์ใน `kpi_score_criteria` หรือ `kpi_score_levels` อยู่แล้ว จะแก้เกณฑ์ผ่านหน้าแก้ไขไม่มีผล |
 | สูตรคะแนน Performance เป็นเชิงเส้น | `Actual ÷ Target × 5` ไม่ได้อ้างอิงช่วงในเกณฑ์ของ KPI และใช้ไม่ได้กับ KPI แบบ "ยิ่งน้อยยิ่งดี" (เช่น มูลค่าไม่ต่อสัญญา < 5%) |

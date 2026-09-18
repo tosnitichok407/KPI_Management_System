@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,8 +17,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -76,6 +75,8 @@ try {
 
 } catch (PDOException $e) {
 
+    error_log("Load user account failed: " . $e->getMessage());
+    http_response_code(500);
     die("Database Error");
 }
 
@@ -142,7 +143,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if (
+        if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+
+    } elseif (
         $username === "" ||
         $email === "" ||
         $employee_id <= 0 ||
@@ -150,6 +155,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ) {
 
         $error = "กรุณากรอกข้อมูลให้ครบถ้วน";
+
+    } elseif (mb_strlen($username) > 50 || mb_strlen($email) > 150) {
+
+        $error = "ข้อมูลยาวเกินกำหนด";
+
+    } elseif ($password !== "" && strlen($password) < 6) {
+
+        $error = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";
 
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
@@ -350,126 +363,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="../../assets/css/user-account.css"
     >
 
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            background: #f5f7fb;
-            color: #1f2937;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-
-        .header {
-            margin-bottom: 25px;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 30px;
-        }
-
-        .header p {
-            margin-top: 5px;
-            color: #6b7280;
-        }
-
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.06);
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: 500;
-        }
-
-        input,
-        select {
-            width: 100%;
-            padding: 11px 13px;
-            border: 1px solid #d1d5db;
-            border-radius: 7px;
-            font-family: inherit;
-            font-size: 15px;
-        }
-
-        input:focus,
-        select:focus {
-            outline: none;
-            border-color: #24449b;
-        }
-
-        .hint {
-            margin-top: 5px;
-            font-size: 13px;
-            color: #6b7280;
-        }
-
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .actions {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 18px;
-            border: none;
-            border-radius: 8px;
-            text-decoration: none;
-            font-family: inherit;
-            font-size: 15px;
-            cursor: pointer;
-        }
-
-        .btn-primary {
-            background: #24449b;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #1d3780;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .btn-secondary:hover {
-            background: #d1d5db;
-        }
-
-    </style>
+    <link
+        rel="stylesheet"
+        href="../../assets/css/admin-user-account-edit.css"
+    >
 
 </head>
 
@@ -505,10 +402,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <?php endif; ?>
 
-        <form
+                <form
             method="POST"
             action=""
         >
+
+            <?= csrfField() ?>
 
             <!-- Username -->
             <div class="form-group">

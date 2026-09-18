@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../includes/security.php";
 
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
@@ -29,8 +27,7 @@ if (!isset($_SESSION["user_id"])) {
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
-    header("Location: ../dashboard.php");
-    exit;
+    redirectToRoleHome("../");
 }
 
 
@@ -622,8 +619,23 @@ if ($page === "home") {
     <link rel="stylesheet" href="../assets/css/evaluation.css?v=period-form-2">
     <link rel="stylesheet" href="../assets/css/kpi.css?v=category-form-1">
     <link rel="stylesheet" href="../assets/css/summary.css">
-    <link rel="stylesheet" href="../assets/css/user-account.css">
+        <link rel="stylesheet" href="../assets/css/user-account.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
+
+
+    <!-- CSS เฉพาะหน้า (เดิมเป็น <style> ในไฟล์ของแต่ละหน้า) -->
+
+    <?php
+    $pageStylesheets = [
+        "home" => ["admin-dashboard.css"],
+        "kpi-assignment" => ["admin-kpi-assignment.css"],
+        "summary" => ["period-picker.css?v=1", "admin-kpi-summary.css"]
+    ];
+
+    foreach ($pageStylesheets[$page] ?? [] as $stylesheet): ?>
+        <link rel="stylesheet" href="../assets/css/<?= htmlspecialchars($stylesheet, ENT_QUOTES, "UTF-8") ?>">
+    <?php endforeach; ?>
+
 
 
     <?php if ($page === "home"): ?>
@@ -637,300 +649,6 @@ if ($page === "home") {
     <?php endif; ?>
 
 
-    <style>
-    
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard
-        |--------------------------------------------------------------------------
-        */
-
-        .dashboard-header {
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            gap: 20px;
-
-            margin-bottom: 25px;
-        }
-
-
-        .dashboard-header h1 {
-            margin: 0;
-
-            font-size: 28px;
-        }
-
-
-        .dashboard-header p {
-            margin: 5px 0 0;
-
-            color: #6b7280;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Period
-        |--------------------------------------------------------------------------
-        */
-
-        .period-filter {
-            display: flex;
-
-            align-items: center;
-
-            gap: 10px;
-        }
-
-
-        .period-filter label {
-            font-weight: 500;
-        }
-
-
-        .period-filter select {
-            min-width: 220px;
-
-            padding: 10px 14px;
-
-            border: 1px solid #d1d5db;
-
-            border-radius: 8px;
-
-            background: white;
-
-            font-family: inherit;
-
-            font-size: 14px;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Statistics
-        |--------------------------------------------------------------------------
-        */
-
-        .stats-grid {
-            display: grid;
-
-            grid-template-columns:
-                repeat(4, 1fr);
-
-            gap: 20px;
-
-            margin-bottom: 25px;
-        }
-
-
-        .stat-card {
-            background: white;
-
-            border-radius: 14px;
-
-            padding: 22px;
-
-            box-shadow:
-                0 4px 15px rgba(0, 0, 0, .06);
-
-            border: 1px solid #eef0f4;
-        }
-
-
-        .stat-card-header {
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-        }
-
-
-        .stat-title {
-            color: #6b7280;
-
-            font-size: 14px;
-        }
-
-
-        .stat-icon {
-            width: 42px;
-            height: 42px;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            border-radius: 10px;
-
-            background: #eef2ff;
-
-            font-size: 20px;
-        }
-
-
-        .stat-value {
-            margin-top: 12px;
-
-            font-size: 30px;
-
-            font-weight: 700;
-
-            color: #111827;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Charts
-        |--------------------------------------------------------------------------
-        */
-
-        .chart-grid {
-            display: grid;
-
-            grid-template-columns:
-                2fr 1fr;
-
-            gap: 20px;
-
-            margin-bottom: 20px;
-        }
-
-
-        .chart-card {
-            background: white;
-
-            border-radius: 14px;
-
-            padding: 22px;
-
-            box-shadow:
-                0 4px 15px rgba(0, 0, 0, .06);
-
-            border: 1px solid #eef0f4;
-        }
-
-
-        .chart-card h2 {
-            margin: 0;
-
-            font-size: 19px;
-        }
-
-
-        .chart-card p {
-            margin: 4px 0 20px;
-
-            color: #6b7280;
-
-            font-size: 13px;
-        }
-
-
-        .chart-container {
-            position: relative;
-
-            height: 330px;
-        }
-
-
-        .chart-empty {
-            height: 100%;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
-            color: #9ca3af;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mobile
-        |--------------------------------------------------------------------------
-        */
-
-        @media (max-width: 1100px) {
-
-            .stats-grid {
-                grid-template-columns:
-                    repeat(2, 1fr);
-            }
-
-            .chart-grid {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
-
-        @media (max-width: 650px) {
-
-            .sidebar {
-                transform: translateX(-100%);
-
-                transition:
-                    transform .3s ease;
-            }
-
-
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-
-
-            .main-content {
-                margin-left: 0;
-
-                width: 100%;
-            }
-
-
-            .mobile-menu-button {
-                display: block;
-            }
-
-
-            .dashboard-header {
-                flex-direction: column;
-
-                align-items: flex-start;
-            }
-
-
-            .period-filter {
-                width: 100%;
-            }
-
-
-            .period-filter select {
-                flex: 1;
-
-                min-width: 0;
-            }
-
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-
-            .chart-container {
-                height: 280px;
-            }
-
-        }
-    </style>
 
 </head>
 
@@ -1481,11 +1199,7 @@ if ($page === "home") {
 
                 ?>
 
-                    <div
-                        style="
-                        padding:40px;
-                        text-align:center;
-                    ">
+                                        <div class="page-not-found">
 
                         <h2>
                             ไม่พบหน้าที่ต้องการ
@@ -1526,10 +1240,10 @@ if ($page === "home") {
 |--------------------------------------------------------------------------
 */
 
-            const employeeLabels =
+                        const employeeLabels =
                 <?= json_encode(
                     $employeeLabels,
-                    JSON_UNESCAPED_UNICODE
+                    JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
                 ) ?>;
 
 
@@ -1539,10 +1253,10 @@ if ($page === "home") {
                 ) ?>;
 
 
-            const typeLabels =
+                        const typeLabels =
                 <?= json_encode(
                     $typeLabels,
-                    JSON_UNESCAPED_UNICODE
+                    JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
                 ) ?>;
 
 
@@ -1552,10 +1266,10 @@ if ($page === "home") {
                 ) ?>;
 
 
-            const kpiLabels =
+                        const kpiLabels =
                 <?= json_encode(
                     $kpiLabels,
-                    JSON_UNESCAPED_UNICODE
+                    JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
                 ) ?>;
 
 

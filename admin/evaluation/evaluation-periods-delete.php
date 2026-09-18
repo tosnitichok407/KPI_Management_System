@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
@@ -18,8 +18,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -29,10 +28,7 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 |--------------------------------------------------------------------------
 */
 
-if (($_SERVER["REQUEST_METHOD"] ?? "GET") !== "POST") {
-    header("Location: ../index.php?page=evaluation");
-    exit;
-}
+csrfRequirePost("../index.php?page=evaluation");
 
 $id = (int) ($_POST["id"] ?? 0);
 
@@ -97,6 +93,8 @@ try {
     exit;
 
 } catch (PDOException $e) {
+
+    error_log("Delete evaluation period failed: " . $e->getMessage());
 
     header("Location: ../index.php?page=evaluation&error=delete_failed");
     exit;

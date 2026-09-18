@@ -370,8 +370,8 @@ $hasAnyScore = count($yearData["performances"]) > 0;
 <script>
     (function () {
 
-        const monthLabels = <?= json_encode($monthLabels, JSON_UNESCAPED_UNICODE) ?>;
-        const colors = <?= json_encode($colors) ?>;
+        const monthLabels = <?= json_encode($monthLabels, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+        const colors = <?= json_encode($colors, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
         function datasets(seriesMap) {
             return Object.keys(seriesMap).map(function (name, index) {
@@ -442,12 +442,12 @@ $hasAnyScore = count($yearData["performances"]) > 0;
             });
         }
 
-        lineChart("chartDepartments", monthLabels, <?= json_encode($departmentSeries, JSON_UNESCAPED_UNICODE) ?>, 5, "");
-        lineChart("chartTypes", monthLabels, <?= json_encode($typeSeries, JSON_UNESCAPED_UNICODE) ?>, 5, "");
-        lineChart("chartEmployees", monthLabels, <?= json_encode($employeeSeries, JSON_UNESCAPED_UNICODE) ?>, 5, "");
-        lineChart("chartQuarters", ["Q1", "Q2", "Q3", "Q4"], <?= json_encode($departmentQuarters, JSON_UNESCAPED_UNICODE) ?>, 5, "");
-        lineChart("chartCompletion", monthLabels, <?= json_encode($departmentCompletion, JSON_UNESCAPED_UNICODE) ?>, 100, "%");
-        lineChart("chartYears", monthLabels, <?= json_encode($yearCompareSeries, JSON_UNESCAPED_UNICODE) ?>, 5, "");
+        lineChart("chartDepartments", monthLabels, <?= json_encode($departmentSeries, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 5, "");
+        lineChart("chartTypes", monthLabels, <?= json_encode($typeSeries, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 5, "");
+        lineChart("chartEmployees", monthLabels, <?= json_encode($employeeSeries, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 5, "");
+        lineChart("chartQuarters", ["Q1", "Q2", "Q3", "Q4"], <?= json_encode($departmentQuarters, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 5, "");
+        lineChart("chartCompletion", monthLabels, <?= json_encode($departmentCompletion, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 100, "%");
+        lineChart("chartYears", monthLabels, <?= json_encode($yearCompareSeries, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>, 5, "");
 
     })();
 </script>

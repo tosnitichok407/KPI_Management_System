@@ -77,12 +77,11 @@ function employeeFeedbackYears(PDO $pdo, int $employeeId): array
 /*
 | การ์ด Feedback
 | options: root, title, subtitle, link ["href", "label"], header_extra (HTML), empty
+| หน้าที่เรียกใช้ต้อง <link> assets/css/employee-feedback.css ใน <head>
 */
 function renderFeedbackCard(array $items, array $options = []): void
 {
-    static $cssLoaded = false;
-
-    $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, "UTF-8");
+        $e = static fn($value): string => htmlspecialchars((string) $value, ENT_QUOTES, "UTF-8");
 
     $root = $options["root"] ?? "../";
     $link = $options["link"] ?? null;
@@ -93,10 +92,7 @@ function renderFeedbackCard(array $items, array $options = []): void
         9 => "กันยายน", 10 => "ตุลาคม", 11 => "พฤศจิกายน", 12 => "ธันวาคม"
     ];
 
-    if (!$cssLoaded) {
-        echo '<link rel="stylesheet" href="' . $e($root . "assets/css/employee-feedback.css?v=1") . '">';
-        $cssLoaded = true;
-    }
+        /* CSS ของการ์ด (assets/css/employee-feedback.css) โหลดใน <head> ของหน้าที่เรียกใช้ */
 
     ?>
 

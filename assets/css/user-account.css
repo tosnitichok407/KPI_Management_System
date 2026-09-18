@@ -5,3 +5,92 @@
 @import url("forms.css");
 @import url("tables.css");
 @import url("admin.css");
+
+/* =========================================================
+   ACCOUNT SUMMARY
+========================================================= */
+
+.account-stats {
+  display: grid;
+
+  grid-template-columns: repeat(4, 1fr);
+
+  gap: 16px;
+
+  margin-bottom: 20px;
+}
+
+.account-stat-card {
+  padding: 16px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 10px;
+}
+
+.account-stat-card h3 {
+  margin: 0 0 6px;
+
+  color: #6b7280;
+
+  font-size: 14px;
+
+  font-weight: 500;
+}
+
+.account-stat-card strong {
+  display: block;
+
+  color: #244397;
+
+  font-size: 26px;
+
+  line-height: 1.1;
+}
+
+.account-stat-card strong small {
+  color: #98a2b3;
+
+  font-size: 13px;
+
+  font-weight: 400;
+}
+
+.account-stat-card p {
+  margin: 8px 0 0;
+
+  color: #98a2b3;
+
+  font-size: 12px;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+  .account-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .account-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   TABLE HELPERS (เดิมเป็น inline style ใน user-accounts.php)
+========================================================= */
+
+.text-muted {
+  color: #9ca3af;
+}
+
+.status.none {
+  background: #f3f4f6;
+  color: #6b7280;
+}

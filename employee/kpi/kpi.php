@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
@@ -118,7 +116,7 @@ $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $assignmentId = (int) ($_POST["assignment_id"] ?? 0);
+        $assignmentId = (int) ($_POST["assignment_id"] ?? 0);
 
     // Actual ใช้เฉพาะ Performance KPI (Competency เลือกคะแนน 1-5 แทน)
     $actual = trim($_POST["actual"] ?? "");
@@ -126,16 +124,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $score = trim($_POST["score"] ?? "");
     $comment = trim($_POST["comment"] ?? "");
 
-
     /*
     |--------------------------------------------------------------------------
     | Validate Assignment
     |--------------------------------------------------------------------------
     */
 
-    if ($assignmentId <= 0) {
+    if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+    } elseif ($assignmentId <= 0) {
 
         $error = "ไม่พบ KPI ที่ต้องการบันทึก";
+    } elseif (mb_strlen($comment) > 5000) {
+
+        $error = "ความคิดเห็นยาวเกินกำหนด";
     } elseif (!$selectedPeriod) {
 
         $error = "ยังไม่มีรอบประเมินของเดือน"
@@ -471,7 +474,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
                 }
             }
-        } catch (PDOException $e) {
+                } catch (PDOException $e) {
+
+            error_log("Save KPI performance failed: " . $e->getMessage());
 
             $error =
                 "ไม่สามารถบันทึกข้อมูล KPI ได้";
@@ -670,603 +675,9 @@ $totalCompetency =
         href="../../assets/css/employee-kpi.css?v=layout-employee-2">
 
 
-    <style>
-        /*
-        |--------------------------------------------------------------------------
-        | Tabs
-        |--------------------------------------------------------------------------
-        */
-
-        .kpi-tabs {
-
-            display: flex;
-
-            gap: 12px;
-
-            margin-bottom: 25px;
-
-        }
-
-
-        .kpi-tab {
-
-            padding: 14px 28px;
-
-            border-radius: 10px;
-
-            text-decoration: none;
-
-            font-weight: 600;
-
-            background: #e2e4e8;
-
-            color: #475569;
-
-            transition: .2s;
-
-        }
-
-
-        .kpi-tab:hover {
-
-            background: #dbe4f0;
-
-        }
-
-
-        .kpi-tab.active {
-
-            background: #244397;
-
-            color: white;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Table
-        |--------------------------------------------------------------------------
-        */
-
-        .kpi-input-table {
-
-            width: 100%;
-
-            border-collapse: collapse;
-
-        }
-
-
-        .kpi-input-table th {
-
-            background: #f1f5f9;
-
-            padding: 15px;
-
-            text-align: left;
-
-            border-bottom: 1px solid #e2e8f0;
-
-        }
-
-
-        .kpi-input-table td {
-
-            padding: 18px 15px;
-
-            border-bottom: 1px solid #e5e7eb;
-
-            vertical-align: top;
-
-        }
-
-
-        .kpi-title {
-
-            font-weight: 600;
-
-            font-size: 16px;
-
-            color: #1e293b;
-
-        }
-
-
-        .kpi-description {
-
-            margin-top: 5px;
-
-            color: #64748b;
-
-            font-size: 14px;
-
-            line-height: 1.6;
-
-        }
-
-
-        .kpi-meta {
-
-            margin-top: 8px;
-
-            display: flex;
-
-            gap: 8px;
-
-            flex-wrap: wrap;
-
-        }
-
-
-        .kpi-badge {
-
-            display: inline-block;
-
-            padding: 4px 9px;
-
-            border-radius: 6px;
-
-            background: #eff6ff;
-
-            color: #1d4ed8;
-
-            font-size: 13px;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Input
-        |--------------------------------------------------------------------------
-        */
-
-        .input-area {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(2, minmax(120px, 1fr));
-
-            gap: 12px;
-
-        }
-
-
-        .input-group {
-
-            display: flex;
-
-            flex-direction: column;
-
-            gap: 5px;
-
-        }
-
-
-        .input-group label {
-
-            font-size: 13px;
-
-            font-weight: 500;
-
-            color: #64748b;
-
-        }
-
-
-        .input-group input,
-        .input-group textarea,
-        .score-select {
-
-            width: 100%;
-
-            padding: 9px 10px;
-
-            border: 1px solid #cbd5e1;
-
-            border-radius: 7px;
-
-            font-family: inherit;
-
-            font-size: 14px;
-
-            box-sizing: border-box;
-
-        }
-
-
-        .input-group textarea {
-
-            min-height: 70px;
-
-            resize: vertical;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Score
-        |--------------------------------------------------------------------------
-        */
-
-        .score-display {
-
-            margin-top: 10px;
-
-            padding: 8px 12px;
-
-            background: #eff6ff;
-
-            border-radius: 7px;
-
-            font-weight: 600;
-
-            color: #244397;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Score Criteria
-        |--------------------------------------------------------------------------
-        */
-
-        .criteria-box {
-
-            margin-top: 15px;
-
-            padding: 12px;
-
-            background: #f8fafc;
-
-            border: 1px solid #e2e8f0;
-
-            border-radius: 8px;
-
-        }
-
-
-        .criteria-title {
-
-            font-weight: 600;
-
-            margin-bottom: 8px;
-
-            color: #334155;
-
-        }
-
-
-        .criteria-item {
-
-            padding: 6px 0;
-
-            border-bottom: 1px solid #e5e7eb;
-
-            font-size: 13px;
-
-            color: #64748b;
-
-        }
-
-
-        .criteria-item:last-child {
-
-            border-bottom: none;
-
-        }
-
-
-        /* ระดับที่ได้ตามคะแนนที่บันทึก */
-        .criteria-item.is-current {
-            margin: 2px -8px;
-            padding: 6px 8px;
-            border-radius: 6px;
-            background: #eff6ff;
-            color: #244397;
-            font-weight: 600;
-        }
-
-        .criteria-item.is-empty {
-            color: #94a3b8;
-        }
-
-        .criteria-current {
-            margin-left: 6px;
-            padding: 1px 8px;
-            border-radius: 999px;
-            background: #244397;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        /* KPI ที่ Admin ยังไม่ได้กำหนดเกณฑ์ */
-        .criteria-note {
-            margin-bottom: 6px;
-            color: #b45309;
-            font-size: 12px;
-        }
-
-
-        .criteria-score {
-
-            font-weight: 600;
-
-            color: #244397;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Competency: เลือกระดับผลงาน 5..1
-        |--------------------------------------------------------------------------
-        */
-
-        .competency-form {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        /* ปุ่มบันทึกขนาดเท่าฝั่ง Performance (ไม่ยืดเต็มความกว้าง) */
-        .competency-form .save-button {
-            align-self: flex-start;
-            margin-top: 0;
-        }
-
-        .level-options {
-            display: grid;
-            gap: 8px;
-        }
-
-        .level-options .level-option {
-            display: grid;
-            grid-template-columns: auto 34px 1fr;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            background: #fff;
-            color: #334155;
-            font-size: 13px;
-            font-weight: 400;
-            cursor: pointer;
-            transition: border-color .15s, background .15s;
-        }
-
-        .level-options .level-option:hover {
-            border-color: #244397;
-            background: #f8fafc;
-        }
-
-        .level-options .level-option input[type="radio"] {
-            width: 16px;
-            height: 16px;
-            margin: 0;
-            padding: 0;
-            border: 0;
-            accent-color: #244397;
-        }
-
-        .level-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background: #eff6ff;
-            color: #244397;
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .level-text {
-            line-height: 1.5;
-        }
-
-        .level-option.is-empty .level-text {
-            color: #94a3b8;
-        }
-
-        .level-options .level-option:has(input:checked) {
-            border-color: #244397;
-            background: #eff6ff;
-            box-shadow: inset 0 0 0 1px #244397;
-        }
-
-        .level-option:has(input:checked) .level-number {
-            background: #244397;
-            color: #fff;
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Save Button
-        |--------------------------------------------------------------------------
-        */
-
-        .save-button {
-
-            margin-top: 12px;
-
-            padding: 10px 18px;
-
-            border: none;
-
-            border-radius: 7px;
-
-            background: #244397;
-
-            color: white;
-
-            font-family: inherit;
-
-            cursor: pointer;
-
-            font-weight: 500;
-
-        }
-
-
-        .save-button:hover {
-
-            background: #1e3a8a;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Messages
-        |--------------------------------------------------------------------------
-        */
-
-        .success-message {
-
-            background: #dcfce7;
-
-            color: #166534;
-
-            padding: 13px 16px;
-
-            border-radius: 8px;
-
-            margin-bottom: 20px;
-
-        }
-
-
-        .error-message {
-
-            background: #fee2e2;
-
-            color: #991b1b;
-
-            padding: 13px 16px;
-
-            border-radius: 8px;
-
-            margin-bottom: 20px;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Empty
-        |--------------------------------------------------------------------------
-        */
-
-        .empty-kpi {
-
-            text-align: center;
-
-            padding: 50px 20px;
-
-            color: #64748b;
-
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Period
-        |--------------------------------------------------------------------------
-        */
-
-        .period-info {
-
-            margin-bottom: 15px;
-
-            color: #64748b;
-
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mobile
-        |--------------------------------------------------------------------------
-        */
-
-        @media (max-width: 800px) {
-
-            .kpi-tabs {
-
-                flex-direction: column;
-
-            }
-
-
-            .kpi-tab {
-
-                text-align: center;
-
-            }
-
-
-            .input-area {
-
-                grid-template-columns: 1fr;
-
-            }
-
-
-            .table-wrapper {
-
-                overflow-x: auto;
-
-            }
-
-
-            .kpi-input-table {
-
-                min-width: 850px;
-
-            }
-
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Month Filter
-        |--------------------------------------------------------------------------
-        */
-
-        .period-filter {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .period-filter label {
-            font-weight: 500;
-        }
-
-        .period-filter select {
-            padding: 8px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            background: #fff;
-            font-family: inherit;
-            font-size: 14px;
-        }
-
-        .period-filter-status {
-            color: #475569;
-            font-size: 14px;
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="../../assets/css/employee-my-kpi.css">
 
 </head>
 
@@ -1494,7 +905,7 @@ $totalCompetency =
 
                     <div class="empty-kpi">
 
-                        <div style="font-size:40px;">
+                        <div class="empty-kpi-icon">
                             📈
                         </div>
 
@@ -1518,7 +929,7 @@ $totalCompetency =
 
                                 <tr>
 
-                                    <th style="width:35%;">
+                                    <th class="col-kpi-topic">
                                         หัวข้อ KPI
                                     </th>
 
@@ -1635,6 +1046,8 @@ $totalCompetency =
                                                 method="POST"
                                                 action="kpi.php?tab=performance&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>">
 
+                                                <?= csrfField() ?>
+
                                                 <input
 
                                                     type="hidden"
@@ -1664,17 +1077,7 @@ $totalCompetency =
 
                                                         </label>
 
-                                                        <div style="
-
-                                                                padding: 9px 10px;
-
-                                                                background: #f1f5f9;
-
-                                                                border: 1px solid #cbd5e1;
-
-                                                                border-radius: 7px;
-
-                                                            ">
+                                                        <div class="target-readonly">
 
                                                             <?= number_format((int) $kpi["target_value"]) ?>
 
@@ -1710,12 +1113,7 @@ $totalCompetency =
                                                             placeholder="กรอกผลที่ทำได้"
                                                             required>
 
-                                                        <div
-                                                            style="
-                                                                margin-top:8px;
-                                                                font-size:13px;
-                                                                color:#64748b;
-                                                            ">
+                                                        <div class="input-hint">
 
                                                             คะแนนจริง = Weight × Criteria
 
@@ -1781,7 +1179,7 @@ $totalCompetency =
 
                     <div class="empty-kpi">
 
-                        <div style="font-size:40px;">
+                        <div class="empty-kpi-icon">
                             ⭐
                         </div>
 
@@ -1805,7 +1203,7 @@ $totalCompetency =
 
                                 <tr>
 
-                                    <th style="width:35%;">
+                                    <th class="col-kpi-topic">
                                         หัวข้อ KPI
                                     </th>
 
@@ -1878,6 +1276,8 @@ $totalCompetency =
                                                 class="competency-form"
                                                 action="kpi.php?tab=competency&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>">
 
+                                                <?= csrfField() ?>
+
                                                 <input
                                                     type="hidden"
                                                     name="assignment_id"
@@ -1926,12 +1326,7 @@ $totalCompetency =
 
                                                     </div>
 
-                                                    <div
-                                                        style="
-                                                            margin-top:8px;
-                                                            font-size:13px;
-                                                            color:#64748b;
-                                                        ">
+                                                    <div class="input-hint">
 
                                                         คะแนนจริง = Weight × คะแนนที่เลือก
 

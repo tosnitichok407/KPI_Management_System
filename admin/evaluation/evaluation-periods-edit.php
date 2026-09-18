@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
@@ -19,8 +19,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -113,6 +112,8 @@ try {
 
 } catch (PDOException $e) {
 
+    error_log("Load evaluation period failed: " . $e->getMessage());
+    http_response_code(500);
     die("Database error.");
 }
 
@@ -138,7 +139,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if (
+        if (!csrfVerify()) {
+
+        $error =
+            "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+
+    } elseif (
         $periodYear < 2000 || $periodYear > 2100 || $periodMonth < 1 || $periodMonth > 12
     ) {
 
@@ -231,7 +237,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             exit;
 
 
-        } catch (PDOException $e) {
+                } catch (PDOException $e) {
+
+            error_log("Update evaluation period failed: " . $e->getMessage());
 
             $error =
                 $e->getCode() === "23000" ? "มีรอบประเมินสำหรับปีและเดือนนี้แล้ว" : "ไม่สามารถแก้ไขรอบการประเมินได้";

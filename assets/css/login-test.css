@@ -1,0 +1,103 @@
+/* Login Test (หน้า debug) — ย้ายมาจาก login-test.php */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: #195ee8;
+    color: #1f2937;
+    font-family: "Kanit", sans-serif;
+}
+
+.test-card {
+    width: min(440px, 100%);
+    padding: 28px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, .05);
+}
+
+h1 {
+    margin: 0 0 5px;
+    color: #1e3a8a;
+    font-size: 25px;
+}
+
+.description {
+    margin: 0 0 22px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+label {
+    display: block;
+    margin: 14px 0 6px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    font: inherit;
+}
+
+input:focus {
+    outline: 2px solid #bfdbfe;
+    border-color: #1e3a8a;
+}
+
+button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 11px;
+    border: 0;
+    border-radius: 7px;
+    background: #1e3a8a;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #244397;
+}
+
+.result {
+    margin: 18px 0 0;
+    padding: 13px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.user-data {
+    margin: 10px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 0, 0, .1);
+    line-height: 1.8;
+}
+
+.warning {
+    margin-top: 20px;
+    color: #92400e;
+    font-size: 12px;
+}

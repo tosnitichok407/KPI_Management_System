@@ -11,6 +11,12 @@
 |
 */
 
+if (!isset($formAction)) {
+    // ไฟล์นี้เป็น partial ต้อง include จากหน้าเพิ่ม / แก้ไขเท่านั้น
+    http_response_code(404);
+    exit;
+}
+
 $monthNames = monthlyPeriodMonths();
 
 $currentYear = (int) date("Y");
@@ -38,9 +44,11 @@ $previewPeriod =
 <form
     method="POST"
     action="<?= htmlspecialchars($formAction, ENT_QUOTES, "UTF-8") ?>"
-    class="period-form"
+        class="period-form"
     id="periodForm"
 >
+
+    <?= csrfField() ?>
 
     <?php if ($lockPeriod): ?>
 
@@ -230,8 +238,8 @@ $previewPeriod =
 <script>
     (function () {
 
-        const monthNames = <?= json_encode($monthNames, JSON_UNESCAPED_UNICODE) ?>;
-        const takenByYear = <?= json_encode((object) $existingMonths) ?>;
+                const monthNames = <?= json_encode($monthNames, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+        const takenByYear = <?= json_encode((object) $existingMonths, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
         const locked = <?= $lockPeriod ? "true" : "false" ?>;
 
         const yearSelect = document.getElementById("period_year");

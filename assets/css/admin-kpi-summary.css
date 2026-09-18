@@ -1,0 +1,515 @@
+/* =========================================================
+   ADMIN › KPI SUMMARY (index.php?page=summary)
+   โหลดเฉพาะหน้านี้จาก admin/index.php เพราะมี selector ระดับ element (th / td)
+   ย้ายมาจาก admin/kpi-summary/kpi-summary.php
+========================================================= */
+
+/* =================================================
+   HEADER
+================================================= */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 25px;
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 600;
+}
+
+.page-header p {
+    margin: 5px 0 0;
+    color: #6b7280;
+}
+
+.btn-export {
+    gap: 6px;
+}
+
+/* =================================================
+   SUMMARY CARDS
+================================================= */
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.summary-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 22px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+}
+
+.summary-card-title {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.summary-card-value {
+    margin-top: 8px;
+    color: #244397;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.summary-card-value small {
+    color: #98a2b3;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.summary-card-note {
+    margin-top: 6px;
+    color: #98a2b3;
+    font-size: 12px;
+}
+
+/* =================================================
+   CARD
+================================================= */
+
+.card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+}
+
+.card-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 18px;
+    color: #244397;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.card-title .count {
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* =================================================
+   OTHER FILTERS (เปลี่ยนแล้วโหลดใหม่ทันที)
+================================================= */
+
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 15px;
+    align-items: end;
+}
+
+.filter-row .form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-row label {
+    margin-bottom: 7px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.filter-row select {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid #d8dce5;
+    border-radius: 8px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+
+.filter-row select:focus {
+    border-color: #244397;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.filter-note {
+    margin-top: 14px;
+    color: #667085;
+    font-size: 13px;
+}
+
+.filter-note strong {
+    color: #244397;
+}
+
+/* =================================================
+   TABLES
+================================================= */
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.summary-table,
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.summary-table {
+    min-width: 860px;
+}
+
+.detail-table {
+    min-width: 900px;
+}
+
+th {
+    background: #f1f4f9;
+    color: #444;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 13px 12px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+td {
+    padding: 13px 12px;
+    border-bottom: 1px solid #edf0f5;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+tbody tr:hover td {
+    background: #fafbfe;
+}
+
+.col-index {
+    width: 44px;
+    color: #98a2b3;
+    text-align: center;
+}
+
+.col-number {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.empty {
+    padding: 35px;
+    color: #888;
+    text-align: center;
+}
+
+/* พนักงาน */
+
+.employee-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.employee-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #244397;
+    color: #fff;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.employee-cell strong {
+    display: block;
+    color: #1f2937;
+}
+
+.employee-meta {
+    margin-top: 2px;
+    color: #667085;
+    font-size: 13px;
+}
+
+/* ตัวเลขในตารางสรุป */
+
+.stat-main {
+    font-weight: 600;
+    color: #1f2937;
+    white-space: nowrap;
+}
+
+.stat-sub {
+    margin-top: 2px;
+    color: #98a2b3;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.progress {
+    width: 110px;
+    height: 6px;
+    margin-top: 6px;
+    border-radius: 6px;
+    background: #edf0f5;
+    overflow: hidden;
+}
+
+.progress span {
+    display: block;
+    height: 100%;
+    background: #244397;
+}
+
+.progress.done span {
+    background: #237a42;
+}
+
+/* ป้าย */
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.badge-type {
+    background: #edf2ff;
+    color: #244397;
+}
+
+.badge-type.performance {
+    background: #fff4df;
+    color: #a16207;
+}
+
+.badge-quarter {
+    background: #eef2ff;
+    color: #244397;
+    font-weight: 500;
+}
+
+.badge-active {
+    background: #e5f7eb;
+    color: #237a42;
+}
+
+.badge-inactive {
+    background: #f1f1f1;
+    color: #777;
+}
+
+.badge-submitted {
+    background: #e5f7eb;
+    color: #237a42;
+}
+
+.badge-draft {
+    background: #fff4df;
+    color: #a16207;
+}
+
+.weight-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 5px 11px;
+    border: 1px solid #dfe4ee;
+    border-radius: 20px;
+    background: #fff;
+    color: #667085;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.weight-chip strong {
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.weight-chip small {
+    color: #98a2b3;
+}
+
+.weight-chip.full {
+    border-color: #bfe3cb;
+    background: #eefaf2;
+}
+
+.weight-chip.full strong {
+    color: #237a42;
+}
+
+.weight-chip.over {
+    border-color: #f5c2c2;
+    background: #fff0f0;
+}
+
+.weight-chip.over strong {
+    color: #c62828;
+}
+
+.btn-small {
+    display: inline-block;
+    padding: 6px 11px;
+    border-radius: 6px;
+    background: #eef3ff;
+    color: #244397;
+    font-size: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+/* ตารางรายละเอียด: กลุ่มพนักงาน */
+
+.detail-table .group-row td {
+    padding: 0;
+    border-top: 1px solid #dfe4ee;
+    border-bottom: 1px solid #dfe4ee;
+    background: #f4f6fb;
+}
+
+.detail-table .group-row:first-child td {
+    border-top: 0;
+}
+
+.detail-table .group-row:hover td {
+    background: #f4f6fb;
+}
+
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 14px;
+}
+
+.group-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: #667085;
+    font-size: 13px;
+}
+
+.kpi-name {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.kpi-unit {
+    margin-top: 2px;
+    color: #98a2b3;
+    font-size: 12px;
+}
+
+.col-period {
+    min-width: 230px;
+}
+
+.period-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.period-dates {
+    margin-top: 3px;
+    color: #98a2b3;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.result-score {
+    font-weight: 600;
+    color: #1f2937;
+    white-space: nowrap;
+}
+
+.result-score small {
+    color: #98a2b3;
+    font-weight: 400;
+}
+
+.result-meta {
+    margin-top: 2px;
+    color: #667085;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.result-none {
+    color: #98a2b3;
+    font-size: 13px;
+}
+
+.row-inactive td,
+.row-inactive .kpi-name {
+    color: #98a2b3;
+}
+
+/* =================================================
+   RESPONSIVE
+================================================= */
+
+@media (max-width: 1100px) {
+
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .filter-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .picker-legend {
+        margin-left: 0;
+    }
+
+}
+
+@media (max-width: 650px) {
+
+    .summary-cards,
+    .filter-row {
+        grid-template-columns: 1fr;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .card {
+        padding: 18px;
+    }
+
+    .month-track {
+        flex-wrap: wrap;
+    }
+
+}

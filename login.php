@@ -1,10 +1,44 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/includes/security.php";
 
 require_once __DIR__ . "/config/database.php";
 
 $error = "";
+
+
+/*
+|--------------------------------------------------------------------------
+| Login Throttle
+|--------------------------------------------------------------------------
+|
+| นับความพยายามที่ล้มเหลวจาก login_logs (ตารางเดิม) ต่อ username หรือ IP
+| ใน 15 นาทีล่าสุด ถ้าเกิน 10 ครั้ง ให้ปฏิเสธชั่วคราวเพื่อกัน brute-force
+|
+*/
+
+function loginAttemptsExceeded(PDO $pdo, string $username, int $limit = 10, int $minutes = 15): bool
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*)
+            FROM login_logs
+            WHERE login_status = 'Failed'
+              AND login_time >= (NOW() - INTERVAL :minutes MINUTE)
+              AND (username = :username OR ip_address = :ip_address)
+        ");
+
+        $stmt->bindValue(":minutes", $minutes, PDO::PARAM_INT);
+        $stmt->bindValue(":username", $username);
+        $stmt->bindValue(":ip_address", $_SERVER["REMOTE_ADDR"] ?? "");
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn() >= $limit;
+    } catch (PDOException $e) {
+        // ถ้าตาราง log มีปัญหา ไม่ให้ Login พัง
+        return false;
+    }
+}
 
 
 /* ---Redirect if already logged in ---*/
@@ -21,8 +55,7 @@ if (isset($_SESSION["user_id"])) {
         exit;
     }
 
-    header("Location: dashboard.php");
-    exit;
+    redirectToRoleHome("");
 }
 
 
@@ -35,9 +68,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     /* --- Validate Input ---*/
 
-    if ($username === "" || $password === "") {
+    if (!csrfVerify()) {
+
+        $error = "Session expired. Please try again.";
+    } elseif ($username === "" || $password === "") {
 
         $error = "Please enter Employee ID and Password.";
+    } elseif (mb_strlen($username) > 50 || strlen($password) > 1024) {
+
+        $error = "Invalid Employee ID or Password.";
+    } elseif (loginAttemptsExceeded($pdo, $username)) {
+
+        /* --- Brute-force Throttle: ล็อกอินผิดเกินกำหนดใน 15 นาที --- */
+        $error = "Too many failed login attempts. Please try again in 15 minutes.";
     } else {
 
 
@@ -461,6 +504,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         method="POST"
                         action="login.php">
 
+                        <?= csrfField() ?>
+
                         <!-- Employee ID -->
                         <div class="form-group">
 
@@ -562,7 +607,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         </div>
     </div>
 
-    <!===SHOW / HIDE PASSWORD===>
+    <!-- === SHOW / HIDE PASSWORD === -->
 
         <script>
             const passwordInput =

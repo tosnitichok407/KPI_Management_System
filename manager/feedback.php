@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../includes/security.php";
 require_once __DIR__ . "/../config/database.php";
 
 
@@ -24,7 +24,8 @@ if (!isset($_SESSION["user_id"]) || !in_array((int) ($_SESSION["role_id"] ?? 0),
 
 $employeeId = (int) ($_POST["employee_id"] ?? 0);
 $periodId = (int) ($_POST["period_id"] ?? 0);
-$score = (float) ($_POST["evaluation_score"] ?? -1);
+$scoreInput = trim((string) ($_POST["evaluation_score"] ?? ""));
+$score = is_numeric($scoreInput) ? (float) $scoreInput : -1;
 $feedback = trim($_POST["feedback"] ?? "");
 
 
@@ -47,7 +48,13 @@ $redirect = "index.php?" . $returnQuery;
 |--------------------------------------------------------------------------
 */
 
-if (($_SERVER["REQUEST_METHOD"] ?? "GET") !== "POST" || $employeeId <= 0 || $periodId <= 0 || $score < 0 || $score > 100 || $feedback === "") {
+if (
+    ($_SERVER["REQUEST_METHOD"] ?? "GET") !== "POST"
+    || !csrfVerify()
+    || $employeeId <= 0 || $periodId <= 0
+    || $score < 0 || $score > 100
+    || $feedback === "" || mb_strlen($feedback) > 5000
+) {
     header("Location: {$redirect}&saved=0");
     exit;
 }
@@ -94,6 +101,8 @@ try {
     header("Location: {$redirect}&saved=1");
 
 } catch (PDOException $exception) {
+
+    error_log("Save manager feedback failed: " . $exception->getMessage());
 
     header("Location: {$redirect}&saved=0");
 }

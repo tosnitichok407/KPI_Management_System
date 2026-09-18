@@ -1,0 +1,112 @@
+/* =========================================================
+   ADMIN › แก้ไข KPI (หน้า standalone)
+   ย้ายมาจาก admin/kpi-management/kpi-edit.php
+========================================================= */
+
+body {
+    margin: 0;
+    font-family: var(--font-family, "Kanit", sans-serif);
+    background: #f5f7fb;
+}
+
+.container {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.card {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, .08);
+}
+
+h1 {
+    margin-top: 0;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+textarea {
+    min-height: 100px;
+}
+
+.score-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+.score-box {
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.score-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.actions {
+    margin-top: 25px;
+    display: flex;
+    gap: 10px;
+}
+
+button,
+.back {
+    padding: 11px 20px;
+    border: none;
+    border-radius: 7px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button {
+    background: #244397;
+    color: white;
+}
+
+.back {
+    background: #e5e7eb;
+    color: #111827;
+}
+
+.error {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 12px;
+    border-radius: 7px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 700px) {
+
+    .score-grid {
+        grid-template-columns: 1fr;
+    }
+
+}

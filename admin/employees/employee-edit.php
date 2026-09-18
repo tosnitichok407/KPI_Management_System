@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,8 +17,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -90,13 +89,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $phone = trim($_POST["phone"] ?? "");
     $email = trim($_POST["email"] ?? "");
 
-    $department_id = $_POST["department_id"] ?? null;
-    $position_id = $_POST["position_id"] ?? null;
+        $department_id = (int) ($_POST["department_id"] ?? 0);
+    $position_id = (int) ($_POST["position_id"] ?? 0);
 
-    $hire_date = $_POST["hire_date"] ?? null;
+    $hire_date = trim($_POST["hire_date"] ?? "");
 
     $status = $_POST["status"] ?? "Active";
-
 
     /*
     |--------------------------------------------------------------------------
@@ -104,7 +102,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if (
+    if (!csrfVerify()) {
+
+        $error = "Session expired. Please try again.";
+
+    } elseif (
         $employee_code === "" ||
         $first_name === "" ||
         $last_name === ""
@@ -112,9 +114,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $error = "Please fill in all required fields.";
 
-    } elseif (!in_array($status, ["Active", "Inactive"])) {
+    } elseif (
+        mb_strlen($employee_code) > 20 ||
+        mb_strlen($first_name) > 100 ||
+        mb_strlen($last_name) > 100 ||
+        mb_strlen($phone) > 20 ||
+        mb_strlen($email) > 150
+    ) {
+
+        $error = "Input is too long.";
+
+    } elseif (!in_array($status, ["Active", "Inactive"], true)) {
 
         $error = "Invalid employee status.";
+
+    } elseif (!in_array($gender, ["", null, "Male", "Female", "Other"], true)) {
+
+        $error = "Invalid gender.";
+
+    } elseif ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+        $error = "Invalid email address.";
+
+    } elseif ($hire_date !== "" && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $hire_date)) {
+
+        $error = "Invalid hire date.";
 
     } else {
 
@@ -192,13 +216,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             ? $email
                             : null,
 
-                    ":department_id" =>
-                        $department_id !== ""
+                                        ":department_id" =>
+                        $department_id > 0
                             ? $department_id
                             : null,
 
                     ":position_id" =>
-                        $position_id !== ""
+                        $position_id > 0
                             ? $position_id
                             : null,
 
@@ -365,6 +389,8 @@ if (!$employee) {
             method="POST"
             action="employee-edit.php?id=<?= $employee_id ?>"
         >
+
+                        <?= csrfField() ?>
 
             <input
                 type="hidden"
@@ -681,13 +707,7 @@ if (!$employee) {
 
             <!-- Buttons -->
 
-            <div
-                style="
-                    margin-top: 25px;
-                    display: flex;
-                    gap: 10px;
-                "
-            >
+                        <div class="form-buttons">
 
                 <button
                     type="submit"

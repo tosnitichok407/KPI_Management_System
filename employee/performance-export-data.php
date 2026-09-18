@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . "/../includes/security.php";
+
 /*
 |--------------------------------------------------------------------------
 | แบบฟอร์มประเมิน (ใช้กับ PDF)
@@ -226,6 +228,7 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
 function requireEmployeeExportAccess(): array
 {
     if (session_status() === PHP_SESSION_NONE) {
+        // ปกติ session ถูกเริ่มโดย includes/security.php ที่ require ไว้ด้านบนแล้ว
         session_start();
     }
     if (!isset($_SESSION["user_id"])) {

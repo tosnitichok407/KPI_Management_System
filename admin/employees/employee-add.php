@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,8 +17,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -63,24 +62,49 @@ $positions = $pdo
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $employee_code = trim($_POST["employee_code"] ?? "");
+        $employee_code = trim($_POST["employee_code"] ?? "");
     $first_name = trim($_POST["first_name"] ?? "");
     $last_name = trim($_POST["last_name"] ?? "");
     $gender = $_POST["gender"] ?? null;
     $phone = trim($_POST["phone"] ?? "");
     $email = trim($_POST["email"] ?? "");
-    $department_id = $_POST["department_id"] ?? null;
-    $position_id = $_POST["position_id"] ?? null;
-    $hire_date = $_POST["hire_date"] ?? null;
+    $department_id = (int) ($_POST["department_id"] ?? 0);
+    $position_id = (int) ($_POST["position_id"] ?? 0);
+    $hire_date = trim($_POST["hire_date"] ?? "");
 
+    if (!csrfVerify()) {
 
-    if (
+        $error = "Session expired. Please try again.";
+
+    } elseif (
         $employee_code === "" ||
         $first_name === "" ||
         $last_name === ""
     ) {
 
         $error = "Please fill in all required fields.";
+
+    } elseif (
+        mb_strlen($employee_code) > 20 ||
+        mb_strlen($first_name) > 100 ||
+        mb_strlen($last_name) > 100 ||
+        mb_strlen($phone) > 20 ||
+        mb_strlen($email) > 150
+    ) {
+
+        $error = "Input is too long.";
+
+    } elseif (!in_array($gender, ["", null, "Male", "Female", "Other"], true)) {
+
+        $error = "Invalid gender.";
+
+    } elseif ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+        $error = "Invalid email address.";
+
+    } elseif ($hire_date !== "" && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $hire_date)) {
+
+        $error = "Invalid hire date.";
 
     } else {
 
@@ -205,7 +229,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <section class="filter-card">
 
-        <form method="POST">
+                <form method="POST">
+
+            <?= csrfField() ?>
 
             <div class="form-group">
 
@@ -384,7 +410,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </div>
 
 
-            <div style="margin-top: 20px;">
+                        <div class="form-buttons compact">
 
                 <button
                     type="submit"
@@ -393,13 +419,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     บันทึกข้อมูลพนักงาน
                 </button>
 
-                 <a
-                href="../index.php?page=employees"
-                class="btn btn-secondary"
-                style="margin-left: 5px;"
-            >
-                ยกเลิก
-            </a>
+                <a
+                    href="../index.php?page=employees"
+                    class="btn btn-secondary"
+                >
+                    ยกเลิก
+                </a>
 
             </div>
 

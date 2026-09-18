@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,8 +17,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -82,12 +81,12 @@ $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $category_id = $_POST["category_id"] ?? "";
+        $category_id = trim($_POST["category_id"] ?? "");
     $kpi_name = trim($_POST["kpi_name"] ?? "");
     $description = trim($_POST["description"] ?? "");
-    $weight = $_POST["weight"] ?? "";
+    $weight = trim($_POST["weight"] ?? "");
     $unit = trim($_POST["unit"] ?? "");
-    $max_score = $_POST["max_score"] ?? "";
+    $max_score = trim($_POST["max_score"] ?? "");
 
     $score_5 = trim($_POST["score_5"] ?? "");
     $score_4 = trim($_POST["score_4"] ?? "");
@@ -96,7 +95,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $score_1 = trim($_POST["score_1"] ?? "");
 
 
-    if ($category_id === "") {
+        if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+    } elseif ($category_id === "" || !ctype_digit($category_id)) {
 
         $error = "กรุณาเลือก KPI Category";
     } elseif ($kpi_name === "") {
@@ -105,6 +107,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif ($weight === "") {
 
         $error = "กรุณากรอก Weight";
+    } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
+
+        $error = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
+    } elseif ($max_score !== "" && (!is_numeric($max_score) || $max_score < 0)) {
+
+        $error = "Max Score ต้องเป็นตัวเลข";
+    } elseif (
+        mb_strlen($kpi_name) > 255 || mb_strlen($unit) > 50 ||
+        mb_strlen($score_5) > 255 || mb_strlen($score_4) > 255 || mb_strlen($score_3) > 255 ||
+        mb_strlen($score_2) > 255 || mb_strlen($score_1) > 255
+    ) {
+
+        $error = "ข้อมูลยาวเกินกำหนด";
     } else {
 
         try {
@@ -168,7 +183,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             header("Location: ../index.php?page=kpi-management");
             exit;
-        } catch (PDOException $e) {
+                } catch (PDOException $e) {
+
+            error_log("Update KPI failed: " . $e->getMessage());
 
             $error = "ไม่สามารถแก้ไข KPI ได้";
         }
@@ -199,115 +216,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
         href="../../assets/css/kpi.css?v=category-form-1">
 
-    <style>
-        body {
-            margin: 0;
-            font-family: var(--font-family, "Kanit", sans-serif);
-            background: #f5f7fb;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 3px 15px rgba(0, 0, 0, .08);
-        }
-
-        h1 {
-            margin-top: 0;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
-        }
-
-        input,
-        textarea,
-        select {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #d1d5db;
-            border-radius: 7px;
-            font-family: inherit;
-            font-size: 15px;
-            box-sizing: border-box;
-        }
-
-        textarea {
-            min-height: 100px;
-        }
-
-        .score-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 12px;
-        }
-
-        .score-box {
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-        }
-
-        .score-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .actions {
-            margin-top: 25px;
-            display: flex;
-            gap: 10px;
-        }
-
-        button,
-        .back {
-            padding: 11px 20px;
-            border: none;
-            border-radius: 7px;
-            font-family: inherit;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        button {
-            background: #244397;
-            color: white;
-        }
-
-        .back {
-            background: #e5e7eb;
-            color: #111827;
-        }
-
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 7px;
-            margin-bottom: 20px;
-        }
-
-        @media (max-width: 700px) {
-
-            .score-grid {
-                grid-template-columns: 1fr;
-            }
-
-        }
-    </style>
+    <link
+        rel="stylesheet"
+        href="../../assets/css/admin-kpi-edit.css">
 
 </head>
 
@@ -334,8 +245,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <?php endif; ?>
 
 
-            <form method="POST">
+                        <form method="POST">
 
+                <?= csrfField() ?>
 
                 <div class="form-group">
 

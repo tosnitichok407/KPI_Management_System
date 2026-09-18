@@ -12,6 +12,12 @@
 |
 */
 
+if (!isset($yearData)) {
+    // ไฟล์นี้เป็น partial ต้อง include จากหน้า manager เท่านั้น
+    http_response_code(404);
+    exit;
+}
+
 $showMonth = $showMonth ?? true;
 $showDepartment = $showDepartment ?? true;
 $extraHidden = $extraHidden ?? [];
@@ -103,9 +109,7 @@ $hasFilter =
             <a href="index.php?page=<?= htmlspecialchars($page, ENT_QUOTES, "UTF-8") ?>" class="btn btn-secondary">
                 ล้างตัวกรอง
             </a>
-
+            
         <?php endif; ?>
-
     </div>
-
 </form>

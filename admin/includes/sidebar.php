@@ -1,5 +1,11 @@
 <?php
 
+if (!isset($pages)) {
+    // ไฟล์นี้เป็น partial ต้อง include จาก admin/index.php เท่านั้น
+    http_response_code(404);
+    exit;
+}
+
 $currentPage =
     $_GET["page"] ?? "home";
 

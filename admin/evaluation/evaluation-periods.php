@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 require_once __DIR__ . "/../../includes/quarter-helper.php";
@@ -21,8 +19,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -161,7 +158,7 @@ $errorMessage = [
     <section class="quarter-period-grid">
         <?php foreach ($quarterPeriods as $quarterPeriod): ?>
             <article class="quarter-period-card">
-                <h2><?= $quarterPeriod["quarter"] ?>/<?= $quarterPeriod["year"] ?></h2>
+                <h2><?= htmlspecialchars($quarterPeriod["quarter"], ENT_QUOTES, "UTF-8") ?>/<?= (int) $quarterPeriod["year"] ?></h2>
                 <p><?= $quarterPeriod["start_date"] ?> - <?= $quarterPeriod["end_date"] ?></p>
                 <strong>
                     <?= empty($quarterPeriod["months"])
@@ -183,11 +180,11 @@ $errorMessage = [
         <div class="table-header">
 
             <h2>
-                Evaluation Periods
+                รอบการประเมิน
             </h2>
 
             <span>
-                <?= count($periods) ?> periods
+                <?= count($periods) ?> รอบการประเมิน
             </span>
 
         </div>
@@ -322,13 +319,13 @@ $errorMessage = [
                                 ): ?>
 
                                     <span class="status-open">
-                                        Open
+                                        เปิด
                                     </span>
 
                                 <?php else: ?>
 
                                     <span class="status-closed">
-                                        Closed
+                                        ปิด
                                     </span>
 
                                 <?php endif; ?>
@@ -346,7 +343,7 @@ $errorMessage = [
                                         href="evaluation/evaluation-periods-edit.php?id=<?= (int) $period["period_id"] ?>"
                                         class="btn-small edit"
                                     >
-                                        Edit
+                                        แก้ไข
                                     </a>
 
                                     <?php $inUse = (int) $period["usage_count"] > 0; ?>
@@ -360,6 +357,7 @@ $errorMessage = [
                                             JSON_UNESCAPED_UNICODE
                                         ), ENT_QUOTES, "UTF-8") ?>)"
                                     >
+                                                                                <?= csrfField() ?>
                                         <input type="hidden" name="id" value="<?= (int) $period["period_id"] ?>">
 
                                         <button
@@ -370,7 +368,7 @@ $errorMessage = [
                                                 ? "มีข้อมูลที่ใช้รอบนี้อยู่ " . (int) $period["usage_count"] . " รายการ จึงลบไม่ได้"
                                                 : "ลบรอบประเมิน" ?>"
                                         >
-                                            Delete
+                                            ลบ
                                         </button>
                                     </form>
 

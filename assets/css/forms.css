@@ -51,3 +51,15 @@
     flex: 1;
   }
 }
+
+/* ปุ่มท้ายฟอร์มเพิ่ม/แก้ไข (เดิมเป็น inline style ในหน้า employee-add / employee-edit / user-account-add) */
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+.form-buttons.compact {
+  gap: 5px;
+  margin-top: 20px;
+}

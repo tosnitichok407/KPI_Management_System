@@ -18,7 +18,8 @@ try {
     );
 
 } catch (PDOException $e) {
-    die(
-        "Database connection failed: " . $e->getMessage()
-    );
+    // ไม่แสดงรายละเอียดการเชื่อมต่อ (host / user / ข้อความ error) ให้ผู้ใช้ — บันทึกลง error log แทน
+    error_log("Database connection failed: " . $e->getMessage());
+    http_response_code(500);
+    die("Database connection failed. Please contact the system administrator.");
 }

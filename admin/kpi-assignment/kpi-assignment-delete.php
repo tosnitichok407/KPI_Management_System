@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -19,9 +19,8 @@ if (!isset($_SESSION["user_id"])) {
    CHECK ADMIN
 ========================= */
 
-if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
-    header("Location: ../dashboard.php");
-    exit;
+if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
+    redirectToRoleHome("../");
 }
 
 
@@ -29,7 +28,9 @@ if (!isset($_SESSION["role_id"]) || $_SESSION["role_id"] != 1) {
    GET ASSIGNMENT ID
 ========================= */
 
-$assignment_id = intval($_GET["id"] ?? 0);
+csrfRequirePost("../index.php?page=kpi-assignment");
+
+$assignment_id = intval($_POST["id"] ?? 0);
 
 if ($assignment_id <= 0) {
 
@@ -108,6 +109,8 @@ try {
     /* =========================
        ERROR
     ========================= */
+
+    error_log("Delete KPI assignment failed: " . $e->getMessage());
 
     header(
         "Location: ../index.php?page=kpi-assignment&error=delete_failed"

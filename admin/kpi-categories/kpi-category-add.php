@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -19,8 +19,7 @@ if (!isset($_SESSION["user_id"])) {
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -64,7 +63,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if ($category_name === "") {
+        if (!csrfVerify()) {
+
+        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
+
+    } elseif ($category_name === "") {
 
         $error = "กรุณากรอกชื่อหมวดหมู่ KPI";
 

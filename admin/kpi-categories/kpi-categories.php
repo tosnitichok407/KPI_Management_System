@@ -1,8 +1,6 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -18,8 +16,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -29,9 +26,11 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 |--------------------------------------------------------------------------
 */
 
-if (isset($_GET["delete"])) {
+if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST" && isset($_POST["delete"])) {
 
-    $category_id = (int) $_GET["delete"];
+    /* ลบผ่าน POST + CSRF token เท่านั้น (เดิมเป็นลิงก์ GET) */
+
+    $category_id = csrfVerify() ? (int) $_POST["delete"] : 0;
 
     if ($category_id > 0) {
 
@@ -74,11 +73,17 @@ if (isset($_GET["delete"])) {
                 $_SESSION["category_success"] =
                     "ลบ KPI Category เรียบร้อยแล้ว";
             }
-        } catch (PDOException $e) {
+                } catch (PDOException $e) {
+
+            error_log("Delete KPI category failed: " . $e->getMessage());
 
             $_SESSION["category_error"] =
                 "ไม่สามารถลบ KPI Category ได้";
         }
+    } else {
+
+        $_SESSION["category_error"] =
+            "ไม่สามารถลบ KPI Category ได้ กรุณาลองใหม่อีกครั้ง";
     }
 
     header("Location: ../index.php?page=kpi-categories");
@@ -294,12 +299,17 @@ unset($_SESSION["category_error"]);
                                                 แก้ไข
                                             </a>
 
-                                            <a
-                                                href="index.php?page=kpi-categories&delete=<?= (int) $category["category_id"] ?>"
-                                                class="btn-small danger"
-                                                onclick="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');">
-                                                ลบ
-                                            </a>
+                                            <form
+                                                method="POST"
+                                                action="index.php?page=kpi-categories"
+                                                class="inline-form"
+                                                onsubmit="return confirm('ต้องการลบ KPI Category นี้หรือไม่?');">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="delete" value="<?= (int) $category["category_id"] ?>">
+                                                <button type="submit" class="btn-small danger">
+                                                    ลบ
+                                                </button>
+                                            </form>
 
                                         </div>
 

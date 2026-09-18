@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -17,8 +17,7 @@ if (!isset($_SESSION["user_id"])) {
 }
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 }
 
 
@@ -110,7 +109,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    if ($employee_id <= 0) {
+        if (!csrfVerify()) {
+
+        $error = "Session expired. Please try again.";
+
+    }
+
+    elseif ($employee_id <= 0) {
 
         $error = "Please select an employee.";
 
@@ -122,9 +127,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     |--------------------------------------------------------------------------
     */
 
-    elseif ($username === "") {
+        elseif ($username === "") {
 
         $error = "Please enter username.";
+
+    }
+
+    elseif (mb_strlen($username) > 50) {
+
+        $error = "Username must not exceed 50 characters.";
+
+    }
+
+    elseif ($email !== "" && (mb_strlen($email) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL))) {
+
+        $error = "Invalid email address.";
 
     }
 
@@ -468,10 +485,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <section class="filter-card">
 
-        <form
+                <form
             method="POST"
             action="user-account-add.php"
         >
+
+            <?= csrfField() ?>
 
 
             <!-- =================================================
@@ -668,13 +687,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                  BUTTONS
             ================================================== -->
 
-            <div
-                style="
-                    margin-top: 25px;
-                    display: flex;
-                    gap: 10px;
-                "
-            >
+                        <div class="form-buttons">
                 <button
                     type="submit"
                     class="btn btn-primary"
@@ -684,10 +697,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                 <a
-                    href="../user-accounts/user-accounts.php"
+                    href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    Cancel
+                    ยกเลิก
                 </a>
 
             </div>

@@ -1,6 +1,6 @@
 <?php
 
-session_start();
+require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
 
@@ -20,8 +20,7 @@ if (!isset($_SESSION["user_id"])) {
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
-    header("Location: ../../dashboard.php");
-    exit;
+    redirectToRoleHome("../../");
 
 }
 
@@ -32,7 +31,9 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 |--------------------------------------------------------------------------
 */
 
-$employee_id = (int) ($_GET["id"] ?? 0);
+csrfRequirePost("../index.php?page=employees");
+
+$employee_id = (int) ($_POST["id"] ?? 0);
 
 if ($employee_id <= 0) {
 
@@ -172,9 +173,9 @@ try {
     |--------------------------------------------------------------------------
     */
 
-    // สำหรับตรวจสอบปัญหาในช่วงพัฒนา
-    die(
-        "ไม่สามารถลบพนักงานได้<br><br>" .
-        htmlspecialchars($e->getMessage())
-    );
+    // ไม่แสดงข้อความ error ของฐานข้อมูลให้ผู้ใช้ (บันทึกลง error log แทน)
+    error_log("Delete employee failed: " . $e->getMessage());
+
+    header("Location: ../index.php?page=employees&error=delete");
+    exit;
 }
