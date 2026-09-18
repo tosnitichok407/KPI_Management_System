@@ -140,6 +140,10 @@ $typeScores = [];
 $kpiLabels = [];
 $kpiScores = [];
 
+/* การ์ดรายไตรมาส: กำหนดค่าเริ่มต้นไว้เสมอ (ใช้ใน HTML ของหน้า home) */
+$quarterScores = [];
+$selectedDashboardYear = (int) date("Y");
+
 
 if ($page === "home") {
 
@@ -152,18 +156,13 @@ if ($page === "home") {
                     AND kp.score IS NOT NULL
         ORDER BY kp.performance_date
     ");
-    $quarterScores = [];
-
-    foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
+        foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
         $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
         $quarter = getQuarterFromDate($quarterRow["performance_date"]);
         $key = $year . "-" . $quarter;
         $quarterScores[$key][] = (float) $quarterRow["score"];
     }
 
-    $selectedDashboardYear = !empty($periods)
-        ? (int) date("Y", strtotime($periods[0]["start_date"]))
-        : (int) date("Y");
 
 
     /*
@@ -192,11 +191,33 @@ if ($page === "home") {
     |--------------------------------------------------------------------------
     */
 
-    if ($selectedPeriod <= 0 && !empty($periods)) {
+        if ($selectedPeriod <= 0 && !empty($periods)) {
 
         $selectedPeriod =
             (int) $periods[0]["period_id"];
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard Year (ปีของรอบประเมินที่เลือก สำหรับการ์ดรายไตรมาส)
+    |--------------------------------------------------------------------------
+    |
+    | เดิมคำนวณจาก $periods ก่อนโหลดข้อมูล จึงได้ปีปัจจุบันเสมอ
+    |
+    */
+
+    foreach ($periods as $period) {
+
+        if ((int) $period["period_id"] === $selectedPeriod) {
+
+            $selectedDashboardYear =
+                (int) date("Y", strtotime($period["start_date"]));
+
+            break;
+        }
+    }
+
 
 
     /*

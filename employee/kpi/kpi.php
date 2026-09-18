@@ -1105,11 +1105,9 @@ $totalCompetency =
                                                             type="number"
                                                             step="1"
                                                             name="actual"
-                                                            value="<?= htmlspecialchars(
-                                                                        (int) $kpi["actual"] ?? "",
-                                                                        ENT_QUOTES,
-                                                                        "UTF-8"
-                                                                    ) ?>"
+                                                                                                                        value="<?= $kpi["actual"] !== null
+                                                                        ? (int) $kpi["actual"]
+                                                                        : "" ?>"
                                                             placeholder="กรอกผลที่ทำได้"
                                                             required>
 
