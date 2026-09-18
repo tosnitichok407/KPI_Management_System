@@ -18,6 +18,14 @@ if (!isset($yearData)) {
     exit;
 }
 
+/* ค่าจาก manager/index.php (กำหนดค่าเริ่มต้นไว้ให้ editor/static analyzer เห็นว่าตัวแปรถูกประกาศ) */
+$page = $page ?? "home";
+$filterYear = (int) ($filterYear ?? date("Y"));
+$filterMonth = (int) ($filterMonth ?? 0);
+$filterDepartment = (int) ($filterDepartment ?? 0);
+$availableYears = $availableYears ?? [$filterYear];
+$monthNames = $monthNames ?? monthlyPeriodMonths();
+
 $showMonth = $showMonth ?? true;
 $showDepartment = $showDepartment ?? true;
 $extraHidden = $extraHidden ?? [];
