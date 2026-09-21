@@ -12,7 +12,7 @@ require_once __DIR__ . "/../../config/database.php";
 ========================= */
 
 if (!isset($_SESSION["user_id"])) {
-    header("Location: ../login.php");
+    header("Location: ../../login.php");
     exit;
 }
 
@@ -22,7 +22,7 @@ if (!isset($_SESSION["user_id"])) {
 ========================= */
 
 if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
-    redirectToRoleHome("../");
+    redirectToRoleHome("../../");
 }
 
 
