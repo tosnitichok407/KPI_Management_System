@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/../includes/security.php";
+require_once __DIR__ . "/../includes/kpi-score-helper.php";
 
 /*
 |--------------------------------------------------------------------------
@@ -243,51 +244,7 @@ function requireEmployeeExportAccess(): array
     return ["employee_id" => $employeeId];
 }
 
-/*
-| เกณฑ์ระดับผลงาน 5..1 ของแต่ละ KPI  → [kpi_id => [5 => "...", 4 => "...", ...]]
-| ใช้แหล่งเดียวต่อ KPI ตามลำดับ: kpi_score_criteria → kpi_score_levels → score_5..score_1 (ข้อมูลเก่า)
-*/
-function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
-{
-    $ids = array_values(array_unique(array_map(fn($kpi) => (int) $kpi["kpi_id"], $kpis)));
-    if (empty($ids)) {
-        return [];
-    }
-    $in = implode(",", array_fill(0, count($ids), "?"));
-
-    $fromCriteria = [];
-    $stmt = $pdo->prepare("SELECT kpi_id, score_level, criteria FROM kpi_score_criteria WHERE kpi_id IN ({$in})");
-    $stmt->execute($ids);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $fromCriteria[(int) $row["kpi_id"]][(int) $row["score_level"]] = trim($row["criteria"]);
-    }
-
-    $fromLevels = [];
-    $stmt = $pdo->prepare("SELECT kpi_id, score, criteria FROM kpi_score_levels WHERE kpi_id IN ({$in})");
-    $stmt->execute($ids);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $fromLevels[(int) $row["kpi_id"]][(int) round((float) $row["score"])] = trim($row["criteria"]);
-    }
-
-    $result = [];
-    foreach ($kpis as $kpi) {
-        $kpiId = (int) $kpi["kpi_id"];
-        if (!empty($fromCriteria[$kpiId])) {
-            $result[$kpiId] = $fromCriteria[$kpiId];
-        } elseif (!empty($fromLevels[$kpiId])) {
-            $result[$kpiId] = $fromLevels[$kpiId];
-        } else {
-            for ($level = 5; $level >= 1; $level--) {
-                $text = trim((string) ($kpi["score_" . $level] ?? ""));
-                if ($text !== "") {
-                    $result[$kpiId][$level] = $text;
-                }
-            }
-        }
-    }
-
-    return $result;
-}
+/* เกณฑ์ระดับผลงาน 5..1 ของแต่ละ KPI → loadKpiScoreCriteria() ใน includes/kpi-score-helper.php */
 
 function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int $month): array
 {

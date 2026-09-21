@@ -28,3 +28,5 @@ env/
 
 # XAMPP
 xampp/
+# ไฟล์สำรองข้อมูลผลงาน (มีข้อมูลพนักงาน ไม่ควรเข้า git)
+database/backups/

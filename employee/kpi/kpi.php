@@ -7,6 +7,7 @@ require_once __DIR__ . "/../../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 require_once __DIR__ . "/../includes/layout.php";
 require_once __DIR__ . "/../performance-export-data.php";
 
@@ -164,7 +165,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     a.target_value,
                     k.kpi_type,
                     k.kpi_name,
-                    k.max_score
+                    k.max_score,
+                    k.score_5,
+                    k.score_4,
+                    k.score_3,
+                    k.score_2,
+                    k.score_1
 
                 FROM kpi_assignments a
 
@@ -217,9 +223,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     if ($actual === "") {
 
                         $error = "กรุณากรอก Actual";
-                    } elseif (!ctype_digit($actual)) {
+                    } elseif (!preg_match('/^\d{1,13}(\.\d{1,2})?$/', $actual)) {
 
-                        $error = "กรุณากรอกผลที่ทำได้เป็นจำนวนเต็ม";
+                        $error = "กรุณากรอกผลที่ทำได้เป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
                     } elseif (
                         $assignment["target_value"] === null ||
                         $assignment["target_value"] === ""
@@ -228,34 +234,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $error = "KPI นี้ยังไม่ได้กำหนด Target โดย Admin";
                     } else {
 
-                        $targetValue = (int) $assignment["target_value"];
-                        $actualValue = (int) $actual;
+                        $targetValue = (float) $assignment["target_value"];
+                        $actualValue = (float) $actual;
 
-                        if ($targetValue <= 0) {
-
-                            $error = "Target ของ KPI ต้องมากกว่า 0";
-                        } else {
-
-                            /*
+                        /*
         |--------------------------------------------------------------------------
-        | Score = Actual / Target × 5
+        | เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนดไว้
+        |--------------------------------------------------------------------------
+        |
+        | ไม่ใช้สูตรสัดส่วน Actual / Target × 5 อีกต่อไป เพราะให้ผลไม่ตรงกับเกณฑ์
+        | ที่แสดงบนหน้าจอ เช่น เกณฑ์ "5 : >100%" กับ "4 : 100%" แต่สูตรสัดส่วน
+        | ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม ทั้งที่ต้องได้ 4
+        |
+        | รายละเอียดการตัดเกรดอยู่ใน includes/kpi-score-helper.php
         |--------------------------------------------------------------------------
         */
 
-                            $scoreValue =
-                                ($actualValue / $targetValue) * 5;
+                        $assignmentLevels =
+                            loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
 
-                            if ($scoreValue > 5) {
-                                $scoreValue = 5;
-                            }
+                        $grade = kpiPerformanceGrade(
+                            $assignmentLevels,
+                            $actualValue,
+                            $targetValue > 0 ? $targetValue : null
+                        );
 
-                            if ($scoreValue < 0) {
-                                $scoreValue = 0;
-                            }
+                        if ($grade === null) {
 
-                            $score = number_format(
-                                $scoreValue
-                            );
+                            $error = "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย"
+                                . " กรุณาติดต่อผู้ดูแลระบบ";
+                        } else {
+
+                            $score = (string) $grade;
                         }
                     }
 
@@ -371,11 +381,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $updateStmt->execute([
 
                             ":target" =>
-                            (int) $assignment["target_value"],
+                            (float) $assignment["target_value"],
 
                             ":actual" =>
                             $actual !== ""
-                                ? (int) $actual
+                                ? (float) $actual
                                 : null,
 
                             ":score" =>
@@ -451,11 +461,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             $selectedPeriod["start_date"],
 
                             ":target" =>
-                            (int) $assignment["target_value"],
+                            (float) $assignment["target_value"],
 
                             ":actual" =>
                             $actual !== ""
-                                ? (int) $actual
+                                ? (float) $actual
                                 : null,
 
                             ":score" =>
@@ -989,7 +999,7 @@ $totalCompetency =
 
                                             </div>
 
-                                            <!-- ระดับผลงาน 5..1 (แสดงทุก KPI) · ไฮไลต์ระดับของคะแนนที่บันทึก -->
+                                            <!-- ระดับผลงาน 5..1 (แสดงทุก KPI) · ไฮไลต์ระดับที่ได้จากผลงานที่บันทึก -->
 
                                             <?php
 
@@ -998,9 +1008,33 @@ $totalCompetency =
 
                                             $levels = $kpiCriteria[$kpiId] ?? [];
 
-                                            $currentLevel = ($kpi["score"] !== null && $kpi["score"] !== "")
-                                                ? (int) round((float) $kpi["score"])
-                                                : 0;
+                                            /*
+                                            | ไฮไลต์ตามเกณฑ์โดยตรง (ตัดเกรดจาก Actual ใหม่ทุกครั้ง)
+                                            | ผลงานเก่าที่บันทึกด้วยสูตรสัดส่วนเดิมจึงแสดงระดับที่ถูกต้อง
+                                            | แม้ยังไม่ได้คำนวณคะแนนย้อนหลัง
+                                            */
+
+                                            $currentLevel = 0;
+
+                                            if ($kpi["actual"] !== null && $kpi["actual"] !== "") {
+
+                                                $currentLevel = (int) kpiPerformanceGrade(
+                                                    $levels,
+                                                    (float) $kpi["actual"],
+                                                    (float) $kpi["target_value"] > 0
+                                                        ? (float) $kpi["target_value"]
+                                                        : null
+                                                );
+                                            } elseif ($kpi["score"] !== null && $kpi["score"] !== "") {
+
+                                                $currentLevel = (int) round((float) $kpi["score"]);
+                                            }
+
+                                            $savedScore = ($kpi["score"] !== null && $kpi["score"] !== "")
+                                                ? (float) $kpi["score"]
+                                                : null;
+
+                                            $weightValue = (float) ($kpi["weight"] ?? 0);
 
                                             ?>
 
@@ -1035,6 +1069,28 @@ $totalCompetency =
                                                     </div>
 
                                                 <?php endfor; ?>
+
+                                                <?php if ($currentLevel > 0): ?>
+
+                                                    <div class="score-display">
+
+                                                        เกรดที่ได้: <?= $currentLevel ?> / 5
+                                                        · คะแนนจริง <?= number_format($weightValue * $currentLevel, 2) ?>
+                                                        (Weight <?= number_format($weightValue, 2) ?> × <?= $currentLevel ?>)
+
+                                                        <?php if ($savedScore !== null && abs($savedScore - $currentLevel) > 0.001): ?>
+
+                                                            <br>
+                                                            <small>
+                                                                คะแนนที่บันทึกไว้เดิมคือ <?= number_format($savedScore, 2) ?>
+                                                                (คำนวณด้วยสูตรเก่า) · บันทึกใหม่อีกครั้งเพื่อปรับให้ตรงเกณฑ์
+                                                            </small>
+
+                                                        <?php endif; ?>
+
+                                                    </div>
+
+                                                <?php endif; ?>
 
                                             </div>
 
@@ -1105,28 +1161,23 @@ $totalCompetency =
 
                                                         <input
                                                             type="number"
-                                                            step="1"
+                                                            step="0.01"
+                                                            min="0"
                                                             name="actual"
-                                                                                                                        value="<?= $kpi["actual"] !== null
-                                                                        ? (int) $kpi["actual"]
+                                                            value="<?= $kpi["actual"] !== null
+                                                                        ? rtrim(rtrim(number_format((float) $kpi["actual"], 2, ".", ""), "0"), ".")
                                                                         : "" ?>"
                                                             placeholder="กรอกผลที่ทำได้"
                                                             required>
 
                                                         <div class="input-hint">
 
-                                                            คะแนนจริง = Weight × Criteria
+                                                            ระบบจะเทียบผลที่ทำได้กับเกณฑ์ด้านซ้ายเพื่อหาเกรด 1-5
+                                                            แล้วคิดคะแนนจริง = Weight × เกรด
 
                                                         </div>
 
                                                     </div>
-
-                                                    <?php if (
-                                                        $kpi["score"] !== null &&
-                                                        $kpi["score"] !== ""
-                                                    ): ?>
-
-                                                    <?php endif; ?>
 
                                                 </div>
                                                 <button

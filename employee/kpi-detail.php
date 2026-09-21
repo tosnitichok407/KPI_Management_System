@@ -6,6 +6,7 @@ require_once __DIR__ . "/../config/database.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../includes/kpi-score-helper.php";
 require_once __DIR__ . "/includes/layout.php";
 
 
@@ -70,6 +71,11 @@ $sql = "
         k.description,
         k.unit,
         k.max_score,
+        k.score_5,
+        k.score_4,
+        k.score_3,
+        k.score_2,
+        k.score_1,
 
         a.assignment_year,
         COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
@@ -117,6 +123,9 @@ $error = "";
 $success = "";
 
 $targetValue = (float) $kpi["target_value"];
+
+/* เกณฑ์ระดับผลงาน 5..1 ของ KPI นี้ (ใช้ตัดเกรดแทนสูตรสัดส่วนเดิม) */
+$kpiLevels = loadKpiScoreCriteria($pdo, [$kpi])[(int) $kpi["kpi_id"]] ?? [];
 
 $currentYear = (int) date("Y");
 $currentMonth = (int) date("n");
@@ -188,10 +197,10 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
         $error =
             "กรุณากรอก Actual";
-    } elseif (!is_numeric($actual)) {
+    } elseif (!preg_match('/^\d{1,13}(\.\d{1,2})?$/', (string) $actual)) {
 
         $error =
-            "Actual ต้องเป็นตัวเลข";
+            "Actual ต้องเป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
     } else {
 
 
@@ -205,40 +214,30 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
             (float) $actual;
 
 
-        if ($targetValue <= 0) {
+        /*
+        ------------------------------------------------------
+        เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนด
+
+        เดิมใช้สูตรสัดส่วน Actual / Target × 5 ซึ่งไม่ตรงกับเกณฑ์
+        ที่แสดงไว้ เช่น "5 : >100%" กับ "4 : 100%" แต่สูตรเดิม
+        ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม
+
+        รายละเอียดอยู่ใน includes/kpi-score-helper.php
+        ------------------------------------------------------
+        */
+
+        $score = kpiPerformanceGrade(
+            $kpiLevels,
+            $actualValue,
+            $targetValue > 0 ? $targetValue : null
+        );
+
+
+        if ($score === null) {
 
             $error =
-                "Target ต้องมากกว่า 0";
+                "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
         } else {
-
-
-            /*
-            ------------------------------------------------------
-            Score Formula
-            ------------------------------------------------------
-
-            Actual / Target × 5
-
-            Maximum = 5
-            ------------------------------------------------------
-            */
-
-            $score =
-                ($actualValue / $targetValue) * 5;
-
-
-            if ($score > 5) {
-                $score = 5;
-            }
-
-
-            if ($score < 0) {
-                $score = 0;
-            }
-
-
-            $score =
-                round($score, 2);
 
 
             /*
