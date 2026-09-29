@@ -3,6 +3,10 @@
 ระบบจัดการและประเมินผล KPI ของพนักงานรายเดือน พัฒนาด้วย PHP + MySQL/MariaDB (PDO) สำหรับใช้งานบน XAMPP
 แยกการใช้งานเป็น 3 บทบาท คือ **Admin**, **Manager** และ **Employee** พร้อมส่งออกแบบฟอร์มประเมินตามรูปแบบของบริษัทเป็น **Excel** และ **PDF**
 
+> 📐 **นักพัฒนาที่จะแก้โค้ด** อ่าน [ARCHITECTURE.md](ARCHITECTURE.md) — อธิบายว่าแต่ละส่วนเชื่อมกันอย่างไร
+> ข้อตกลงร่วมที่ห้ามแก้ข้างเดียว และโค้ดสำคัญพร้อมคำอธิบาย
+> README ฉบับนี้ตอบว่า "ระบบทำอะไรได้บ้าง และติดตั้งอย่างไร"
+
 ---
 
 ## สารบัญ
@@ -39,7 +43,7 @@ Manager : ดู Dashboard / ผลรายแผนก / ผลรายคน
 | **รอบประเมิน = 1 เดือน** | `evaluation_periods` 1 แถวต่อ (ปี, เดือน) ระบบคำนวณ Quarter และวันเริ่ม-สิ้นสุดให้อัตโนมัติ |
 | **การมอบหมาย KPI = รายปี** | `kpi_assignments` 1 แถวต่อ (KPI, พนักงาน, ปี) ใช้ซ้ำทุกเดือน กำหนดช่วงที่มีผลด้วย `start_date` / `end_date` ได้ |
 | **ผลงาน = การมอบหมาย + เดือน** | `kpi_performances` 1 แถวต่อ (assignment, รอบประเมิน) |
-| **น้ำหนักรวมต่อคน = 100%** | Performance + Competency ของพนักงานแต่ละคนในปีเดียวกันรวมกันไม่เกิน 100% (ระบบตรวจตอนมอบหมาย) |
+| **น้ำหนักรวมต่อคน = 100%** | Performance + Competency ของพนักงานแต่ละคนในปีเดียวกันรวมกันไม่เกิน 100% (ระบบตรวจยอดรวมทั้งสองประเภทตอนมอบหมายและตอนแก้ไข) |
 
 การเข้าสู่ระบบส่งผู้ใช้ไปตาม `role_id`
 
@@ -108,8 +112,16 @@ Manager : ดู Dashboard / ผลรายแผนก / ผลรายคน
 
 | ประเภท | วิธีได้คะแนน (เกรด 1-5) |
 | --- | --- |
-| Performance | พนักงานกรอก Actual ระบบคำนวณ `Actual ÷ Target × 5` (ปัดเป็นจำนวนเต็ม สูงสุด 5) |
+| Performance | พนักงานกรอก Actual ระบบเทียบกับ **เกณฑ์ระดับผลงาน (Criteria)** ของ KPI นั้นเพื่อหาเกรด 1-5 |
 | Competency | พนักงาน/ผู้ประเมินเลือกระดับ 1-5 ตามเกณฑ์ของ KPI |
+
+การตัดเกรดอยู่ใน [`includes/kpi-score-helper.php`](includes/kpi-score-helper.php) ใช้ร่วมกันทั้ง `employee/kpi/kpi.php`
+และ `employee/kpi-detail.php` — แปลงข้อความเกณฑ์เป็นกฎเชิงตัวเลข รองรับ `>100%`, `100%`, `99-90%`, `<5%`,
+`ตรงเวลา 95% - 97%`, `ความพึงพอใจ 90% ขึ้นไป`, `ต่ำกว่า 85%`, `ไม่เกิน 3 ครั้ง`
+รายละเอียดการทำงานดูใน [ARCHITECTURE.md](ARCHITECTURE.md#การตัดเกรด-kpi)
+
+> KPI ที่ยังไม่มีเกณฑ์เชิงตัวเลข (เกณฑ์เป็นข้อความล้วน) จะใช้สูตรสัดส่วน `Actual ÷ Target × 5`
+> ปัดเป็นระดับเต็ม 1-5 เป็นตัวสำรอง — ทางที่ถูกต้องคือให้ Admin กรอกเกณฑ์ 5..1 ให้ครบ
 
 ### คะแนนในแบบฟอร์ม
 
@@ -137,11 +149,16 @@ KPI ที่ยังไม่ประเมินนับคะแนนจ�
 
 ### แหล่งเกณฑ์ระดับผลงาน 5..1
 
-`loadKpiScoreCriteria()` อ่านตามลำดับความสำคัญ และใช้ร่วมกันทั้งหน้า KPI ของฉันและแบบฟอร์ม Excel/PDF
+`loadKpiScoreCriteria()` ใน `includes/kpi-score-helper.php` อ่านตามลำดับความสำคัญ **และเลือกแหล่งเดียวต่อ KPI**
+(ไม่ผสมข้ามแหล่ง) ใช้ร่วมกันทั้งหน้า KPI ของฉัน การตัดเกรดตอนบันทึก และแบบฟอร์ม Excel/PDF
 
-1. `kpi_score_criteria` (หน้าเพิ่ม KPI ของ Admin บันทึกที่นี่)
+1. `kpi_score_criteria` (หน้าเพิ่ม KPI และหน้าแก้ไข KPI ของ Admin บันทึกที่นี่ ผ่าน `saveKpiScoreCriteria()`)
 2. `kpi_score_levels`
-3. `kpi_indicators.score_5` … `score_1` (หน้าแก้ไข KPI ของ Admin บันทึกที่นี่)
+3. `kpi_indicators.score_5` … `score_1` (ข้อมูลเก่า · หน้าเพิ่ม/แก้ไขเขียนสำเนาไว้ด้วย)
+
+KPI "มูลค่าไม่ต่อสัญญา" ใช้กฎเฉพาะที่กำหนดใน `includes/kpi-score-helper.php` (`NON_RENEWAL_KPI_CRITERIA`) แทนเกณฑ์ในฐานข้อมูลเสมอ ทุกหน้าและไฟล์ Export จึงใช้เกณฑ์เดียวกัน
+
+ถ้าผู้เรียกไม่ได้ `SELECT` คอลัมน์ `score_5..score_1` มาด้วย ฟังก์ชันจะ query เพิ่มเองสำหรับ KPI ที่ตกมาถึงข้อ 3
 
 ---
 
@@ -177,7 +194,7 @@ KPI ที่ยังไม่ประเมินนับคะแนนจ�
    CREATE DATABASE kpi_management_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
 
-4. นำเข้าโครงสร้างตารางและข้อมูลตั้งต้น (ดู [ฐานข้อมูล](#ฐานข้อมูล)) — **repository นี้ยังไม่มีไฟล์ schema ตั้งต้น** ต้องใช้ไฟล์ dump จากผู้พัฒนา
+4. นำเข้าโครงสร้างตารางจาก [`database/schema.sql`](database/schema.sql) แล้วเพิ่มข้อมูลตั้งต้น (roles 1 admin / 2 manager / 3 employee และบัญชี Admin) หรือใช้ไฟล์ dump จากผู้พัฒนา
 5. ตรวจสอบค่าการเชื่อมต่อใน [`config/database.php`](config/database.php)
 
    | ค่า | ค่าเริ่มต้น |
@@ -242,11 +259,19 @@ AND a.status = 'Active'
 | --- | --- | --- |
 | 1 | `20260911_monthly_evaluation_periods.sql` | เพิ่มปี/เดือน/Quarter ให้รอบประเมิน และบังคับ 1 รอบต่อเดือน |
 | 2 | `20260911_annual_assignment_monthly_performance.sql` | การมอบหมายรายปี (unique ต่อปี) และผลงาน 1 แถวต่อการมอบหมายต่อเดือน |
+| 3 | `20260921_recalculate_kpi_scores.php` | คำนวณคะแนน Performance ที่บันทึกด้วยสูตรสัดส่วนเดิมใหม่ให้ตรงเกณฑ์ |
 
-ในไฟล์มี pre-check ที่ต้องผ่านก่อน และไม่มีการลบตาราง/คอลัมน์/ข้อมูลเดิม
+ในไฟล์ SQL มี pre-check ที่ต้องผ่านก่อน และไม่มีการลบตาราง/คอลัมน์/ข้อมูลเดิม
 
 ```bash
 /Applications/XAMPP/xamppfiles/bin/mysql -u root kpi_management_system < database/migrations/20260911_monthly_evaluation_periods.sql
+```
+
+รายการที่ 3 เป็นสคริปต์ PHP (CLI เท่านั้น) ค่าเริ่มต้นเป็น **dry run** ไม่แตะข้อมูล ต้องใส่ `--apply` จึงจะเขียนจริง
+
+```bash
+php database/migrations/20260921_recalculate_kpi_scores.php                                   # ดูผลก่อน
+php database/migrations/20260921_recalculate_kpi_scores.php --apply --backup=backup.csv       # เขียนจริง + สำรอง
 ```
 
 ### Demo Seed — `database/seeds/`
@@ -301,6 +326,7 @@ KPI-System/
 │   └── performance-export-pdf.php    # Export PDF
 ├── includes/
 │   ├── security.php              # เริ่ม session (HttpOnly/SameSite/strict mode), CSRF token, redirect ตามบทบาท
+│   ├── kpi-score-helper.php      # ตัดเกรด 1-5 จากเกณฑ์ระดับผลงาน + โหลดเกณฑ์จากฐานข้อมูล
 │   ├── monthly-period-helper.php # ชื่อเดือน / รายละเอียดรอบรายเดือน / ค้นหารอบ
 │   ├── quarter-helper.php        # Quarter จากเดือน/วันที่
 │   ├── period-picker.php         # ตัวเลือกปี + เดือนแบบปุ่ม (Admin Summary, Employee)
@@ -315,12 +341,12 @@ KPI-System/
 │   └── images/
 ├── config/database.php           # การเชื่อมต่อฐานข้อมูล (PDO)
 ├── database/
+│   ├── schema.sql                # โครงสร้างตารางทั้งหมด (ไม่มีข้อมูล)
 │   ├── migrations/               # SQL migrations
 │   └── seeds/                    # Demo seed (CLI เท่านั้น)
 ├── vendor/                       # Dompdf, PhpSpreadsheet (Composer)
 ├── login.php                     # เข้าสู่ระบบ + บันทึก login_logs + redirect ตามบทบาท
 ├── logout.php                    # ออกจากระบบ
-├── login-test.php                # หน้า debug ทดสอบ Login (ลบก่อนขึ้นระบบจริง)
 └── composer.json
 ```
 
@@ -340,7 +366,10 @@ KPI-System/
 มีอยู่แล้ว
 
 - รหัสผ่านเก็บด้วย `password_hash()` และตรวจด้วย `password_verify()`
-- `session_regenerate_id()` หลังเข้าสู่ระบบสำเร็จ และ `logout.php` ล้าง session + cookie
+- `session_regenerate_id()` หลังเข้าสู่ระบบสำเร็จ และ `logout.php` ล้าง session + cookie (ลิงก์ออกจากระบบต้องมี CSRF token)
+- Session หมดอายุเมื่อไม่ใช้งาน 30 นาที และตรวจสถานะบัญชี/พนักงานซ้ำทุก request (ปิดบัญชีแล้ว session ที่ค้างอยู่ถูกตัดใน request ถัดไป)
+- Login ตรวจรหัสผ่านก่อนสถานะบัญชี ผู้ที่ไม่รู้รหัสผ่านได้ข้อความเดียวกันเสมอ
+- พนักงานบันทึกผลงานได้เฉพาะรอบประเมินที่สถานะ `Open`
 - ตรวจสถานะบัญชีและสถานะพนักงานก่อนเข้าสู่ระบบ บันทึกทุกความพยายามลง `login_logs`
 - หน้า Admin และ Manager ตรวจ `role_id` ก่อนแสดงผล ผู้ใช้บทบาทอื่นถูกส่งกลับหน้าแรกของบทบาทตัวเอง
 - หน้าพนักงานและไฟล์ Export ใช้ `employee_id` จาก session จึงแสดงเฉพาะข้อมูลของผู้ที่ login อยู่ (หน้าแรกและข้อมูลส่วนตัวตรวจ `role_id = 3` เพิ่ม ส่วนหน้าอื่นตรวจเพียงว่า login และมี `employee_id`)
@@ -350,11 +379,9 @@ KPI-System/
 - Login ถูกจำกัดชั่วคราวเมื่อล้มเหลวเกิน 10 ครั้งใน 15 นาที (นับจาก `login_logs` ต่อ username / IP)
 - ข้อความ error ของฐานข้อมูลไม่แสดงให้ผู้ใช้ (บันทึกลง error log ของ PHP แทน)
 - `config/`, `includes/`, `database/`, `vendor/` มี `.htaccess` ปิดการเข้าถึงผ่าน URL โดยตรง
-- `login-test.php` เปิดได้เฉพาะจาก localhost (127.0.0.1 / ::1)
 
 ก่อนใช้งานจริง
 
-- ลบ `login-test.php`
 - เปลี่ยนบัญชีฐานข้อมูลใน `config/database.php` (ไม่ใช้ `root` ที่ไม่มีรหัสผ่าน)
 - ปิด `display_errors` และบันทึก error ลง log, ใช้ HTTPS (session cookie จะเป็น `Secure` ให้อัตโนมัติ)
 - สำรองฐานข้อมูลเป็นประจำ
@@ -366,8 +393,6 @@ KPI-System/
 | เรื่อง | รายละเอียด |
 | --- | --- |
 | ลบ KPI | ปุ่มลบในหน้าจัดการ KPI จะปฏิเสธเมื่อ KPI ถูกมอบหมายแล้ว (`kpi_assignments` / `employee_kpi`) เพราะการลบจะ CASCADE ไปถึงผลงานของพนักงาน |
-
-| ไม่มี schema ตั้งต้นใน repository | ติดตั้งเครื่องใหม่ต้องใช้ไฟล์ dump จากผู้พัฒนา |
-| เกณฑ์คะแนนบันทึกคนละที่ | หน้าเพิ่ม KPI บันทึกใน `kpi_score_criteria` แต่หน้าแก้ไข KPI อ่าน/บันทึกที่ `score_5..score_1` — KPI ที่มีเกณฑ์ใน `kpi_score_criteria` หรือ `kpi_score_levels` อยู่แล้ว จะแก้เกณฑ์ผ่านหน้าแก้ไขไม่มีผล |
-| สูตรคะแนน Performance เป็นเชิงเส้น | `Actual ÷ Target × 5` ไม่ได้อ้างอิงช่วงในเกณฑ์ของ KPI และใช้ไม่ได้กับ KPI แบบ "ยิ่งน้อยยิ่งดี" (เช่น มูลค่าไม่ต่อสัญญา < 5%) |
+| คะแนนเป็นการรายงานตัวเอง ไม่มีขั้นอนุมัติ | คอลัมน์ `kpi_performances.status` (Draft/Submitted/Approved) ถูกเขียนแต่ไม่มี query ใดกรอง — พนักงานบันทึกแล้วคะแนนขึ้นรายงานผู้บริหารและไฟล์ Export ทันที และระบบยังไม่มีหน้าให้หัวหน้าให้คะแนนหรืออนุมัติ |
+| Manager ไม่จำกัดแผนก | `manager/index.php` อ่าน `$_SESSION["department_id"]` แต่ไม่ได้ใช้กรอง · `manager/feedback.php` ไม่ตรวจว่าพนักงานอยู่ในขอบเขตของหัวหน้าคนนั้น (Feedback แยกแถวตามหัวหน้า จึงไม่เขียนทับของหัวหน้าคนอื่น แต่หน้าจอ Manager แสดงรายการล่าสุดของเดือนนั้น) |
 | Feedback ยังไม่มีสถานะอ่านแล้ว | พนักงานไม่มีการแจ้งเตือน Feedback ใหม่ |
