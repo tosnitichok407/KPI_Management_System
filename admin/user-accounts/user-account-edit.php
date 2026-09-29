@@ -317,6 +317,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 } catch (PDOException $e) {
 
+        error_log("admin/user-accounts/user-account-edit: " . $e->getMessage());
+
                     $error =
                         "ไม่สามารถแก้ไข Account ได้";
                 }

@@ -237,13 +237,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                 /* =============================================
-                   CHECK TOTAL WEIGHT BY KPI TYPE
+                   CHECK TOTAL WEIGHT
 
-                   แยก:
-                   - Competency
-                   - Performance
-
-                   และไม่รวม Assignment ที่กำลังแก้ไข
+                   Performance + Competency ของพนักงานในปีเดียวกัน
+                   รวมกันไม่เกิน 100% (ไม่รวม Assignment ที่กำลังแก้ไข)
                 ============================================= */
 
                 $weight_sql = "
@@ -252,12 +249,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     FROM kpi_assignments a
 
-                    INNER JOIN kpi_indicators k
-                        ON a.kpi_id = k.kpi_id
-
                     WHERE a.employee_id = ?
                     AND a.assignment_year = ?
-                    AND k.kpi_type = ?
                     AND a.status = 'Active'
                     AND a.assignment_id != ?
                 ";
@@ -268,7 +261,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $weight_stmt->execute([
                     $employee_id,
                     $assignment_year,
-                    $kpi_type,
                     $assignment_id
                 ]);
 
@@ -307,9 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if ($new_total_weight > 100) {
 
                     $error =
-                        "ไม่สามารถบันทึกได้ เพราะ Weight รวมของ "
-                        . $kpi_type
-                        . " จะเป็น "
+                        "ไม่สามารถบันทึกได้ เพราะ Weight รวม (Performance + Competency) จะเป็น "
                         . number_format(
                             $new_total_weight,
                             2

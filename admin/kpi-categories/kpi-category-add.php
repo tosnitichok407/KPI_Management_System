@@ -175,6 +175,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/kpi-categories/kpi-category-add: " . $e->getMessage());
+
             $error =
                 "ไม่สามารถเพิ่ม KPI Category ได้ กรุณาลองใหม่อีกครั้ง";
         }

@@ -295,7 +295,7 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $competencyScore = 0;
     foreach ($kpis as &$kpi) {
         $kpi["criteria"] = $criteria[(int) $kpi["kpi_id"]] ?? [];
-        $kpi["target_value"] = $kpi["assignment_target"];
+        $kpi["target_value"] = kpiEffectiveTarget($kpi, $kpi["assignment_target"]);
         $kpi["actual_value"] = $kpi["actual"];
         $kpi["score_value"] = $kpi["score"];
         $kpi["weight_value"] = (float) $kpi["assignment_weight"];

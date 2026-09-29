@@ -251,6 +251,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/employees/employee-edit: " . $e->getMessage());
+
             $error = "Unable to update employee.";
 
         }

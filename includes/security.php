@@ -36,6 +36,95 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
+/*
+|--------------------------------------------------------------------------
+| Idle Timeout
+|--------------------------------------------------------------------------
+|
+| ไม่มีการใช้งานเกิน SESSION_IDLE_TIMEOUT วินาที → ล้าง session (ต้อง login ใหม่)
+| หน้าแต่ละหน้าตรวจ $_SESSION["user_id"] อยู่แล้ว จึง redirect ไปหน้า login เอง
+|
+*/
+
+const SESSION_IDLE_TIMEOUT = 1800; // 30 นาที
+
+if (isset($_SESSION["user_id"])) {
+
+    $lastActivity = (int) ($_SESSION["last_activity"] ?? 0);
+
+    if ($lastActivity > 0 && (time() - $lastActivity) > SESSION_IDLE_TIMEOUT) {
+
+        securityClearSession();
+    } else {
+
+        $_SESSION["last_activity"] = time();
+    }
+}
+
+
+/* ล้างข้อมูลผู้ใช้ใน session และเปลี่ยนเลข session (ใช้ตอนหมดเวลา / บัญชีถูกปิด) */
+function securityClearSession(): void
+{
+    $_SESSION = [];
+
+    if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+        session_regenerate_id(true);
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ตรวจสถานะบัญชีซ้ำทุก request
+|--------------------------------------------------------------------------
+|
+| config/database.php เรียกฟังก์ชันนี้หลังเชื่อมต่อสำเร็จ (ทุกหน้า require security.php
+| ก่อน database.php) · ถ้า Admin ปิดบัญชีหรือปิดพนักงานระหว่างที่ผู้ใช้ login ค้างอยู่
+| session จะถูกล้างใน request ถัดไป · role_id ใน session ถูกอัปเดตตามฐานข้อมูลเสมอ
+|
+*/
+
+function securityRecheckAccount(PDO $pdo): void
+{
+    if (!isset($_SESSION["user_id"])) {
+        return;
+    }
+
+    try {
+
+        $stmt = $pdo->prepare("
+            SELECT
+                u.role_id,
+                u.status AS user_status,
+                e.status AS employee_status
+            FROM users u
+            INNER JOIN employees e ON e.employee_id = u.employee_id
+            WHERE u.user_id = :user_id
+            LIMIT 1
+        ");
+        $stmt->execute([":user_id" => (int) $_SESSION["user_id"]]);
+
+        $account = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (
+            !$account
+            || strtolower((string) $account["user_status"]) !== "active"
+            || strtolower((string) $account["employee_status"]) !== "active"
+        ) {
+            securityClearSession();
+            return;
+        }
+
+        $_SESSION["role_id"] = $account["role_id"];
+
+    } catch (PDOException $e) {
+
+        // ตรวจไม่ได้ (ฐานข้อมูลมีปัญหาชั่วคราว) ไม่ตัดผู้ใช้ออก แต่บันทึกไว้
+        error_log("Session account recheck failed: " . $e->getMessage());
+    }
+}
+
 if (!headers_sent()) {
     header("X-Frame-Options: SAMEORIGIN");
     header("X-Content-Type-Options: nosniff");
@@ -105,6 +194,12 @@ function roleHomeUrl(string $root = ""): string
         default:
             return $root . "login.php";
     }
+}
+
+/* ลิงก์ออกจากระบบพร้อม CSRF token (logout.php จะปฏิเสธถ้า token ไม่ตรง) */
+function logoutUrl(string $root = ""): string
+{
+    return $root . "logout.php?token=" . urlencode(csrfToken());
 }
 
 function redirectToRoleHome(string $root = ""): void

@@ -111,7 +111,7 @@ $currentPage =
     <div class="sidebar-bottom">
 
         <a
-            href="../logout.php"
+            href="<?= htmlspecialchars(logoutUrl("../"), ENT_QUOTES, "UTF-8") ?>"
             class="logout-button">
 
             ออกจากระบบ

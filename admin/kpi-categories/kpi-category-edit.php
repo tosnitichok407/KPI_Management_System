@@ -211,6 +211,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/kpi-categories/kpi-category-edit: " . $e->getMessage());
+
             $error =
                 "ไม่สามารถแก้ไข KPI Category ได้ กรุณาลองใหม่อีกครั้ง";
         }

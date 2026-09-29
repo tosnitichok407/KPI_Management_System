@@ -9,7 +9,6 @@ require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 require_once __DIR__ . "/../includes/layout.php";
-require_once __DIR__ . "/../performance-export-data.php";
 
 
 /*
@@ -147,6 +146,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $error = "ยังไม่มีรอบประเมินของเดือน"
             . $thaiMonths[$selectedMonth] . " " . $selectedYear
             . " กรุณาติดต่อผู้ดูแลระบบ";
+    } elseif (($selectedPeriod["status"] ?? "") !== "Open") {
+
+        $error = "รอบประเมินของเดือน"
+            . $thaiMonths[$selectedMonth] . " " . $selectedYear
+            . " ปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
     } else {
 
         try {
@@ -194,6 +198,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             ]);
 
             $assignment = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($assignment && isNonRenewalKpi($assignment)) {
+                $assignment["target_value"] = NON_RENEWAL_KPI_TARGET;
+            }
 
 
             if (!$assignment) {
@@ -250,14 +258,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         |--------------------------------------------------------------------------
         */
 
-                        $assignmentLevels =
-                            loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
+                        if (isNonRenewalKpi($assignment)) {
 
-                        $grade = kpiPerformanceGrade(
-                            $assignmentLevels,
-                            $actualValue,
-                            $targetValue > 0 ? $targetValue : null
-                        );
+                            $grade = nonRenewalKpiGrade($actualValue);
+                        } else {
+
+                            $assignmentLevels =
+                                loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
+
+                            $grade = kpiPerformanceGrade(
+                                $assignmentLevels,
+                                $actualValue,
+                                $targetValue > 0 ? $targetValue : null
+                            );
+                        }
 
                         if ($grade === null) {
 
@@ -588,7 +602,16 @@ try {
 
     $assignments =
         $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($assignments as &$row) {
+        if (isNonRenewalKpi($row)) {
+            $row["target_value"] = NON_RENEWAL_KPI_TARGET;
+        }
+    }
+    unset($row);
 } catch (PDOException $e) {
+
+        error_log("employee/kpi/kpi: " . $e->getMessage());
 
     $assignments = [];
 
@@ -638,8 +661,16 @@ foreach ($assignments as $assignment) {
 try {
     $kpiCriteria = loadKpiScoreCriteria($pdo, $assignments);
 } catch (PDOException $e) {
+
+        error_log("employee/kpi/kpi: " . $e->getMessage());
     // ถ้าตารางเกณฑ์มีปัญหา ไม่ให้ทั้งหน้า KPI พัง
     $kpiCriteria = [];
+}
+
+foreach ($assignments as $row) {
+    if (isNonRenewalKpi($row)) {
+        $kpiCriteria[(int) $row["kpi_id"]] = NON_RENEWAL_KPI_CRITERIA;
+    }
 }
 
 
@@ -1016,7 +1047,10 @@ $totalCompetency =
 
                                             $currentLevel = 0;
 
-                                            if ($kpi["actual"] !== null && $kpi["actual"] !== "") {
+                                            if ($kpi["actual"] !== null && $kpi["actual"] !== "" && isNonRenewalKpi($kpi)) {
+
+                                                $currentLevel = nonRenewalKpiGrade((float) $kpi["actual"]);
+                                            } elseif ($kpi["actual"] !== null && $kpi["actual"] !== "") {
 
                                                 $currentLevel = (int) kpiPerformanceGrade(
                                                     $levels,

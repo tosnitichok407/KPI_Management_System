@@ -127,6 +127,8 @@ try {
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 
+        error_log("admin/employees/employees: " . $e->getMessage());
+
     $employees = [];
 
     $error = "Unable to load employee data.";

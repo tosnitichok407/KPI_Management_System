@@ -158,6 +158,8 @@ try {
 
 } catch (PDOException $e) {
 
+        error_log("admin/user-accounts/user-accounts: " . $e->getMessage());
+
     $employees = [];
 
     $error = "Unable to load account data.";
@@ -273,6 +275,8 @@ try {
     }
 
 } catch (PDOException $e) {
+
+        error_log("admin/user-accounts/user-accounts: " . $e->getMessage());
 
     $error = $error ?? "Unable to load account summary.";
 }

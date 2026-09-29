@@ -50,6 +50,65 @@ const KPI_CRITERIA_TARGET_TOLERANCE = 1.5;
 
 /*
 |--------------------------------------------------------------------------
+| กฎเฉพาะ KPI "มูลค่าไม่ต่อสัญญา"
+|--------------------------------------------------------------------------
+|
+| เป้าหมาย 100% · ตัดเกรดจาก Actual (%) ตามสูตร Excel ของบริษัท:
+|   > 20%      → 5
+|   15% - 20%  → 4
+|   10% - 14%  → 3
+|   5% - 9%    → 2
+|   < 5%       → 1
+| ค่าทศนิยมที่ตกช่องว่างของสูตร Excel (เช่น 14.5%) ปัดลงไปเกรดล่าง
+|
+| กฎนี้อยู่ที่ไฟล์กลางเพื่อให้ทุกเส้นทางใช้เกณฑ์เดียวกัน:
+| หน้า KPI ของฉัน · หน้ารายละเอียด KPI · แบบฟอร์ม Excel/PDF · สคริปต์คำนวณย้อนหลัง
+| loadKpiScoreCriteria() จะคืนเกณฑ์ชุดนี้แทนเกณฑ์ในฐานข้อมูลของ KPI ตัวนี้เสมอ
+|
+*/
+
+const NON_RENEWAL_KPI_NAME = "มูลค่าไม่ต่อสัญญา";
+const NON_RENEWAL_KPI_TARGET = 100;
+
+const NON_RENEWAL_KPI_CRITERIA = [
+    5 => ">20%",
+    4 => "15% - 20%",
+    3 => "10% - 14%",
+    2 => "5% - 9%",
+    1 => "<5%",
+];
+
+function isNonRenewalKpi(array $kpi): bool
+{
+    return mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false;
+}
+
+function nonRenewalKpiGrade(float $actual): int
+{
+    if ($actual > 20) {
+        return 5;
+    }
+    if ($actual >= 15) {
+        return 4;
+    }
+    if ($actual >= 10) {
+        return 3;
+    }
+    if ($actual >= 5) {
+        return 2;
+    }
+    return 1;
+}
+
+/* เป้าหมายที่ใช้จริงของ KPI (KPI "มูลค่าไม่ต่อสัญญา" ใช้ 100% เสมอ) */
+function kpiEffectiveTarget(array $kpi, $assignedTarget)
+{
+    return isNonRenewalKpi($kpi) ? NON_RENEWAL_KPI_TARGET : $assignedTarget;
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | แปลงข้อความเกณฑ์ → กฎเชิงตัวเลข
 |--------------------------------------------------------------------------
 */
@@ -406,7 +465,7 @@ function kpiPerformanceGrade(array $levels, float $actual, ?float $target): ?int
 | ใช้แหล่งเดียวต่อ KPI ตามลำดับ: kpi_score_criteria → kpi_score_levels → score_5..score_1 (ข้อมูลเก่า)
 |
 */
-function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
+function loadKpiScoreCriteria(PDO $pdo, array $kpis, bool $applySpecialRules = true): array
 {
     $ids = array_values(array_unique(array_map(fn($kpi) => (int) $kpi["kpi_id"], $kpis)));
 
@@ -420,6 +479,11 @@ function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
     $stmt = $pdo->prepare("SELECT kpi_id, score_level, criteria FROM kpi_score_criteria WHERE kpi_id IN ({$in})");
     $stmt->execute($ids);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        /* แถวเกณฑ์ว่าง (ข้อมูลเก่าจากหน้าเพิ่ม KPI) ไม่นับเป็นเกณฑ์ เพื่อไม่ให้บังแหล่งอื่น */
+        if (trim((string) $row["criteria"]) === "") {
+            continue;
+        }
+
         $fromCriteria[(int) $row["kpi_id"]][(int) $row["score_level"]] = trim($row["criteria"]);
     }
 
@@ -491,5 +555,57 @@ function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
         }
     }
 
+    /* กฎเฉพาะ KPI (ดูหัวไฟล์) · อ่านชื่อ KPI จากฐานข้อมูลเอง ไม่พึ่งคอลัมน์ที่ผู้เรียก SELECT มา */
+    if ($applySpecialRules) {
+
+        $in = implode(",", array_fill(0, count($ids), "?"));
+
+        $stmt = $pdo->prepare("SELECT kpi_id, kpi_name FROM kpi_indicators WHERE kpi_id IN ({$in})");
+        $stmt->execute($ids);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (isNonRenewalKpi($row)) {
+                $result[(int) $row["kpi_id"]] = NON_RENEWAL_KPI_CRITERIA;
+            }
+        }
+    }
+
     return $result;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| บันทึกเกณฑ์ระดับผลงาน 5..1 ของ KPI
+|--------------------------------------------------------------------------
+|
+| หน้าเพิ่ม KPI และหน้าแก้ไข KPI ของ Admin ใช้ฟังก์ชันนี้ร่วมกัน
+| เขียนลง kpi_score_criteria (แหล่งที่ loadKpiScoreCriteria() อ่านก่อนเสมอ)
+| ระดับที่เว้นว่างจะถูกลบแถวออก · ผู้เรียกเป็นผู้เปิด/ปิด transaction
+|
+*/
+function saveKpiScoreCriteria(PDO $pdo, int $kpiId, array $levels): void
+{
+    $upsert = $pdo->prepare("
+        INSERT INTO kpi_score_criteria (kpi_id, score_level, criteria)
+        VALUES (:kpi_id, :score_level, :criteria)
+        ON DUPLICATE KEY UPDATE criteria = VALUES(criteria)
+    ");
+
+    $delete = $pdo->prepare("
+        DELETE FROM kpi_score_criteria
+        WHERE kpi_id = :kpi_id AND score_level = :score_level
+    ");
+
+    for ($level = KPI_MAX_LEVEL; $level >= KPI_MIN_LEVEL; $level--) {
+
+        $text = trim((string) ($levels[$level] ?? ""));
+
+        if ($text === "") {
+            $delete->execute([":kpi_id" => $kpiId, ":score_level" => $level]);
+            continue;
+        }
+
+        $upsert->execute([":kpi_id" => $kpiId, ":score_level" => $level, ":criteria" => $text]);
+    }
 }

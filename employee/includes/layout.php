@@ -96,7 +96,7 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
         <div class="sidebar-bottom">
 
             <a
-                href="<?= $e($rootPath) ?>logout.php"
+                href="<?= $e(logoutUrl($rootPath)) ?>"
                 class="logout-button">
 
                 ออกจากระบบ

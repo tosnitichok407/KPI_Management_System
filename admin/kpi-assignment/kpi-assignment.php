@@ -300,14 +300,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         FROM kpi_assignments a
 
-                        INNER JOIN kpi_indicators k
-                            ON a.kpi_id = k.kpi_id
-
                         WHERE a.employee_id = ?
                         AND a.assignment_year = ?
-                        AND k.kpi_type = ?
                         AND a.status = 'Active'
                     ";
+
+                    /*
+                    | น้ำหนักรวมของพนักงาน 1 คนใน 1 ปี = Performance + Competency ไม่เกิน 100%
+                    | (เดิมตรวจแยกประเภท จึงมอบหมายรวมได้ถึง 200%)
+                    */
 
                     $weight_stmt =
                         $pdo->prepare(
@@ -418,8 +419,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         $weight_stmt->execute([
                             $employee_id,
-                            $assignment_year,
-                            $kpi_type
+                            $assignment_year
                         ]);
 
                         $current_weight =
@@ -428,9 +428,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             );
 
 
+                        /* Assignment ที่สถานะ Inactive ไม่นับน้ำหนัก */
                         $new_total_weight =
                             $current_weight
-                            + floatval($weight);
+                            + ($status === "Active" ? floatval($weight) : 0);
 
 
                         /* =============================================
@@ -442,11 +443,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ) {
 
                             throw new Exception(
-                                "Weight ของพนักงาน ID "
+                                "Weight รวมของพนักงาน ID "
                                 . $employee_id
-                                . " ในประเภท "
-                                . $kpi_type
-                                . " จะเกิน 100%"
+                                . " (Performance + Competency) จะเป็น "
+                                . number_format($new_total_weight, 2)
+                                . "% ซึ่งเกิน 100%"
                             );
                         }
 

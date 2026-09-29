@@ -124,6 +124,8 @@ try {
     $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 
+        error_log("admin/kpi-categories/kpi-categories: " . $e->getMessage());
+
     $categories = [];
 
     $_SESSION["category_error"] =

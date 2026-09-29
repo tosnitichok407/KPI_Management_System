@@ -122,6 +122,9 @@ $error = "";
 
 $success = "";
 
+/* KPI "มูลค่าไม่ต่อสัญญา" ใช้เป้าหมาย 100% (กฎกลางใน includes/kpi-score-helper.php) */
+$kpi["target_value"] = kpiEffectiveTarget($kpi, $kpi["target_value"]);
+
 $targetValue = (float) $kpi["target_value"];
 
 /* เกณฑ์ระดับผลงาน 5..1 ของ KPI นี้ (ใช้ตัดเกรดแทนสูตรสัดส่วนเดิม) */
@@ -182,6 +185,12 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
     } elseif (!$selectedPeriod) {
 
         $error = "ไม่พบรอบประเมินของเดือนที่เลือก";
+    } elseif (($selectedPeriod["status"] ?? "") !== "Open") {
+
+        $error = "รอบประเมินของเดือนที่เลือกปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
+    } elseif (($kpi["assignment_status"] ?? "") !== "Active") {
+
+        $error = "KPI นี้ถูกปิดการใช้งาน ไม่สามารถบันทึกผลงานได้";
     } elseif ($performanceDate === "") {
 
         $error =

@@ -159,6 +159,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/employees/employee-add: " . $e->getMessage());
+
             if ($e->getCode() === "23000") {
                 $error = "Employee ID already exists.";
             } else {

@@ -37,6 +37,8 @@ function loginAttemptsExceeded(PDO $pdo, string $username, int $limit = 10, int 
 
         return (int) $stmt->fetchColumn() >= $limit;
     } catch (PDOException $e) {
+
+        error_log("login: " . $e->getMessage());
         // ถ้าตาราง log มีปัญหา ไม่ให้ Login พัง
         return false;
     }
@@ -142,97 +144,57 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
 
+            error_log("Login query failed: " . $e->getMessage());
+
             $error = "Database error. Please try again.";
 
             $user = false;
         }
 
 
-        /* --- Username Not Found --- */
-        if (!$user) {
+        /*
+        |--------------------------------------------------------------------------
+        | ตรวจสอบตามลำดับ: มีผู้ใช้ → รหัสผ่านถูก → บัญชี Active → พนักงาน Active
+        |--------------------------------------------------------------------------
+        |
+        | ตรวจรหัสผ่าน "ก่อน" สถานะบัญชี เพื่อให้คนที่ไม่รู้รหัสผ่านได้ข้อความเดียวกัน
+        | เสมอ (Invalid Employee ID or Password.) จึงเดาไม่ได้ว่า username ใดมีอยู่จริง
+        | ข้อความ "บัญชีถูกปิด" จะแสดงเฉพาะกับคนที่ใส่รหัสผ่านถูกต้องเท่านั้น
+        | เหตุผลจริงของทุกกรณีถูกบันทึกลง login_logs
+        |
+        */
+
+        $failureReason = null;
+
+        if ($error !== "") {
+
+            /* ฐานข้อมูลมีปัญหา: แสดงข้อความด้านบน ไม่นับเป็นการ login ผิด */
+
+        } elseif (!$user) {
 
             $error = "Invalid Employee ID or Password.";
+            $failureReason = "Username not found";
 
+        } elseif (!password_verify($password, (string) $user["password_hash"])) {
 
-            /* --- Failed Login Log --- */
-            try {
-                $log = $pdo->prepare("
-                    INSERT INTO login_logs
-                    (
-                        user_id,
-                        username,
-                        ip_address,
-                        user_agent,
-                        login_status,
-                        failure_reason
-                    )
-                    VALUES
-                    (
-                        NULL,
-                        :username,
-                        :ip_address,
-                        :user_agent,
-                        'Failed',
-                        :failure_reason
-                    )
-                ");
+            $error = "Invalid Employee ID or Password.";
+            $failureReason = "Invalid password";
 
-                $log->execute([
-                    ":username" => $username,
-                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
-                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
-                    ":failure_reason" => "Username not found"
-                ]);
-            } catch (PDOException $e) {
-
-                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
-            }
-        }
-
-        /* --- Check User Status ---*/ elseif (strtolower($user["user_status"]) !== "active") {
+        } elseif (strtolower((string) $user["user_status"]) !== "active") {
 
             $error = "Your account has been deactivated.";
+            $failureReason = "User account inactive";
 
-            try {
-
-                $log = $pdo->prepare("
-                    INSERT INTO login_logs
-                    (
-                        user_id,
-                        username,
-                        ip_address,
-                        user_agent,
-                        login_status,
-                        failure_reason
-                    )
-                    VALUES
-                    (
-                        :user_id,
-                        :username,
-                        :ip_address,
-                        :user_agent,
-                        'Failed',
-                        :failure_reason
-                    )
-                ");
-
-                $log->execute([
-                    ":user_id" => $user["user_id"],
-                    ":username" => $username,
-                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
-                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
-                    ":failure_reason" => "User account inactive"
-                ]);
-            } catch (PDOException $e) {
-
-                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
-            }
-        }
-
-        /* --- Check Employee Status --- */ elseif (strtolower($user["employee_status"]) !== "active") {
+        } elseif (strtolower((string) $user["employee_status"]) !== "active") {
 
             $error = "Your employee account is inactive.";
+            $failureReason = "Employee account inactive";
+        }
 
+
+        /* --- Failed Login Log --- */
+
+        if ($failureReason !== null) {
 
             try {
 
@@ -258,59 +220,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 ");
 
                 $log->execute([
-                    ":user_id" => $user["user_id"],
+                    ":user_id" => $user ? $user["user_id"] : null,
                     ":username" => $username,
                     ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
-                    ":failure_reason" => "Employee account inactive"
+                    ":failure_reason" => $failureReason
                 ]);
             } catch (PDOException $e) {
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
+                error_log("Write login log failed: " . $e->getMessage());
             }
         }
 
-        /* --- Check Password --- */ elseif (!password_verify($password, $user["password_hash"])) {
+        /* --- Login Success --- */
 
-            $error = "Invalid Employee ID or Password.";
+        if ($error === "") {
 
-
-            try {
-
-                $log = $pdo->prepare("
-                    INSERT INTO login_logs
-                    (
-                        user_id,
-                        username,
-                        ip_address,
-                        user_agent,
-                        login_status,
-                        failure_reason
-                    )
-                    VALUES
-                    (
-                        :user_id,
-                        :username,
-                        :ip_address,
-                        :user_agent,
-                        'Failed',
-                        :failure_reason
-                    )
-                ");
-
-                $log->execute([
-                    ":user_id" => $user["user_id"],
-                    ":username" => $username,
-                    ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
-                    ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null,
-                    ":failure_reason" => "Invalid password"
-                ]);
-            } catch (PDOException $e) {
-                // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
-            }
-        }
-
-        /* --- Login Success --- */ else {
             /* --- Regenerate Session ID --- */
             session_regenerate_id(true);
 
@@ -355,6 +281,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION["role_name"] =
                 $user["role_name"];
 
+            /* เวลาใช้งานล่าสุด (ใช้กับ idle timeout ใน includes/security.php) */
+            $_SESSION["last_activity"] = time();
+
 
             /* --- Login Log - Success --- */
 
@@ -388,6 +317,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ":user_agent" => $_SERVER["HTTP_USER_AGENT"] ?? null
                 ]);
             } catch (PDOException $e) {
+
+        error_log("login: " . $e->getMessage());
 
                 // ไม่ให้ Login พัง หาก Login Logs มีปัญหา
             }
@@ -565,22 +496,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     👁
                                 </button>
                             </div>
-                        </div>
-
-                        <!-- Options -->
-                        <div class="form-options">
-
-                            <label class="remember">
-
-                                <input
-                                    type="checkbox"
-                                    name="remember-me"
-                                    id="remember-me">
-
-                                <span>
-                                    Remember Me
-                                </span>
-                            </label>
                         </div>
 
                         <!-- Login -->

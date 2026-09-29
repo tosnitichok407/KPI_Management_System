@@ -218,6 +218,8 @@ try {
     $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 
+        error_log("employee/performance: " . $e->getMessage());
+
     $assignments = [];
 
     $error = "ไม่สามารถโหลดข้อมูล KPI ได้";
