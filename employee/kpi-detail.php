@@ -173,7 +173,7 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
 
     /*
     --------------------------------------------------------------
-    Validation
+    Validation (ข้อมูลจากฟอร์ม)
     --------------------------------------------------------------
     */
 
@@ -189,20 +189,10 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
     } elseif (($selectedPeriod["status"] ?? "") !== "Open") {
 
         $error = "รอบประเมินของเดือนที่เลือกปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
-    } elseif (($kpi["assignment_status"] ?? "") !== "Active") {
-
-        $error = "KPI นี้ถูกปิดการใช้งาน ไม่สามารถบันทึกผลงานได้";
     } elseif ($performanceDate === "") {
 
         $error =
             "กรุณาเลือกวันที่";
-    } elseif (
-        $selectedPeriod["end_date"] < $kpi["start_date"] ||
-        $selectedPeriod["start_date"] > $kpi["end_date"]
-    ) {
-
-        $error =
-            "KPI นี้ไม่ได้มีผลในเดือนที่เลือก";
     } elseif ($actual === "") {
 
         $error =
@@ -213,181 +203,209 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
             "Actual ต้องเป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
     } else {
 
-
         /*
         ----------------------------------------------------------
-        Calculate Score
+        Transaction + ล็อกแถว Assignment จนบันทึกผลงานเสร็จ
+        ----------------------------------------------------------
+        กัน Race Condition: ข้อมูล Assignment ที่โหลดตอนเปิดหน้า ($kpi) อาจเก่าแล้ว
+        (Admin เปลี่ยน KPI / Target / ช่วงวันที่ / สถานะ ระหว่างนั้น)
+        จึงอ่านใหม่หลังล็อก และใช้เฉพาะค่าที่อ่านใหม่ในการตรวจและตัดเกรด
         ----------------------------------------------------------
         */
 
-        $actualValue =
-            (float) $actual;
+        $isUpdate = false;
 
+        try {
 
-        /*
-        ------------------------------------------------------
-        เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนด
+            $pdo->beginTransaction();
 
-        เดิมใช้สูตรสัดส่วน Actual / Target × 5 ซึ่งไม่ตรงกับเกณฑ์
-        ที่แสดงไว้ เช่น "5 : >100%" กับ "4 : 100%" แต่สูตรเดิม
-        ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม
-
-        รายละเอียดอยู่ใน includes/kpi-score-helper.php
-        ------------------------------------------------------
-        */
-
-        /* ฟังก์ชันกลาง: KPI 9 ใช้ Total R / Budget · Budget 0 / NULL → error ไม่บันทึก */
-        $scoreResult = kpiCalculateScore($kpi, $kpiLevels, $actual, $kpi["target_value"]);
-        $score = $scoreResult["grade"];
-
-
-        if ($scoreResult["error"] !== null || $score === null) {
-
-            $error = $scoreResult["error"]
-                ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
-        } else {
-
-
-            /*
-            ------------------------------------------------------
-            Check Duplicate
-            ------------------------------------------------------
-            */
-
-            $check = $pdo->prepare("
-                SELECT performance_id
-
-                FROM kpi_performances
-
+            $lockStmt = $pdo->prepare("
+                SELECT assignment_id
+                FROM kpi_assignments
                 WHERE assignment_id = :assignment_id
-
-                AND employee_id = :employee_id
-
-                AND period_id = :period_id
-
-                LIMIT 1
+                  AND employee_id = :employee_id
+                FOR UPDATE
             ");
-
-
-            $check->execute([
-
-                ":assignment_id" =>
-                $assignmentId,
-
-                ":employee_id" => $employeeId,
-
-                ":period_id" => $selectedPeriodId
-
+            $lockStmt->execute([
+                ":assignment_id" => $assignmentId,
+                ":employee_id" => $employeeId
             ]);
 
+            /* สถานะรอบประเมิน ณ ตอนบันทึก (กันรอบถูกปิดระหว่างนั้น) */
+            $periodLockStmt = $pdo->prepare("
+                SELECT status
+                FROM evaluation_periods
+                WHERE period_id = :period_id
+                LOCK IN SHARE MODE
+            ");
+            $periodLockStmt->execute([":period_id" => $selectedPeriodId]);
+            $lockedPeriodStatus = (string) $periodLockStmt->fetchColumn();
 
-            $existingPerformance = $check->fetch(PDO::FETCH_ASSOC);
+            /* query เดียวกับตอนโหลดหน้า แต่เป็น locking read (อ่านค่าล่าสุดที่ commit แล้ว) */
+            $lockedStmt = $pdo->prepare($sql . " LOCK IN SHARE MODE");
+            $lockedStmt->execute([
+                ":assignment_id" => $assignmentId,
+                ":employee_id" => $employeeId
+            ]);
+            $lockedKpi = $lockedStmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($existingPerformance) {
-                try {
-                    $update = $pdo->prepare("
-                        UPDATE kpi_performances
-                        SET target = :target, actual = :actual, score = :score,
-                            comment = :comment, status = 'Submitted'
-                        WHERE performance_id = :performance_id
-                          AND employee_id = :employee_id
-                    ");
-                    $update->execute([
-                        ":target" => $targetValue,
-                        ":actual" => $actualValue,
-                        ":score" => $score,
-                        ":comment" => $comment !== "" ? $comment : null,
-                        ":performance_id" => $existingPerformance["performance_id"],
-                        ":employee_id" => $employeeId
-                    ]);
-                    $success = "อัปเดตผลงานของเดือนที่เลือกเรียบร้อยแล้ว";
-                                } catch (PDOException $e) {
-                    error_log("Update KPI performance failed: " . $e->getMessage());
-                    $error = "ไม่สามารถอัปเดตผลงานได้";
-                }
+            if ($lockedPeriodStatus !== "Open") {
+
+                $error = "รอบประเมินของเดือนที่เลือกปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
+            } elseif (!$lockedKpi) {
+
+                $error = "ไม่พบ KPI ที่ต้องการบันทึก";
+            } elseif (($lockedKpi["assignment_status"] ?? "") !== "Active") {
+
+                $error = "KPI นี้ถูกปิดการใช้งาน ไม่สามารถบันทึกผลงานได้";
+            } elseif (
+                $selectedPeriod["end_date"] < $lockedKpi["start_date"] ||
+                $selectedPeriod["start_date"] > $lockedKpi["end_date"]
+            ) {
+
+                $error =
+                    "KPI นี้ไม่ได้มีผลในเดือนที่เลือก";
             } else {
 
-
                 /*
-                --------------------------------------------------
-                Insert
-                --------------------------------------------------
+                ------------------------------------------------------
+                Calculate Score — ฟังก์ชันกลางเดิม (includes/kpi-score-helper.php)
+                KPI 9 ใช้ Total R / Budget · Budget 0 / NULL หรือประเภทผิด → error ไม่บันทึก
+                ------------------------------------------------------
                 */
 
-                try {
+                $actualValue = (float) $actual;
+                $lockedTarget = (float) $lockedKpi["target_value"];
+                $lockedLevels =
+                    loadKpiScoreCriteria($pdo, [$lockedKpi])[(int) $lockedKpi["kpi_id"]] ?? [];
 
-                    $insert = $pdo->prepare("
+                $scoreResult = kpiCalculateScore(
+                    $lockedKpi,
+                    $lockedLevels,
+                    $actual,
+                    $lockedKpi["target_value"]
+                );
+                $score = $scoreResult["grade"];
 
-                        INSERT INTO kpi_performances
+                if ($scoreResult["error"] !== null || $score === null) {
 
-                        (
-                            assignment_id,
-                            employee_id,
-                            period_id,
-                            performance_date,
-                            target,
-                            actual,
-                            score,
-                            comment,
-                            status
-                        )
+                    $error = $scoreResult["error"]
+                        ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
+                } else {
 
-                        VALUES
+                    /*
+                    ------------------------------------------------------
+                    Check Duplicate
+                    ------------------------------------------------------
+                    */
 
-                        (
-                            :assignment_id,
-                            :employee_id,
-                            :period_id,
-                            :performance_date,
-                            :target,
-                            :actual,
-                            :score,
-                            :comment,
-                            'Submitted'
-                        )
-
+                    $check = $pdo->prepare("
+                        SELECT performance_id
+                        FROM kpi_performances
+                        WHERE assignment_id = :assignment_id
+                          AND employee_id = :employee_id
+                          AND period_id = :period_id
+                        LIMIT 1
                     ");
-
-
-                    $insert->execute([
-
-                        ":assignment_id" =>
-                        $assignmentId,
-
-                        ":employee_id" =>
-                        $employeeId,
-
-                        ":period_id" => $selectedPeriodId,
-
-                        ":performance_date" =>
-                        $performanceDate,
-
-                        ":target" =>
-                        $targetValue,
-
-                        ":actual" =>
-                        $actualValue,
-
-                        ":score" =>
-                        $score,
-
-                        ":comment" =>
-                        $comment !== ""
-                            ? $comment
-                            : null
-
+                    $check->execute([
+                        ":assignment_id" => $assignmentId,
+                        ":employee_id" => $employeeId,
+                        ":period_id" => $selectedPeriodId
                     ]);
+                    $existingPerformance = $check->fetch(PDO::FETCH_ASSOC);
 
+                    if ($existingPerformance) {
 
-                    $success =
-                        "บันทึกผลงานเรียบร้อยแล้ว";
-                                } catch (PDOException $e) {
+                        $isUpdate = true;
 
-                    error_log("Insert KPI performance failed: " . $e->getMessage());
+                        $update = $pdo->prepare("
+                            UPDATE kpi_performances
+                            SET target = :target, actual = :actual, score = :score,
+                                comment = :comment, status = 'Submitted'
+                            WHERE performance_id = :performance_id
+                              AND employee_id = :employee_id
+                        ");
+                        $update->execute([
+                            ":target" => $lockedTarget,
+                            ":actual" => $actualValue,
+                            ":score" => $score,
+                            ":comment" => $comment !== "" ? $comment : null,
+                            ":performance_id" => $existingPerformance["performance_id"],
+                            ":employee_id" => $employeeId
+                        ]);
 
-                    $error =
-                        "ไม่สามารถบันทึกผลงานได้";
+                        $pdo->commit();
+                        $success = "อัปเดตผลงานของเดือนที่เลือกเรียบร้อยแล้ว";
+                    } else {
+
+                        /*
+                        --------------------------------------------------
+                        Insert
+                        --------------------------------------------------
+                        */
+
+                        $insert = $pdo->prepare("
+                            INSERT INTO kpi_performances
+                            (
+                                assignment_id,
+                                employee_id,
+                                period_id,
+                                performance_date,
+                                target,
+                                actual,
+                                score,
+                                comment,
+                                status
+                            )
+                            VALUES
+                            (
+                                :assignment_id,
+                                :employee_id,
+                                :period_id,
+                                :performance_date,
+                                :target,
+                                :actual,
+                                :score,
+                                :comment,
+                                'Submitted'
+                            )
+                        ");
+                        $insert->execute([
+                            ":assignment_id" => $assignmentId,
+                            ":employee_id" => $employeeId,
+                            ":period_id" => $selectedPeriodId,
+                            ":performance_date" => $performanceDate,
+                            ":target" => $lockedTarget,
+                            ":actual" => $actualValue,
+                            ":score" => $score,
+                            ":comment" => $comment !== "" ? $comment : null
+                        ]);
+
+                        $pdo->commit();
+                        $success = "บันทึกผลงานเรียบร้อยแล้ว";
+                    }
                 }
+            }
+
+            /* ไม่ผ่านเงื่อนไข → ไม่บันทึกอะไรเลย และปล่อยล็อก */
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+        } catch (PDOException $e) {
+
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log(($isUpdate ? "Update" : "Insert") . " KPI performance failed: " . $e->getMessage());
+
+            $success = "";
+
+            /* 1205 = lock wait timeout · 1213 = deadlock (มีการแก้ไขข้อมูลนี้พร้อมกัน) */
+            if (in_array((int) ($e->errorInfo[1] ?? 0), [1205, 1213], true)) {
+                $error = "มีการแก้ไขข้อมูล KPI นี้พร้อมกัน ระบบยังไม่ได้บันทึก กรุณาลองใหม่อีกครั้ง";
+            } else {
+                $error = $isUpdate ? "ไม่สามารถอัปเดตผลงานได้" : "ไม่สามารถบันทึกผลงานได้";
             }
         }
     }

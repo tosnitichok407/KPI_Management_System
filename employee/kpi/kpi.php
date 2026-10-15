@@ -157,7 +157,43 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             /*
             |--------------------------------------------------------------------------
-            | Get Assignment
+            | Transaction + ล็อกแถว Assignment จนบันทึกผลงานเสร็จ
+            |--------------------------------------------------------------------------
+            |
+            | กัน Race Condition: ถ้า Admin เปลี่ยน KPI / พนักงาน / ช่วงวันที่ ระหว่างที่
+            | หน้านี้อ่าน Assignment กับบันทึกผลงาน คะแนนจะถูกตัดด้วยเกณฑ์ของ KPI เดิม
+            | แต่ไปผูกกับ KPI ใหม่ · SELECT ... FOR UPDATE ทำให้การแก้ Assignment ต้องรอ
+            | และข้อมูลที่ใช้ตัดเกรดด้านล่างอ่านหลังได้ล็อกแล้วเท่านั้น
+            |
+            */
+
+            $pdo->beginTransaction();
+
+            $lockStmt = $pdo->prepare("
+                SELECT assignment_id
+                FROM kpi_assignments
+                WHERE assignment_id = :assignment_id
+                  AND employee_id = :employee_id
+                FOR UPDATE
+            ");
+            $lockStmt->execute([
+                ":assignment_id" => $assignmentId,
+                ":employee_id" => $employeeId
+            ]);
+
+            /* สถานะรอบประเมิน ณ ตอนบันทึก (กันรอบถูกปิดระหว่างนั้น) */
+            $periodLockStmt = $pdo->prepare("
+                SELECT status
+                FROM evaluation_periods
+                WHERE period_id = :period_id
+                LOCK IN SHARE MODE
+            ");
+            $periodLockStmt->execute([":period_id" => $selectedPeriodId]);
+            $lockedPeriodStatus = (string) $periodLockStmt->fetchColumn();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get Assignment (locking read · อ่านค่าล่าสุดที่ commit แล้วเสมอ)
             |--------------------------------------------------------------------------
             */
 
@@ -188,6 +224,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                   AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
 
                 LIMIT 1
+                LOCK IN SHARE MODE
             ");
 
             $checkStmt->execute([
@@ -200,7 +237,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $assignment = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
 
-            if (!$assignment) {
+            if ($lockedPeriodStatus !== "Open") {
+
+                $error = "รอบประเมินของเดือน"
+                    . $thaiMonths[$selectedMonth] . " " . $selectedYear
+                    . " ปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
+            } elseif (!$assignment) {
 
                 $error = "ไม่สามารถบันทึก KPI นี้ในเดือนที่เลือกได้";
             } else {
@@ -484,16 +526,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
 
 
+                    $pdo->commit();
+
                     $success =
                         "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
                 }
             }
+
+            /* ไม่ผ่านเงื่อนไข → ไม่บันทึกอะไรเลย และปล่อยล็อก */
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
                 } catch (PDOException $e) {
+
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
             error_log("Save KPI performance failed: " . $e->getMessage());
 
-            $error =
-                "ไม่สามารถบันทึกข้อมูล KPI ได้";
+            $success = "";
+
+            /* 1205 = lock wait timeout · 1213 = deadlock (มีการแก้ไขข้อมูลนี้พร้อมกัน) */
+            $error = in_array((int) ($e->errorInfo[1] ?? 0), [1205, 1213], true)
+                ? "มีการแก้ไขข้อมูล KPI นี้พร้อมกัน ระบบยังไม่ได้บันทึก กรุณาลองใหม่อีกครั้ง"
+                : "ไม่สามารถบันทึกข้อมูล KPI ได้";
         }
     }
 }
