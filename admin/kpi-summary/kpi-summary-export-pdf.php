@@ -128,7 +128,7 @@ foreach ($report["employees"] as $summary) {
         if ($kpi["avg_score"] === null) {
             $result = "<span class='muted'>ยังไม่ประเมิน</span>";
         } elseif ($hasMonth) {
-            $result = "<b>" . $num((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"])
+            $result = "<b>" . kpiScoreLevel((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"])
                 . "<br><span class='small'>"
                 . ($kpi["last_actual"] !== null ? "Actual " . number_format((float) $kpi["last_actual"]) . " · " : "")
                 . $e($kpi["last_status"]) . "</span>";

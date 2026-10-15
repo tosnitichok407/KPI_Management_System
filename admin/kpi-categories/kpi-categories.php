@@ -166,7 +166,7 @@ unset($_SESSION["category_error"]);
                 <a
                     href="kpi-categories/kpi-category-add.php"
                     class="btn btn-primary">
-                    + เพิ่มหมวดหมู่ KPI
+                    <?= icon("plus") ?>เพิ่มหมวดหมู่ KPI
                 </a>
             </div>
 
@@ -300,7 +300,7 @@ unset($_SESSION["category_error"]);
                                             <a
                                                 href="kpi-categories/kpi-category-edit.php?id=<?= (int) $category["category_id"] ?>"
                                                 class="btn-small edit">
-                                                แก้ไข
+                                                <?= icon("square-pen") ?>แก้ไข
                                             </a>
 
                                             <form
@@ -311,7 +311,7 @@ unset($_SESSION["category_error"]);
                                                 <?= csrfField() ?>
                                                 <input type="hidden" name="delete" value="<?= (int) $category["category_id"] ?>">
                                                 <button type="submit" class="btn-small danger">
-                                                    ลบ
+                                                    <?= icon("trash-2") ?>ลบ
                                                 </button>
                                             </form>
 

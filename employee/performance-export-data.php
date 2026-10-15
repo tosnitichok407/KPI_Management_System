@@ -10,8 +10,19 @@ require_once __DIR__ . "/../includes/kpi-score-helper.php";
 |
 | ส่วนที่ 1 = Performance, ส่วนที่ 2 = Competency
 | คะแนนเต็ม = น้ำหนัก × 5, คะแนนจริง = น้ำหนัก × เกรด (สูตรเดียวกับไฟล์ Excel)
+| เกรดเป็นจำนวนเต็มเสมอ (kpiScoreLevel: 4.75 → 4) คะแนนจริงปัดเศษทศนิยมลง
 |
 */
+
+/* ปัดเศษลง: round 6 ตำแหน่งก่อน กัน floating point เช่น 0.57 × 100 = 56.999… */
+function evaluationFloor(float $value, int $decimals = 0): float
+{
+    $factor = 10 ** $decimals;
+
+    return floor(round($value * $factor, 6)) / $factor;
+}
+
+
 function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
 {
     $definitions = [
@@ -42,9 +53,9 @@ function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
             }
 
             $weight = (float) $kpi["weight_value"];
-            $grade = $kpi["score_value"] !== null ? (float) $kpi["score_value"] : null;
+            $grade = $kpi["score_value"] !== null ? (float) kpiScoreLevel((float) $kpi["score_value"]) : null;
             $full = $weight * $fullGrade;
-            $real = $grade === null ? null : $weight * $grade;
+            $real = $grade === null ? null : evaluationFloor($weight * $grade);
 
             $rows[] = [
                 "kpi" => $kpi,
@@ -67,7 +78,7 @@ function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
     }
 
     $totals["percent"] = $totals["full"] > 0
-        ? $totals["actual"] / $totals["full"] * 100
+        ? evaluationFloor($totals["actual"] / $totals["full"] * 100, 2)
         : null;
 
     return [
@@ -146,6 +157,7 @@ function evaluationShortMonths(): array
 | คะแนนรายเดือนทั้งปีของพนักงาน (ตารางสรุปท้ายแบบฟอร์ม)
 | [1..12 => full, actual, percent, grade] — สูตรเดียวกับแบบฟอร์มรายเดือน:
 | คะแนนเต็ม = Σ น้ำหนัก × 5, คะแนนที่ทำได้ = Σ น้ำหนัก × เกรด (เฉพาะ KPI ที่มีผลในเดือนนั้น)
+| เกรด คะแนนที่ทำได้ และร้อยละ ปัดเศษทศนิยมลง
 | เดือนที่ยังไม่มีผลประเมินเลย → actual/percent/grade = null
 */
 function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullGrade = 5): array
@@ -207,7 +219,7 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
             $full += $weight * $fullGrade;
 
             if (isset($scores[$month][(int) $assignment["assignment_id"]])) {
-                $actual += $weight * $scores[$month][(int) $assignment["assignment_id"]];
+                $actual += evaluationFloor($weight * kpiScoreLevel($scores[$month][(int) $assignment["assignment_id"]]));
                 $hasResult = true;
             }
         }
@@ -217,7 +229,7 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
         $months[$month] = [
             "full" => $hasKpi ? $full : null,
             "actual" => $hasResult ? $actual : null,
-            "percent" => $hasResult && $full > 0 ? $actual / $full * 100 : null,
+            "percent" => $hasResult && $full > 0 ? evaluationFloor($actual / $full * 100) : null,
             "grade" => $grade["grade"] ?? null
         ];
     }

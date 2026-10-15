@@ -428,6 +428,8 @@ $avatar =
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
 
     <link
         rel="stylesheet"
@@ -697,9 +699,9 @@ $avatar =
         <?php
         renderFeedbackCard($latestFeedback, [
             "root" => "../",
-            "title" => "💬 Feedback จากหัวหน้า",
+            "title" => "Feedback จากหัวหน้า",
             "subtitle" => "ข้อความล่าสุดจากหัวหน้างานของคุณ",
-            "link" => ["href" => "feedback.php", "label" => "ดูทั้งหมด →"]
+            "link" => ["href" => "feedback.php", "label" => "ดูทั้งหมด"]
         ]);
         ?>
 
@@ -1009,10 +1011,9 @@ $avatar =
                                             <span
                                                 class="score">
 
-                                                <?= number_format(
+                                                <?= kpiScoreLevel(
                                                     (float)
-                                                    $kpi["score"],
-                                                    2
+                                                    $kpi["score"]
                                                 ) ?>
 
                                                 / 5

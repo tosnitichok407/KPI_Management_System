@@ -1307,7 +1307,7 @@ $form_year =
                     type="reset"
                     class="btn btn-secondary">
 
-                    ล้างข้อมูล
+                    <?= icon("rotate-ccw") ?>ล้างข้อมูล
 
                 </button>
 
@@ -1316,7 +1316,7 @@ $form_year =
                     type="submit"
                     class="btn btn-primary">
 
-                    + เพิ่ม KPI
+                    <?= icon("plus") ?>เพิ่ม KPI
 
                 </button>
 
@@ -1547,7 +1547,7 @@ $form_year =
                         type="submit"
                         class="btn btn-primary">
 
-                        ค้นหา
+                        <?= icon("search") ?>ค้นหา
 
                     </button>
 
@@ -1556,7 +1556,7 @@ $form_year =
                         <a
                             href="index.php?page=kpi-assignment"
                             class="btn btn-secondary">
-                            ล้างตัวกรอง
+                            <?= icon("rotate-ccw") ?>ล้างตัวกรอง
                         </a>
 
                     <?php endif; ?>
@@ -1870,7 +1870,7 @@ $form_year =
                                         <a
                                             href="kpi-assignment/kpi-assignment-edit.php?id=<?= (int) $assignment["assignment_id"] ?>"
                                             class="btn-small btn-edit">
-                                            แก้ไข
+                                            <?= icon("square-pen") ?>แก้ไข
                                         </a>
 
                                         <form
@@ -1881,7 +1881,7 @@ $form_year =
                                             <?= csrfField() ?>
                                             <input type="hidden" name="id" value="<?= (int) $assignment["assignment_id"] ?>">
                                             <button type="submit" class="btn-small btn-delete">
-                                                ลบ
+                                                <?= icon("trash-2") ?>ลบ
                                             </button>
                                         </form>
 

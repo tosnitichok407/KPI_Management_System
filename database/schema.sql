@@ -1,30 +1,11 @@
--- KPI Management System: โครงสร้างฐานข้อมูล (ไม่มีข้อมูล)
--- สร้างจากฐานข้อมูลพัฒนาเมื่อ 2026-09-29 ด้วย mysqldump --no-data
--- ใช้งาน: mysql -u root kpi_management_system < database/schema.sql
--- หลังนำเข้าต้องเพิ่มข้อมูลตั้งต้นของ roles (1 admin, 2 manager, 3 employee) และบัญชี Admin
 
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `departments` (
   `department_id` int(11) NOT NULL AUTO_INCREMENT,
   `department_name` varchar(100) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`department_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `employee_kpi` (
   `employee_kpi_id` int(11) NOT NULL AUTO_INCREMENT,
   `employee_id` int(11) NOT NULL,
@@ -43,9 +24,7 @@ CREATE TABLE `employee_kpi` (
   CONSTRAINT `fk_employeekpi_indicator` FOREIGN KEY (`kpi_id`) REFERENCES `kpi_indicators` (`kpi_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_employeekpi_period` FOREIGN KEY (`period_id`) REFERENCES `evaluation_periods` (`period_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `employees` (
   `employee_id` int(11) NOT NULL AUTO_INCREMENT,
   `employee_code` varchar(20) NOT NULL,
@@ -65,9 +44,7 @@ CREATE TABLE `employees` (
   CONSTRAINT `fk_employee_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_employee_position` FOREIGN KEY (`position_id`) REFERENCES `positions` (`position_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `evaluation_periods` (
   `period_id` int(11) NOT NULL AUTO_INCREMENT,
   `period_name` varchar(100) DEFAULT NULL,
@@ -81,9 +58,7 @@ CREATE TABLE `evaluation_periods` (
   UNIQUE KEY `uq_evaluation_period_year_month` (`period_year`,`period_month`),
   KEY `idx_evaluation_period_year_month` (`period_year`,`period_month`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_assignments` (
   `assignment_id` int(11) NOT NULL AUTO_INCREMENT,
   `kpi_id` int(11) NOT NULL,
@@ -105,18 +80,14 @@ CREATE TABLE `kpi_assignments` (
   CONSTRAINT `fk_assignment_kpi` FOREIGN KEY (`kpi_id`) REFERENCES `kpi_indicators` (`kpi_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_assignment_period` FOREIGN KEY (`period_id`) REFERENCES `evaluation_periods` (`period_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_categories` (
   `category_id` int(11) NOT NULL AUTO_INCREMENT,
   `category_name` varchar(100) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_indicators` (
   `kpi_id` int(11) NOT NULL AUTO_INCREMENT,
   `category_id` int(11) DEFAULT NULL,
@@ -135,9 +106,7 @@ CREATE TABLE `kpi_indicators` (
   KEY `fk_kpi_category` (`category_id`),
   CONSTRAINT `fk_kpi_category` FOREIGN KEY (`category_id`) REFERENCES `kpi_categories` (`category_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_performances` (
   `performance_id` int(11) NOT NULL AUTO_INCREMENT,
   `assignment_id` int(11) NOT NULL,
@@ -161,9 +130,7 @@ CREATE TABLE `kpi_performances` (
   CONSTRAINT `fk_performance_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE,
   CONSTRAINT `fk_performance_period` FOREIGN KEY (`period_id`) REFERENCES `evaluation_periods` (`period_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_score_criteria` (
   `criteria_id` int(11) NOT NULL AUTO_INCREMENT,
   `kpi_id` int(11) NOT NULL,
@@ -176,9 +143,7 @@ CREATE TABLE `kpi_score_criteria` (
   CONSTRAINT `fk_kpi_score_criteria_kpi` FOREIGN KEY (`kpi_id`) REFERENCES `kpi_indicators` (`kpi_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_score_level` CHECK (`score_level` between 1 and 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `kpi_score_levels` (
   `score_level_id` int(11) NOT NULL AUTO_INCREMENT,
   `kpi_id` int(11) NOT NULL,
@@ -221,9 +186,7 @@ CREATE TABLE `manager_feedback` (
   PRIMARY KEY (`feedback_id`),
   UNIQUE KEY `unique_review` (`manager_id`,`employee_id`,`period_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `performance_summary` (
   `summary_id` int(11) NOT NULL AUTO_INCREMENT,
   `employee_id` int(11) NOT NULL,
@@ -243,9 +206,7 @@ CREATE TABLE `performance_summary` (
   CONSTRAINT `fk_summary_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_summary_period` FOREIGN KEY (`period_id`) REFERENCES `evaluation_periods` (`period_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 CREATE TABLE `positions` (
   `position_id` int(11) NOT NULL AUTO_INCREMENT,
   `position_name` varchar(100) NOT NULL,
@@ -283,14 +244,4 @@ CREATE TABLE `users` (
   CONSTRAINT `fk_user_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_user_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
-
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 

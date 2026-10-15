@@ -191,6 +191,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/employee.css"
@@ -420,14 +422,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกข้อมูลพนักงาน
+                    <?= icon("save") ?>บันทึกข้อมูลพนักงาน
                 </button>
 
                 <a
                     href="../index.php?page=employees"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
             </div>

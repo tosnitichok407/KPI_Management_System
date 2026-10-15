@@ -15,6 +15,9 @@
 |
 */
 
+/* ตัวช่วยแสดงไอคอน (UI เท่านั้น) — โหลดที่นี่เพราะทุกหน้า require ไฟล์นี้ */
+require_once __DIR__ . "/icons.php";
+
 if (session_status() === PHP_SESSION_NONE) {
 
     $isHttps =

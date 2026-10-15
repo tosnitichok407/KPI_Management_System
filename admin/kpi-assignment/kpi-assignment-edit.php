@@ -464,6 +464,8 @@ $kpis_result =
         href="https://fonts.googleapis.com"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="preconnect"
         href="https://fonts.gstatic.com"
@@ -797,7 +799,7 @@ $kpis_result =
                     href="../index.php?page=kpi-assignment"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
 
@@ -805,7 +807,7 @@ $kpis_result =
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกการแก้ไข
+                    <?= icon("save") ?>บันทึกการแก้ไข
                 </button>
 
 

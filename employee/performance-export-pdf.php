@@ -309,7 +309,7 @@ h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
             <tr class='percent'><td colspan='3' class='r'>คิดเป็นร้อยละ (คะแนนที่ได้ ÷ คะแนนเต็ม)</td><td class='c'>{$percentText}</td></tr>
             <tr class='grade'><td colspan='3' class='r'>เกรดของผลงาน (ตามเกณฑ์สรุปผลการประเมิน)</td><td class='c'>" . $e($monthGrade ?? "-") . "</td></tr>
         </table>
-        <div class='note'>วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × {$fullGrade} · คะแนนจริง = น้ำหนัก × เกรด · KPI ที่ยังไม่ประเมินนับเป็น 0</div>
+        <div class='note'>วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × {$fullGrade} · คะแนนจริง = น้ำหนัก × เกรด (ปัดเศษทศนิยมลง) · KPI ที่ยังไม่ประเมินนับเป็น 0</div>
     </td>
     <td style='width:50%'>
         <table class='scale'>

@@ -17,6 +17,7 @@
 
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 
 /*

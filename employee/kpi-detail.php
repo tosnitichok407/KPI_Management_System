@@ -464,6 +464,8 @@ $performances =
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
@@ -742,7 +744,7 @@ $performances =
                     type="submit"
                     class="submit-button">
 
-                    บันทึกผลงาน
+                    <?= icon("save") ?>บันทึกผลงาน
 
                 </button>
 
@@ -750,7 +752,7 @@ $performances =
                     href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                     class="btn btn-secondary back-button">
 
-                    ย้อนกลับ
+                    <?= icon("arrow-left") ?>ย้อนกลับ
 
                 </a>
 
@@ -866,10 +868,9 @@ $performances =
 
                                     <td class="score">
 
-                                        <?= number_format(
+                                        <?= kpiScoreLevel(
                                             (float)
-                                            $performance["score"],
-                                            2
+                                            $performance["score"]
                                         ) ?>
 
                                         / 5

@@ -362,6 +362,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/user-account.css"
@@ -619,14 +621,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
                 <button
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกการแก้ไข
+                    <?= icon("save") ?>บันทึกการแก้ไข
                 </button>
             </div>
         </form>

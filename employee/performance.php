@@ -506,6 +506,8 @@ if ($totalPerformanceRecords === 0) {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
         <link
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
@@ -589,13 +591,13 @@ if ($totalPerformanceRecords === 0) {
                             class="performance-export-button pdf"
                             target="_blank"
                             rel="noopener">
-                            📄 Export PDF
+                            <?= icon("file-text") ?> Export PDF
                         </a>
 
                         <a
                             href="performance-export-excel.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                             class="performance-export-button excel">
-                            📊 Export Excel
+                            <?= icon("file-spreadsheet") ?> Export Excel
                         </a>
 
                     </div>
@@ -611,9 +613,9 @@ if ($totalPerformanceRecords === 0) {
         <?php
         renderFeedbackCard($monthFeedback, [
             "root" => "../",
-            "title" => "💬 Feedback จากหัวหน้า",
+            "title" => "Feedback จากหัวหน้า",
             "subtitle" => "ประจำเดือน" . $thaiMonths[$selectedMonth] . " " . $selectedYear,
-            "link" => ["href" => "feedback.php?year=" . $selectedYear, "label" => "ดูทั้งหมด →"],
+            "link" => ["href" => "feedback.php?year=" . $selectedYear, "label" => "ดูทั้งหมด"],
             "empty" => $selectedPeriod
                 ? "หัวหน้ายังไม่ได้ให้ Feedback ของเดือนนี้"
                 : "ยังไม่มีรอบประเมินของเดือนนี้"
@@ -680,7 +682,7 @@ if ($totalPerformanceRecords === 0) {
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    🎯
+                    <?= icon("target") ?>
                 </div>
 
                 <div>
@@ -742,7 +744,7 @@ if ($totalPerformanceRecords === 0) {
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    📈
+                    <?= icon("trending-up") ?>
                 </div>
 
                 <div>
@@ -768,7 +770,7 @@ if ($totalPerformanceRecords === 0) {
             <section class="empty-card">
 
                 <div class="empty-icon">
-                    📋
+                    <?= icon("clipboard-list") ?>
                 </div>
 
                 <h2>
@@ -1072,7 +1074,7 @@ if ($totalPerformanceRecords === 0) {
                                         href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>&amp;year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>&amp;period_id=<?= $selectedPeriodId ?>"
                                         class="performance-button">
 
-                                        <?= !empty($kpi["performance_id"])
+                                        <?= icon("square-pen") ?><?= !empty($kpi["performance_id"])
                                             ? "เพิ่ม/ดูผลงาน"
                                             : "บันทึกผลงาน"
                                         ?>

@@ -1,0 +1,173 @@
+/* =========================================================
+   ICONS (Lucide · inline SVG) — ใช้ร่วมกันทุกหน้า
+   สร้างด้วย icon() ใน includes/icons.php
+========================================================= */
+
+:root {
+    --icon-color: #244397;
+    --icon-color-hover: #1e3a8a;
+}
+
+.icon {
+    display: inline-block;
+    width: 1.15em;
+    height: 1.15em;
+    flex-shrink: 0;
+    vertical-align: -0.2em;
+    color: var(--icon-color);
+    stroke-width: 2;
+}
+
+/* ไอคอนหน้าข้อความในปุ่ม/ลิงก์ */
+a > .icon:first-child:not(.icon-only),
+button > .icon:first-child:not(.icon-only),
+h2 > .icon:first-child,
+h3 > .icon:first-child {
+    margin-right: 0.4em;
+}
+
+/* ไอคอนหลังข้อความ (เช่น ดูทั้งหมด →) */
+a > .icon.icon-after {
+    margin-right: 0;
+    margin-left: 0.3em;
+}
+
+/* container ที่มี gap ของตัวเองอยู่แล้ว */
+.logout-button > .icon:first-child,
+.btn-export > .icon:first-child,
+.performance-export-button > .icon:first-child {
+    margin-right: 0;
+}
+
+a:hover > .icon,
+button:hover > .icon {
+    color: var(--icon-color-hover);
+}
+
+
+/* ---------------------------------------------------------
+   พื้นสีเข้ม: ไอคอนใช้สีเดียวกับข้อความ (ขาว) เพื่อให้มองเห็น
+--------------------------------------------------------- */
+
+.btn-primary .icon,
+.login-button .icon,
+.save-button .icon,
+.submit-button .icon,
+.performance-export-button .icon,
+.performance-button .icon,
+.kpi-tab.active .icon,
+.nav-item.active .icon,
+.actions button .icon,
+.btn-primary:hover > .icon,
+.login-button:hover > .icon,
+.save-button:hover > .icon,
+.submit-button:hover > .icon,
+.performance-export-button:hover > .icon,
+.performance-button:hover > .icon,
+.actions button:hover > .icon {
+    color: currentColor;
+}
+
+/* การกระทำที่ทำลายข้อมูล (ลบ / ปิดใช้งาน) คงสีเตือนไว้ */
+.btn-small.danger .icon,
+.btn-delete .icon,
+.btn-small.danger:hover > .icon,
+.btn-delete:hover > .icon {
+    color: currentColor;
+}
+
+
+/* ---------------------------------------------------------
+   Sidebar
+--------------------------------------------------------- */
+
+.nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-icon .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.nav-item:hover .icon {
+    color: var(--icon-color-hover);
+}
+
+.nav-item.active:hover .icon {
+    color: currentColor;
+}
+
+
+/* ---------------------------------------------------------
+   Cards / Empty state
+--------------------------------------------------------- */
+
+.stat-icon .icon,
+.summary-icon .icon {
+    width: 22px;
+    height: 22px;
+}
+
+.empty-icon .icon,
+.empty-kpi-icon .icon {
+    width: 44px;
+    height: 44px;
+    stroke-width: 1.5;
+}
+
+
+/* ---------------------------------------------------------
+   ปุ่มที่มีแต่ไอคอน
+--------------------------------------------------------- */
+
+.mobile-menu-button .icon,
+.dialog-close .icon {
+    width: 22px;
+    height: 22px;
+    vertical-align: middle;
+}
+
+/* ปุ่มเมนูมือถือ: สลับไอคอนตาม aria-expanded ที่ JavaScript เดิมตั้งค่า */
+.mobile-menu-button .icon-x,
+.mobile-menu-button[aria-expanded="true"] .icon-menu {
+    display: none;
+}
+
+.mobile-menu-button[aria-expanded="true"] .icon-x {
+    display: inline-block;
+}
+
+/* ปุ่มแสดง/ซ่อนรหัสผ่าน: สลับไอคอนตาม aria-label ที่ JavaScript เดิมตั้งค่า */
+.show-password .icon {
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+}
+
+.show-password .icon-eye-off,
+.show-password[aria-label="Hide password"] .icon-eye {
+    display: none;
+}
+
+.show-password[aria-label="Hide password"] .icon-eye-off {
+    display: inline-block;
+}
+
+.input-icon .icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+}
+
+.year-step .icon {
+    width: 18px;
+    height: 18px;
+    vertical-align: middle;
+}
+
+.year-step.is-disabled .icon {
+    opacity: 0.4;
+}

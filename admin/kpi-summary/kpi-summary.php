@@ -121,13 +121,13 @@ $employees = $pdo->query("
                 target="_blank"
                 rel="noopener"
                 data-no-scroll-save>
-                📄 Export PDF
+                <?= icon("file-text") ?> Export PDF
             </a>
 
             <a
                 href="index.php?page=kpi-assignment"
                 class="btn btn-primary">
-                มอบหมาย KPI
+                <?= icon("clipboard-list") ?>มอบหมาย KPI
             </a>
 
         </div>
@@ -307,7 +307,7 @@ $employees = $pdo->query("
             <div class="filter-actions">
 
                 <noscript>
-                    <button type="submit" class="btn btn-primary">ค้นหา</button>
+                    <button type="submit" class="btn btn-primary"><?= icon("search") ?>ค้นหา</button>
                 </noscript>
 
                 <?php if ($has_filter): ?>
@@ -315,7 +315,7 @@ $employees = $pdo->query("
                     <a
                         href="index.php?page=summary"
                         class="btn btn-secondary">
-                        ล้างตัวกรอง
+                        <?= icon("rotate-ccw") ?>ล้างตัวกรอง
                     </a>
 
                 <?php endif; ?>
@@ -516,7 +516,7 @@ $employees = $pdo->query("
                                 <a
                                     href="#employee-<?= (int) $summary["employee_id"] ?>"
                                     class="btn-small">
-                                    ดูรายละเอียด
+                                    <?= icon("eye") ?>ดูรายละเอียด
                                 </a>
 
                             </td>
@@ -722,7 +722,7 @@ $employees = $pdo->query("
                                         <!-- เดือนเดียว: ผลของเดือนนั้น -->
 
                                         <div class="result-score">
-                                            <?= number_format((float) $kpi["avg_score"], 2) ?>
+                                            <?= kpiScoreLevel((float) $kpi["avg_score"]) ?>
                                             <small>/ <?= number_format((float) $kpi["max_score"]) ?></small>
                                         </div>
 

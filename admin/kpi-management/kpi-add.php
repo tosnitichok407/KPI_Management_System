@@ -217,6 +217,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/kpi.css?v=category-form-1">
@@ -419,14 +421,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <button
                     type="submit"
                     class="btn btn-primary">
-                    บันทึก KPI
+                    <?= icon("save") ?>บันทึก KPI
                 </button>
 
 
                 <a
                     href="../index.php?page=kpi-management"
                     class="btn btn-secondary">
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
             </form>

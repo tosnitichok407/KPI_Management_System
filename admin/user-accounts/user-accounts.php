@@ -316,7 +316,7 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                 href="user-accounts/user-account-add.php"
                 class="btn btn-primary"
             >
-                + สร้างบัญชีผู้ใช้
+                <?= icon("plus") ?>สร้างบัญชีผู้ใช้
             </a>
 
         </div>
@@ -508,14 +508,14 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                     type="submit"
                     class="btn btn-primary"
                 >
-                ค้นหา
+                <?= icon("search") ?>ค้นหา
                 </button>
 
                 <a
                     href="index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    ล้าง
+                    <?= icon("rotate-ccw") ?>ล้าง
                 </a>
             </div>
         </form>
@@ -745,7 +745,7 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                                             href="user-accounts/user-account-add.php?employee_id=<?= (int) $employee["employee_id"] ?>"
                                             class="btn-small activate"
                                         >
-                                            เพิ่มบัญชีผู้ใช้
+                                            <?= icon("user-plus") ?>เพิ่มบัญชีผู้ใช้
                                         </a>
 
 
@@ -756,7 +756,7 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                                             href="user-accounts/user-account-edit.php?id=<?= (int) $employee["user_id"] ?>"
                                             class="btn-small edit"
                                         >
-                                            แก้ไข
+                                            <?= icon("square-pen") ?>แก้ไข
                                         </a>
 
 
@@ -775,7 +775,7 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                                                 <input type="hidden" name="id" value="<?= (int) $employee["user_id"] ?>">
                                                 <input type="hidden" name="action" value="deactivate">
                                                 <button type="submit" class="btn-small danger">
-                                                    Deactivate
+                                                    <?= icon("user-x") ?>Deactivate
                                                 </button>
                                             </form>
 
@@ -791,7 +791,7 @@ unset($_SESSION["user_success"], $_SESSION["user_error"]);
                                                 <input type="hidden" name="id" value="<?= (int) $employee["user_id"] ?>">
                                                 <input type="hidden" name="action" value="activate">
                                                 <button type="submit" class="btn-small activate">
-                                                    Activate
+                                                    <?= icon("user-check") ?>Activate
                                                 </button>
                                             </form>
 

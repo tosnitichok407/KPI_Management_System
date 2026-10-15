@@ -428,6 +428,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/user-account.css"
@@ -696,7 +698,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    สร้างบัญชี
+                    <?= icon("user-plus") ?>สร้างบัญชี
                 </button>
 
 
@@ -704,7 +706,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
             </div>

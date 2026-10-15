@@ -45,6 +45,7 @@ $yearScores = loadEmployeeYearScores($pdo, $auth["employee_id"], $year);
 | J-L (เดือน): ที่ทำได้ | เกรด (2) | คะแนนจริง (1)x(2)
 |
 | คะแนนเต็ม = น้ำหนัก × 5, คะแนนจริง = น้ำหนัก × เกรด (สูตร Excel)
+| เกรด คะแนนจริง และร้อยละ ปัดเศษทศนิยมลง (ROUNDDOWN) ตรงกับ PDF
 |
 */
 
@@ -61,14 +62,15 @@ const COLOR_MONTH_VALUE = "0070C0";
 
 
 /*
-| สูตรตัดเกรดใน Excel จากช่อง "ทำได้ (%)" (ค่า 0-1) เทียบฐาน 500 คะแนน
+| สูตรตัดเกรดใน Excel จากคะแนนที่ได้ ÷ คะแนนเต็ม เทียบฐาน 500 คะแนน
+| (ไม่ใช้ช่องร้อยละ เพราะช่องนั้นปัดเศษลงแล้ว เกรดจะเพี้ยน)
 | ตรงกับ evaluationGradeScale(): 451+ A+ · 400+ A · 300+ B · 200+ C · ต่ำกว่า D
 */
-function excelGradeFormula(string $percentCell): string
+function excelGradeFormula(string $actualCell, string $fullCell): string
 {
-    $score = "ROUND({$percentCell}*500,6)";
+    $score = "ROUND({$actualCell}/{$fullCell}*500,6)";
 
-    return "=IF({$percentCell}=\"\",\"\","
+    return "=IF(OR({$actualCell}=\"\",{$fullCell}=\"\",{$fullCell}=0),\"\","
         . "IF({$score}>=451,\"A+\","
         . "IF({$score}>=400,\"A\","
         . "IF({$score}>=300,\"B\","
@@ -244,11 +246,11 @@ function renderKpiSection(Worksheet $sheet, int $row, string $title, string $tot
 
         /* เกรด (2) */
         if ($kpi["score_value"] !== null) {
-            $sheet->setCellValue("K{$row}", (float) $kpi["score_value"]);
+            $sheet->setCellValue("K{$row}", kpiScoreLevel((float) $kpi["score_value"]));
         }
 
-        /* คะแนนจริง = น้ำหนัก × เกรด */
-        $sheet->setCellValue("L{$row}", "=IF(K{$row}=\"\",\"\",C{$row}*K{$row})");
+        /* คะแนนจริง = น้ำหนัก × เกรด (ปัดเศษลง แม้แก้เกรดในไฟล์เป็นทศนิยม) */
+        $sheet->setCellValue("L{$row}", "=IF(K{$row}=\"\",\"\",ROUNDDOWN(C{$row}*ROUNDDOWN(K{$row},0),0))");
 
         $row++;
     }
@@ -376,7 +378,7 @@ $row++;
 $percentRow = $row;
 $sheet->mergeCells("A{$percentRow}:K{$percentRow}");
 $sheet->setCellValue("A{$percentRow}", "คิดเป็นร้อยละ (คะแนนที่ได้ ÷ คะแนนเต็ม)");
-$sheet->setCellValue("L{$percentRow}", "=IF(I{$grandRow}=0,\"\",L{$grandRow}/I{$grandRow})");
+$sheet->setCellValue("L{$percentRow}", "=IF(I{$grandRow}=0,\"\",ROUNDDOWN(L{$grandRow}/I{$grandRow},4))");
 $sheet->getStyle("L{$percentRow}")->getNumberFormat()->setFormatCode("0.00%");
 
 $sheet->getStyle("A{$summaryHead}:L{$percentRow}")->applyFromArray([
@@ -399,7 +401,7 @@ $gradeRow = $percentRow + 1;
 
 $sheet->mergeCells("A{$gradeRow}:K{$gradeRow}");
 $sheet->setCellValue("A{$gradeRow}", "เกรดของผลงาน (ตามเกณฑ์สรุปผลการประเมิน)");
-$sheet->setCellValue("L{$gradeRow}", excelGradeFormula("L{$percentRow}"));
+$sheet->setCellValue("L{$gradeRow}", excelGradeFormula("L{$grandRow}", "I{$grandRow}"));
 $sheet->getStyle("A{$gradeRow}:L{$gradeRow}")->applyFromArray([
     "font" => ["bold" => true, "size" => 12],
     "alignment" => ["horizontal" => Alignment::HORIZONTAL_CENTER, "vertical" => Alignment::VERTICAL_CENTER],
@@ -410,7 +412,7 @@ $sheet->getStyle("L{$gradeRow}")->getFont()->getColor()->setRGB("C00000");
 
 $sheet->setCellValue(
     "A" . ($gradeRow + 1),
-    "วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × " . FULL_GRADE . " · คะแนนจริง = น้ำหนัก × เกรด · KPI ที่ยังไม่ประเมินนับเป็น 0"
+    "วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × " . FULL_GRADE . " · คะแนนจริง = น้ำหนัก × เกรด (ปัดเศษทศนิยมลง) · KPI ที่ยังไม่ประเมินนับเป็น 0"
 );
 $sheet->getStyle("A" . ($gradeRow + 1))->getFont()->setItalic(true)->setSize(9)->getColor()->setRGB("667085");
 
@@ -578,10 +580,10 @@ foreach ($monthColumns as $index => $column) {
 
     $sheet->setCellValue(
         "{$column}{$percentMonthRow}",
-        "=IF(OR({$column}{$actualRow}=\"\",{$column}{$fullRow}=\"\",{$column}{$fullRow}=0),\"\",{$column}{$actualRow}/{$column}{$fullRow})"
+        "=IF(OR({$column}{$actualRow}=\"\",{$column}{$fullRow}=\"\",{$column}{$fullRow}=0),\"\",ROUNDDOWN({$column}{$actualRow}/{$column}{$fullRow},2))"
     );
 
-    $sheet->setCellValue("{$column}{$gradeMonthRow}", excelGradeFormula("{$column}{$percentMonthRow}"));
+    $sheet->setCellValue("{$column}{$gradeMonthRow}", excelGradeFormula("{$column}{$actualRow}", "{$column}{$fullRow}"));
 }
 
 $sheet->getStyle("A{$monthHead}:N{$gradeMonthRow}")->applyFromArray([

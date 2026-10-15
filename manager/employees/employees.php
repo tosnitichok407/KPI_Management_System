@@ -263,12 +263,12 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                         data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                         data-month="<?= $feedbackDefaultMonth ?>"
                         data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
-                        ✎ ให้ Feedback
+                        <?= icon("message-square") ?> ให้ Feedback
                     </button>
                 <?php endif; ?>
 
                 <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment]) ?>" class="btn btn-secondary">
-                    ดูทุกคน
+                    <?= icon("users") ?>ดูทุกคน
                 </a>
 
             </div>
@@ -351,7 +351,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                             <td>
                                 <?php if ($row["period"]): ?>
                                     <div class="action-buttons">
-                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit">ดูเดือนนี้</a>
+                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit"><?= icon("eye") ?>ดูเดือนนี้</a>
                                         <button
                                             type="button"
                                             class="btn-small feedback-btn"
@@ -359,7 +359,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                             data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                                             data-month="<?= $month ?>"
                                             data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
-                                            Feedback
+                                            <?= icon("message-square") ?>Feedback
                                         </button>
                                     </div>
                                 <?php endif; ?>
@@ -439,7 +439,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                     <?php if ($item["avg_score"] === null): ?>
                                         <span class="cell-muted">ยังไม่ประเมิน</span>
                                     <?php elseif ($filterMonth > 0): ?>
-                                        <div class="stat-main"><?= number_format($item["avg_score"], 2) ?> / <?= number_format((float) $assignment["max_score"]) ?></div>
+                                        <div class="stat-main"><?= kpiScoreLevel((float) $item["avg_score"]) ?> / <?= number_format((float) $assignment["max_score"]) ?></div>
                                         <div class="cell-sub">
                                             <?php if ($item["latest"]["actual"] !== null): ?>Actual <?= number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
                                             <?= htmlspecialchars($item["latest"]["status"], ENT_QUOTES, "UTF-8") ?>
@@ -578,7 +578,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                 <td>
                                     <div class="action-buttons">
 
-                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit">รายละเอียด</a>
+                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit"><?= icon("eye") ?>รายละเอียด</a>
 
                                         <?php if ($canFeedback): ?>
                                             <button
@@ -588,7 +588,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                                 data-name="<?= htmlspecialchars($employee["first_name"] . " " . $employee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                                                 data-month="<?= $feedbackDefaultMonth ?>"
                                                 data-feedback-map="<?= $feedbackMap((int) $employee["employee_id"]) ?>">
-                                                Feedback
+                                                <?= icon("message-square") ?>Feedback
                                             </button>
                                         <?php endif; ?>
 
@@ -627,7 +627,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
             <?= csrfField() ?>
 
-            <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด">×</button>
+            <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด"><?= icon("x", "icon-only") ?></button>
 
             <h2>Feedback ถึงพนักงาน</h2>
 
@@ -663,8 +663,8 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
             </label>
 
             <div class="dialog-actions">
-                <button type="button" class="btn btn-secondary" onclick="feedbackDialog.close()">ยกเลิก</button>
-                <button type="submit" class="btn btn-primary">ส่ง Feedback</button>
+                <button type="button" class="btn btn-secondary" onclick="feedbackDialog.close()"><?= icon("x") ?>ยกเลิก</button>
+                <button type="submit" class="btn btn-primary"><?= icon("send") ?>ส่ง Feedback</button>
             </div>
 
         </form>

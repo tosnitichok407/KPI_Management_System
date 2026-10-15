@@ -55,7 +55,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🏠
+                <?= icon("house") ?>
             </span>
 
             <span>
@@ -73,7 +73,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🏢
+                <?= icon("building-2") ?>
             </span>
 
             <span>
@@ -91,7 +91,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                👥
+                <?= icon("users") ?>
             </span>
 
             <span>
@@ -114,7 +114,7 @@ $currentPage =
             href="<?= htmlspecialchars(logoutUrl("../"), ENT_QUOTES, "UTF-8") ?>"
             class="logout-button">
 
-            ออกจากระบบ
+            <?= icon("log-out") ?>ออกจากระบบ
 
         </a>
 

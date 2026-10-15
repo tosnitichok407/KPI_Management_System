@@ -407,6 +407,8 @@ if ($page === "home") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
 
     <!-- Admin CSS -->
 
@@ -497,7 +499,7 @@ if ($page === "home") {
                 aria-label="Open navigation menu"
                 aria-expanded="false">
 
-                ☰
+                <?= icon("menu", "icon-only") ?><?= icon("x", "icon-only") ?>
 
             </button>
 
@@ -696,7 +698,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    👥
+                                    <?= icon("users") ?>
 
                                 </div>
 
@@ -731,7 +733,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    🎯
+                                    <?= icon("clipboard-list") ?>
 
                                 </div>
 
@@ -766,7 +768,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    ✅
+                                    <?= icon("clipboard-check") ?>
 
                                 </div>
 
@@ -801,7 +803,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    ⭐
+                                    <?= icon("star") ?>
 
                                 </div>
 
@@ -1363,8 +1365,6 @@ if ($page === "home") {
                 "true"
             );
 
-            mobileMenuButton.textContent =
-                "✕";
 
         }
 
@@ -1384,8 +1384,6 @@ if ($page === "home") {
                 "false"
             );
 
-            mobileMenuButton.textContent =
-                "☰";
 
         }
 

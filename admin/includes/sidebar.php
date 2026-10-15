@@ -61,7 +61,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🏠
+                <?= icon("house") ?>
             </span>
 
             <span>
@@ -82,7 +82,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                👥
+                <?= icon("users") ?>
             </span>
 
             <span>
@@ -103,7 +103,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🔐
+                <?= icon("key-round") ?>
             </span>
 
             <span>
@@ -124,7 +124,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                📂
+                <?= icon("folder") ?>
             </span>
 
             <span>
@@ -145,7 +145,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🎯
+                <?= icon("target") ?>
             </span>
 
             <span>
@@ -166,7 +166,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                📅
+                <?= icon("calendar") ?>
             </span>
 
             <span>
@@ -187,7 +187,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                📋
+                <?= icon("clipboard-list") ?>
             </span>
 
             <span>
@@ -208,7 +208,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                📊
+                <?= icon("chart-column") ?>
             </span>
 
             <span>
@@ -232,7 +232,7 @@ $currentPage =
             href="<?= htmlspecialchars(logoutUrl("../"), ENT_QUOTES, "UTF-8") ?>"
             class="logout-button">
 
-            ออกจากระบบ
+            <?= icon("log-out") ?>ออกจากระบบ
 
         </a>
 

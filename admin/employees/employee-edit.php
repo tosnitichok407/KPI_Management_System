@@ -328,6 +328,8 @@ if (!$employee) {
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/employee.css"
@@ -717,7 +719,7 @@ if (!$employee) {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Save Changes
+                    <?= icon("save") ?>Save Changes
                 </button>
 
 
@@ -725,7 +727,7 @@ if (!$employee) {
                     href="../index.php?page=employees"
                     class="btn btn-secondary"
                 >
-                    Cancel
+                    <?= icon("x") ?>Cancel
                 </a>
 
             </div>

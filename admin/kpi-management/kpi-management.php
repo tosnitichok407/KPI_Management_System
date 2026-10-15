@@ -82,7 +82,7 @@ unset($_SESSION["kpi_success"], $_SESSION["kpi_error"]);
                 <a
                     href="kpi-management/kpi-add.php"
                     class="btn btn-primary">
-                    + เพิ่ม KPI
+                    <?= icon("plus") ?>เพิ่ม KPI
                 </a>
             </div>
         </div>
@@ -189,7 +189,7 @@ unset($_SESSION["kpi_success"], $_SESSION["kpi_error"]);
                                             <a
                                                 href="kpi-management/kpi-edit.php?id=<?= (int) $kpi["kpi_id"] ?>"
                                                 class="btn-small edit">
-                                                แก้ไข
+                                                <?= icon("square-pen") ?>แก้ไข
                                             </a>
 
                                             <form
@@ -200,7 +200,7 @@ unset($_SESSION["kpi_success"], $_SESSION["kpi_error"]);
                                                 <?= csrfField() ?>
                                                 <input type="hidden" name="id" value="<?= (int) $kpi["kpi_id"] ?>">
                                                 <button type="submit" class="btn-small danger">
-                                                    ลบ
+                                                    <?= icon("trash-2") ?>ลบ
                                                 </button>
                                             </form>
                                         </div>

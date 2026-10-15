@@ -171,6 +171,7 @@ KPI "มูลค่าไม่ต่อสัญญา" ใช้กฎเฉ�
 | Excel | [phpoffice/phpspreadsheet](https://github.com/PHPOffice/PhpSpreadsheet) ^5.9 |
 | PDF | [dompdf/dompdf](https://github.com/dompdf/dompdf) ^3.1 + ฟอนต์ TH Sarabun New (`assets/fonts/`) |
 | Frontend | HTML / CSS / JavaScript, ฟอนต์ Kanit (Google Fonts), Chart.js (CDN) สำหรับกราฟของ Manager |
+| Icon | [Lucide](https://lucide.dev) (ISC License) แบบ inline SVG — ไฟล์อยู่ใน `assets/icons/` แสดงผลด้วย `icon()` ใน `includes/icons.php` สีและขนาดกำหนดใน `assets/css/icons.css` |
 
 ไลบรารีใน `vendor/` ถูก commit มากับ repository แล้ว จึงใช้งานได้ทันทีโดยไม่ต้องรัน Composer
 

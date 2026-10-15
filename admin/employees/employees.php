@@ -159,7 +159,7 @@ try {
                 <a
                     href="employees/employee-add.php"
                     class="btn btn-primary">
-                    + เพิ่มพนักงาน
+                    <?= icon("plus") ?>เพิ่มพนักงาน
                 </a>
 
             </div>
@@ -226,13 +226,13 @@ try {
                     <button
                         type="submit"
                         class="btn btn-primary">
-                        ค้นหา
+                        <?= icon("search") ?>ค้นหา
                     </button>
 
                     <a
                         href="index.php?page=employees"
                         class="btn btn-secondary">
-                        ล้าง
+                        <?= icon("rotate-ccw") ?>ล้าง
                     </a>
 
                 </div>
@@ -423,7 +423,7 @@ try {
                                             <a
                                                 href="employees/employee-edit.php?id=<?= (int) $employee["employee_id"] ?>"
                                                 class="btn-small edit">
-                                                แก้ไข
+                                                <?= icon("square-pen") ?>แก้ไข
                                             </a>
 
 
@@ -439,7 +439,7 @@ try {
                                                     <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                     <input type="hidden" name="action" value="deactivate">
                                                     <button type="submit" class="btn-small danger">
-                                                        Deactivate
+                                                        <?= icon("user-x") ?>Deactivate
                                                     </button>
                                                 </form>
 
@@ -454,7 +454,7 @@ try {
                                                     <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                     <input type="hidden" name="action" value="activate">
                                                     <button type="submit" class="btn-small activate">
-                                                        Activate
+                                                        <?= icon("user-check") ?>Activate
                                                     </button>
                                                 </form>
 
@@ -469,7 +469,7 @@ try {
                                                 <?= csrfField() ?>
                                                 <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                 <button type="submit" class="btn-small danger">
-                                                    ลบ
+                                                    <?= icon("trash-2") ?>ลบ
                                                 </button>
                                             </form>
 

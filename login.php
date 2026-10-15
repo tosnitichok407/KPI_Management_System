@@ -363,6 +363,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="assets/css/icons.css?v=1">
+
     <!-- Login CSS -->
     <link
         rel="stylesheet"
@@ -449,7 +451,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             <div class="input-wrapper">
 
                                 <span class="input-icon">
-                                    ID
+                                    <?= icon("id-card", "icon-only") ?>
                                 </span>
 
                                 <input
@@ -477,7 +479,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             <div class="input-wrapper">
 
                                 <span class="input-icon">
-                                    •••
+                                    <?= icon("lock", "icon-only") ?>
                                 </span>
 
                                 <input
@@ -493,7 +495,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     class="show-password"
                                     id="togglePassword"
                                     aria-label="Show password">
-                                    👁
+                                    <?= icon("eye", "icon-only") ?><?= icon("eye-off", "icon-only") ?>
                                 </button>
                             </div>
                         </div>
@@ -503,7 +505,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             type="submit"
                             class="login-button">
 
-                            Login
+                            <?= icon("log-in") ?>Login
 
                         </button>
 
@@ -543,7 +545,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         passwordInput.type = "text";
 
-                        togglePassword.textContent = "🙈";
 
                         togglePassword.setAttribute(
                             "aria-label",
@@ -554,7 +555,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         passwordInput.type = "password";
 
-                        togglePassword.textContent = "👁";
 
                         togglePassword.setAttribute(
                             "aria-label",

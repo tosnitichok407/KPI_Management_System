@@ -712,6 +712,8 @@ $totalCompetency =
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
 
     <link
         rel="stylesheet"
@@ -833,7 +835,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    🎯
+                    <?= icon("target") ?>
                 </div>
 
                 <div>
@@ -853,7 +855,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    📈
+                    <?= icon("trending-up") ?>
                 </div>
 
                 <div>
@@ -873,7 +875,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    ⭐
+                    <?= icon("award") ?>
                 </div>
 
                 <div>
@@ -902,7 +904,7 @@ $totalCompetency =
                 href="kpi.php?tab=performance&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "performance" ? "active" : "" ?>">
 
-                📈 Performance KPI
+                <?= icon("trending-up") ?> Performance KPI
 
                 (<?= $totalPerformance ?>)
 
@@ -912,7 +914,7 @@ $totalCompetency =
                 href="kpi.php?tab=competency&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "competency" ? "active" : "" ?>">
 
-                ⭐ Competency KPI
+                <?= icon("award") ?> Competency KPI
 
                 (<?= $totalCompetency ?>)
 
@@ -949,7 +951,7 @@ $totalCompetency =
                     <div class="empty-kpi">
 
                         <div class="empty-kpi-icon">
-                            📈
+                            <?= icon("trending-up") ?>
                         </div>
 
                         <h3>
@@ -1061,7 +1063,7 @@ $totalCompetency =
                                                 );
                                             } elseif ($kpi["score"] !== null && $kpi["score"] !== "") {
 
-                                                $currentLevel = (int) round((float) $kpi["score"]);
+                                                $currentLevel = kpiScoreLevel((float) $kpi["score"]);
                                             }
 
                                             $savedScore = ($kpi["score"] !== null && $kpi["score"] !== "")
@@ -1218,7 +1220,7 @@ $totalCompetency =
                                                     type="submit"
                                                     class="save-button">
 
-                                                    บันทึกข้อมูล
+                                                    <?= icon("save") ?>บันทึกข้อมูล
 
                                                 </button>
                                             </form>
@@ -1265,7 +1267,7 @@ $totalCompetency =
                     <div class="empty-kpi">
 
                         <div class="empty-kpi-icon">
-                            ⭐
+                            <?= icon("award") ?>
                         </div>
 
                         <h3>
@@ -1312,7 +1314,7 @@ $totalCompetency =
                                     $levels = $kpiCriteria[$kpiId] ?? [];
 
                                     $currentScore = ($kpi["score"] !== null && $kpi["score"] !== "")
-                                        ? (int) round((float) $kpi["score"])
+                                        ? kpiScoreLevel((float) $kpi["score"])
                                         : 0;
 
                                     $realScore = (float) ($kpi["weight"] ?? 0) * $currentScore;
@@ -1423,7 +1425,7 @@ $totalCompetency =
                                                     type="submit"
                                                     class="save-button">
 
-                                                    บันทึกข้อมูล
+                                                    <?= icon("save") ?>บันทึกข้อมูล
 
                                                 </button>
 

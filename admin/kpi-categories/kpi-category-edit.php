@@ -253,6 +253,8 @@ $submitLabel = "บันทึกการแก้ไข";
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/kpi.css?v=category-form-1"
