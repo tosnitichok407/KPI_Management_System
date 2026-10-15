@@ -680,7 +680,9 @@ $employees = $pdo->query("
 
 
                                 <td class="col-number">
-                                    <?= number_format($kpi["target_value"]) ?>%
+                                    <?= isNonRenewalKpi($kpi)
+                                        ? "Budget " . kpiFormatMoney($kpi["target_value"])
+                                        : number_format($kpi["target_value"]) . "%" ?>
                                 </td>
 
 
@@ -729,7 +731,7 @@ $employees = $pdo->query("
                                         <div class="result-meta">
 
                                             <?php if ($kpi["last_actual"] !== null): ?>
-                                                Actual <?= number_format((float) $kpi["last_actual"]) ?>
+                                                <?= isNonRenewalKpi($kpi) ? "Total R สูงสุด " . kpiFormatMoney($kpi["last_actual"]) : "Actual " . number_format((float) $kpi["last_actual"]) ?>
                                                 ·
                                             <?php endif; ?>
 

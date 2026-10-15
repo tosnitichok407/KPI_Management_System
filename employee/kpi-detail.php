@@ -122,8 +122,8 @@ $error = "";
 
 $success = "";
 
-/* KPI "มูลค่าไม่ต่อสัญญา" ใช้เป้าหมาย 100% (กฎกลางใน includes/kpi-score-helper.php) */
-$kpi["target_value"] = kpiEffectiveTarget($kpi, $kpi["target_value"]);
+/* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget (จำนวนเงิน) ตามที่ Admin กำหนด ไม่บังคับเป็น 100 อีกต่อไป */
+$isBudgetKpi = isNonRenewalKpi($kpi);
 
 $targetValue = (float) $kpi["target_value"];
 
@@ -235,17 +235,15 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
         ------------------------------------------------------
         */
 
-        $score = kpiPerformanceGrade(
-            $kpiLevels,
-            $actualValue,
-            $targetValue > 0 ? $targetValue : null
-        );
+        /* ฟังก์ชันกลาง: KPI 9 ใช้ Total R / Budget · Budget 0 / NULL → error ไม่บันทึก */
+        $scoreResult = kpiCalculateScore($kpi, $kpiLevels, $actual, $kpi["target_value"]);
+        $score = $scoreResult["grade"];
 
 
-        if ($score === null) {
+        if ($scoreResult["error"] !== null || $score === null) {
 
-            $error =
-                "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
+            $error = $scoreResult["error"]
+                ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
         } else {
 
 
@@ -697,11 +695,15 @@ $performances =
                     <div class="form-group">
 
                         <label>
-                            Target
+                            <?= $isBudgetKpi ? "Budget (เป้าหมายจำนวนเงิน)" : "Target" ?>
                         </label>
 
                         <div class="target-value">
-                            <?= number_format($targetValue, 0) ?>
+                            <?php if ($isBudgetKpi): ?>
+                                <?= kpiBudgetIsValid($kpi["target_value"]) ? kpiFormatMoney($kpi["target_value"]) : "ยังไม่ได้กำหนด Budget" ?>
+                            <?php else: ?>
+                                <?= number_format($targetValue, 0) ?>
+                            <?php endif; ?>
                         </div>
 
                     </div>
@@ -710,7 +712,7 @@ $performances =
                     <div class="form-group">
 
                         <label>
-                            Actual
+                            <?= $isBudgetKpi ? "Total R (ไม่รวม Total N)" : "Actual" ?>
                         </label>
 
                         <input
@@ -718,8 +720,12 @@ $performances =
                             name="actual"
                             step="0.01"
                             min="0"
-                            placeholder="เช่น 100"
+                            placeholder="<?= $isBudgetKpi ? "ยอด Total R (จำนวนเงิน)" : "เช่น 100" ?>"
                             required>
+
+                        <?php if ($isBudgetKpi): ?>
+                            <small>Achievement = Total R / Budget × 100 · ห้ามรวม Total N และห้ามใช้ Total R+N</small>
+                        <?php endif; ?>
 
                     </div>
 
@@ -847,10 +853,12 @@ $performances =
 
                                     <td>
 
-                                        <?= number_format(
-                                            $targetValue,
-                                            0
-                                        ) ?>
+                                        <?= $isBudgetKpi
+                                            ? kpiFormatMoney($kpi["target_value"])
+                                            : number_format(
+                                                $targetValue,
+                                                0
+                                            ) ?>
 
                                     </td>
 
@@ -874,6 +882,20 @@ $performances =
                                         ) ?>
 
                                         / 5
+
+                                        <?php if ($isBudgetKpi): ?>
+                                            <?php $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $kpi["target_value"]); ?>
+                                            <br>
+                                            <small>
+                                                คะแนนที่บันทึกไว้
+                                                <?php if ($historyResult["grade"] !== null): ?>
+                                                    · ตามเกณฑ์ปัจจุบัน <?= $historyResult["grade"] ?> / 5
+                                                    (<?= kpiFormatAchievement($historyResult["achievement"]) ?>)
+                                                <?php elseif ($historyResult["error"] !== null): ?>
+                                                    · คำนวณตามเกณฑ์ปัจจุบันไม่ได้ (ยังไม่ได้กำหนด Budget)
+                                                <?php endif; ?>
+                                            </small>
+                                        <?php endif; ?>
 
                                     </td>
 

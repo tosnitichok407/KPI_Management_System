@@ -130,7 +130,7 @@ foreach ($report["employees"] as $summary) {
         } elseif ($hasMonth) {
             $result = "<b>" . kpiScoreLevel((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"])
                 . "<br><span class='small'>"
-                . ($kpi["last_actual"] !== null ? "Actual " . number_format((float) $kpi["last_actual"]) . " · " : "")
+                . ($kpi["last_actual"] !== null ? (isNonRenewalKpi($kpi) ? "Total R สูงสุด " . kpiFormatMoney($kpi["last_actual"]) : "Actual " . number_format((float) $kpi["last_actual"])) . " · " : "")
                 . $e($kpi["last_status"]) . "</span>";
         } else {
             $result = "<b>" . $num((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"]) . " เฉลี่ย"
@@ -143,7 +143,9 @@ foreach ($report["employees"] as $summary) {
             . "<td class='center muted'>" . ($index + 1) . "</td>"
             . "<td>" . $e($kpi["kpi_name"]) . "<br><span class='small'>หน่วย: " . $e($kpi["unit"] ?? "-") . "</span></td>"
             . "<td class='{$typeClass}'>" . $e($kpi["kpi_type"]) . "</td>"
-            . "<td class='num'>" . number_format((float) $kpi["target_value"]) . "%</td>"
+            . "<td class='num'>" . (isNonRenewalKpi($kpi)
+                ? "Budget " . kpiFormatMoney($kpi["target_value"])
+                : number_format((float) $kpi["target_value"]) . "%") . "</td>"
             . "<td class='num'><b>" . number_format((float) $kpi["weight"]) . "%</b></td>"
             . "<td>" . $e($kpi["period_label"]) . " " . (int) $kpi["assignment_year"] . " (" . $e($kpi["quarter_label"]) . ")"
                 . "<br><span class='small'>" . date("d/m/Y", strtotime($kpi["start_date"])) . " – " . date("d/m/Y", strtotime($kpi["end_date"])) . "</span></td>"

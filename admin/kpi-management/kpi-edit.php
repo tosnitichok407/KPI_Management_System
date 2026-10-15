@@ -452,8 +452,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <?php if ($hasSpecialRule): ?>
 
                     <div class="error">
-                        KPI นี้ใช้กฎตัดเกรดเฉพาะที่กำหนดไว้ในระบบ
+                        KPI นี้ใช้กฎตัดเกรดเฉพาะที่กำหนดไว้ในระบบ:
+                        Achievement = Total R / Budget × 100 (ไม่รวม Total N)
                         (<?= htmlspecialchars(implode(" / ", NON_RENEWAL_KPI_CRITERIA), ENT_QUOTES, "UTF-8") ?>)
+                        · กำหนด Budget ที่หน้ามอบหมาย KPI
                         เกณฑ์ที่กรอกด้านล่างจะถูกบันทึก แต่ไม่ถูกใช้ตัดเกรด
                     </div>
 

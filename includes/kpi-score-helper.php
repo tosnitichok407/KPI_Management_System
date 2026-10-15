@@ -33,60 +33,219 @@ const KPI_CRITERIA_TARGET_TOLERANCE = 1.5;
 
 /*
 |--------------------------------------------------------------------------
-| กฎเฉพาะ KPI "มูลค่าไม่ต่อสัญญา"
+| กฎเฉพาะ KPI ID 9 "มูลค่าไม่ต่อสัญญา"
 |--------------------------------------------------------------------------
 |
-| เป้าหมาย 100% · ตัดเกรดจาก Actual (%) ตามสูตร Excel ของบริษัท:
-|   > 20%      → 5
-|   15% - 20%  → 4
-|   10% - 14%  → 3
-|   5% - 9%    → 2
-|   < 5%       → 1
-| ค่าทศนิยมที่ตกช่องว่างของสูตร Excel (เช่น 14.5%) ปัดลงไปเกรดล่าง
+| Target = Budget (จำนวนเงิน) · Actual = Total R (ไม่รวม Total N และห้ามใช้ Total R+N)
+| Achievement = Total R / Budget × 100
 |
-| กฎนี้อยู่ที่ไฟล์กลางเพื่อให้ทุกเส้นทางใช้เกณฑ์เดียวกัน:
-| หน้า KPI ของฉัน · หน้ารายละเอียด KPI · แบบฟอร์ม Excel/PDF · สคริปต์คำนวณย้อนหลัง
-| loadKpiScoreCriteria() จะคืนเกณฑ์ชุดนี้แทนเกณฑ์ในฐานข้อมูลของ KPI ตัวนี้เสมอ
+|   Achievement >= 100%          → 5
+|   96% <= Achievement < 100%    → 4
+|   90% <= Achievement < 96%     → 3
+|   85% <= Achievement < 90%     → 2
+|   Achievement < 85%            → 1
+|
+| ช่วงคะแนนต่อเนื่องนี้เป็นข้อกำหนดของระบบ เพื่อให้ทุกเปอร์เซ็นต์ทศนิยมมีคะแนน
+| (เช่น 99.5% → 4) ไม่ใช่การคัดลอกสูตร Excel เดิมทุกประการ
+|
+| Budget เป็น 0 / NULL / ไม่ใช่ตัวเลข → ไม่คำนวณคะแนน (kpiCalculateScore คืน error)
+|
+| ระบุ KPI ด้วย kpi_id = 9 เป็นหลัก และต้องมีชื่อ "มูลค่าไม่ต่อสัญญา" ประกอบ
+| ถ้า ID ตรงแต่ชื่อไม่ตรง จะไม่ใช้กฎนี้ (บันทึก error_log ไว้ให้ตรวจสอบ)
+|
+| ทุกหน้าต้องคำนวณผ่าน kpiCalculateScore() / nonRenewalAchievement() เท่านั้น:
+| หน้า KPI ของฉัน · หน้ารายละเอียด KPI · หน้าผลงาน · แบบฟอร์ม Excel/PDF · สคริปต์คำนวณย้อนหลัง
+| loadKpiScoreCriteria() คืนข้อความเกณฑ์ชุดนี้ (ใช้แสดงผลเท่านั้น ไม่ผ่านตัวอ่านเกณฑ์ทั่วไป)
 |
 */
 
+const NON_RENEWAL_KPI_ID = 9;
 const NON_RENEWAL_KPI_NAME = "มูลค่าไม่ต่อสัญญา";
-const NON_RENEWAL_KPI_TARGET = 100;
+
+/* เพดานของ kpi_assignments.target_value = decimal(10,2) */
+const KPI_BUDGET_MAX = 99999999.99;
+
+/* เกณฑ์ขั้นต่ำ (%) ของแต่ละระดับ · ต่ำกว่า 85% = ระดับ 1 */
+const NON_RENEWAL_KPI_THRESHOLDS = [
+    5 => 100,
+    4 => 96,
+    3 => 90,
+    2 => 85,
+];
 
 const NON_RENEWAL_KPI_CRITERIA = [
-    5 => ">20%",
-    4 => "15% - 20%",
-    3 => "10% - 14%",
-    2 => "5% - 9%",
-    1 => "<5%",
+    5 => "Achievement ≥ 100%",
+    4 => "96% ≤ Achievement < 100%",
+    3 => "90% ≤ Achievement < 96%",
+    2 => "85% ≤ Achievement < 90%",
+    1 => "Achievement < 85%",
 ];
 
 function isNonRenewalKpi(array $kpi): bool
 {
-    return mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false;
+    if ((int) ($kpi["kpi_id"] ?? 0) !== NON_RENEWAL_KPI_ID) {
+        return false;
+    }
+
+    if (mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false) {
+        return true;
+    }
+
+    static $warned = false;
+    if (!$warned) {
+        $warned = true;
+        error_log(
+            "kpi-score-helper: kpi_id " . NON_RENEWAL_KPI_ID . " name mismatch ("
+            . (string) ($kpi["kpi_name"] ?? "[not selected]")
+            . ") · non-renewal rule not applied"
+        );
+    }
+
+    return false;
 }
 
-function nonRenewalKpiGrade(float $actual): int
+/* แปลงจำนวนเงิน / ตัวเลข → หน่วยสตางค์ (จำนวนเต็ม) · null = ไม่ใช่ตัวเลข */
+function kpiToCents($value): ?int
 {
-    if ($actual > 20) {
-        return 5;
+    if ($value === null || $value === "" || !is_numeric($value)) {
+        return null;
     }
-    if ($actual >= 15) {
-        return 4;
-    }
-    if ($actual >= 10) {
-        return 3;
-    }
-    if ($actual >= 5) {
-        return 2;
-    }
-    return 1;
+
+    return (int) round((float) $value * 100);
 }
 
-/* เป้าหมายที่ใช้จริงของ KPI (KPI "มูลค่าไม่ต่อสัญญา" ใช้ 100% เสมอ) */
-function kpiEffectiveTarget(array $kpi, $assignedTarget)
+/*
+| Achievement (%) แบบตัดทศนิยมลง 2 ตำแหน่ง (basis point) เพื่อไม่ให้ค่าที่แสดง
+| ข้ามเกณฑ์ที่ยังไม่ถึงจริง เช่น 95.999% แสดง 95.99% (ไม่ใช่ 96.00%)
+| คำนวณจากจำนวนเต็มเพื่อเลี่ยงความคลาดเคลื่อนของ float ที่ขอบเกณฑ์
+| null = Budget เป็น 0 / NULL / ไม่ใช่ตัวเลข หรือไม่มี Total R
+*/
+function nonRenewalAchievementBasisPoints($totalR, $budget): ?int
 {
-    return isNonRenewalKpi($kpi) ? NON_RENEWAL_KPI_TARGET : $assignedTarget;
+    $budgetCents = kpiToCents($budget);
+    $actualCents = kpiToCents($totalR);
+
+    if ($budgetCents === null || $budgetCents <= 0 || $actualCents === null || $actualCents < 0) {
+        return null;
+    }
+
+    if ($actualCents > intdiv(PHP_INT_MAX, 10000)) {
+        return (int) floor($actualCents / $budgetCents * 10000);
+    }
+
+    return intdiv($actualCents * 10000, $budgetCents);
+}
+
+function nonRenewalAchievement($totalR, $budget): ?float
+{
+    $basisPoints = nonRenewalAchievementBasisPoints($totalR, $budget);
+
+    return $basisPoints === null ? null : $basisPoints / 100;
+}
+
+/* ระดับ 1..5 จาก Total R และ Budget · null = คำนวณไม่ได้ */
+function nonRenewalKpiGrade($totalR, $budget): ?int
+{
+    $basisPoints = nonRenewalAchievementBasisPoints($totalR, $budget);
+
+    if ($basisPoints === null) {
+        return null;
+    }
+
+    foreach (NON_RENEWAL_KPI_THRESHOLDS as $level => $minimumPercent) {
+        if ($basisPoints >= $minimumPercent * 100) {
+            return $level;
+        }
+    }
+
+    return KPI_MIN_LEVEL;
+}
+
+/* Budget ใช้ได้หรือไม่ (มากกว่า 0) */
+function kpiBudgetIsValid($budget): bool
+{
+    $cents = kpiToCents($budget);
+
+    return $cents !== null && $cents > 0;
+}
+
+const NON_RENEWAL_BUDGET_ERROR =
+    "KPI มูลค่าไม่ต่อสัญญายังไม่ได้กำหนด Budget (เป้าหมายจำนวนเงิน) หรือ Budget เป็น 0"
+    . " จึงคำนวณคะแนนไม่ได้ กรุณาติดต่อผู้ดูแลระบบ";
+
+/*
+|--------------------------------------------------------------------------
+| ฟังก์ชันกลาง: คำนวณคะแนน Performance KPI หนึ่งรายการ
+|--------------------------------------------------------------------------
+|
+| $kpi ต้องมี kpi_id และ kpi_name · $levels = เกณฑ์จาก loadKpiScoreCriteria()
+| คืน ["grade" => ?int, "achievement" => ?float, "error" => ?string]
+|   - KPI 9: ใช้ Budget / Total R ตามกฎด้านบน
+|   - KPI อื่น: ใช้ kpiPerformanceGrade() ตามเดิม (achievement = null)
+|
+*/
+function kpiCalculateScore(array $kpi, array $levels, $actual, $target): array
+{
+    $actualMissing = $actual === null || $actual === "";
+
+    if (isNonRenewalKpi($kpi)) {
+
+        if (!kpiBudgetIsValid($target)) {
+            return ["grade" => null, "achievement" => null, "error" => NON_RENEWAL_BUDGET_ERROR];
+        }
+
+        if ($actualMissing) {
+            return ["grade" => null, "achievement" => null, "error" => null];
+        }
+
+        return [
+            "grade" => nonRenewalKpiGrade($actual, $target),
+            "achievement" => nonRenewalAchievement($actual, $target),
+            "error" => null
+        ];
+    }
+
+    if ($actualMissing) {
+        return ["grade" => null, "achievement" => null, "error" => null];
+    }
+
+    $targetValue = $target !== null && $target !== "" && (float) $target > 0 ? (float) $target : null;
+    $grade = kpiPerformanceGrade($levels, (float) $actual, $targetValue);
+
+    return [
+        "grade" => $grade,
+        "achievement" => null,
+        "error" => $grade === null
+            ? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ"
+            : null
+    ];
+}
+
+/* ตรวจค่า Budget ที่ Admin กรอก (เฉพาะ KPI 9) · คืนข้อความ error หรือ null ถ้าผ่าน */
+function kpiValidateBudgetInput(array $kpi, string $raw): ?string
+{
+    if (!isNonRenewalKpi($kpi)) {
+        return null;
+    }
+
+    if (!preg_match('/^\d{1,8}(\.\d{1,2})?$/', $raw) || !kpiBudgetIsValid($raw) || (float) $raw > KPI_BUDGET_MAX) {
+        return "Budget ของ KPI มูลค่าไม่ต่อสัญญาต้องเป็นจำนวนเงินมากกว่า 0 และไม่เกิน "
+            . number_format(KPI_BUDGET_MAX, 2) . " (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
+    }
+
+    return null;
+}
+
+/* แสดงจำนวนเงิน (Budget / Total R) */
+function kpiFormatMoney($value): string
+{
+    return $value === null || $value === "" ? "-" : number_format((float) $value, 2);
+}
+
+/* แสดง Achievement (%) ที่ตัดลง 2 ตำแหน่งแล้ว */
+function kpiFormatAchievement(?float $achievement): string
+{
+    return $achievement === null ? "-" : number_format($achievement, 2) . "%";
 }
 
 

@@ -7,6 +7,7 @@ require_once __DIR__ . "/../../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 
 /* =========================================================
@@ -227,6 +228,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $kpi_type_sql = "
                 SELECT
+                    kpi_id,
+                    kpi_name,
                     kpi_type
                 FROM kpi_indicators
                 WHERE kpi_id = ?
@@ -242,14 +245,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $kpi_id
             ]);
 
+            $kpi_row =
+                $kpi_type_stmt->fetch(PDO::FETCH_ASSOC);
+
             $kpi_type =
-                $kpi_type_stmt->fetchColumn();
+                $kpi_row["kpi_type"] ?? false;
+
+            /* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget จำนวนเงิน (> 0 และไม่เกินเพดานคอลัมน์) */
+            $budget_error = $kpi_row
+                ? kpiValidateBudgetInput($kpi_row, $target_value)
+                : null;
 
 
             if (!$kpi_type) {
 
                 $error =
                     "ไม่พบประเภทของ KPI";
+
+            } elseif ($budget_error !== null) {
+
+                $error = $budget_error;
 
             } else {
 
@@ -1183,6 +1198,7 @@ $form_year =
 
                     <select
                         name="kpi_id"
+                        id="assignment_kpi_select"
                         required>
 
                         <option value="">
@@ -1196,7 +1212,8 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= (int) $kpi["kpi_id"] ?>">
+                                value="<?= (int) $kpi["kpi_id"] ?>"
+                                <?= isNonRenewalKpi($kpi) ? 'data-budget="1"' : "" ?>>
 
                                 [<?= htmlspecialchars(
                                     $kpi["kpi_type"]
@@ -1229,18 +1246,24 @@ $form_year =
                 <div class="form-group">
 
                     <label>
-                        เป้าหมาย (%) <span>*</span>
+                        <span id="target_label_text">เป้าหมาย (%)</span> <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="target_value"
+                        id="target_value_input"
                         step="1"
                         min="0"
                         max="100"
                         placeholder="เช่น 100"
                         required>
+
+                    <small id="target_budget_hint" hidden>
+                        KPI มูลค่าไม่ต่อสัญญา: กรอก Budget เป็นจำนวนเงิน (มากกว่า 0 ไม่เกิน <?= number_format(KPI_BUDGET_MAX, 2) ?>)
+                        · คะแนนคำนวณจาก Total R / Budget × 100
+                    </small>
 
                 </div>
 
@@ -1812,7 +1835,9 @@ $form_year =
 
                                 <td class="col-number">
 
-                                    <?= number_format($assignment["target_value"]) ?>%
+                                    <?= isNonRenewalKpi($assignment)
+                                        ? "Budget " . kpiFormatMoney($assignment["target_value"])
+                                        : number_format($assignment["target_value"]) . "%" ?>
 
                                 </td>
 
@@ -1915,6 +1940,40 @@ $form_year =
 /* =========================================================
    FORM ELEMENTS
 ========================================================= */
+
+/* KPI 9 มูลค่าไม่ต่อสัญญา: ช่อง Target เป็น Budget จำนวนเงิน */
+(function () {
+    const kpiSelect = document.getElementById("assignment_kpi_select");
+    const targetInput = document.getElementById("target_value_input");
+    const targetLabel = document.getElementById("target_label_text");
+    const budgetHint = document.getElementById("target_budget_hint");
+
+    if (!kpiSelect || !targetInput) {
+        return;
+    }
+
+    function syncTargetField() {
+        const option = kpiSelect.options[kpiSelect.selectedIndex];
+        const isBudget = !!(option && option.dataset.budget === "1");
+
+        targetLabel.textContent = isBudget ? "Budget (เป้าหมายจำนวนเงิน)" : "เป้าหมาย (%)";
+        targetInput.step = isBudget ? "0.01" : "1";
+        targetInput.min = isBudget ? "0.01" : "0";
+        targetInput.max = isBudget ? "<?= number_format(KPI_BUDGET_MAX, 2, ".", "") ?>" : "100";
+        targetInput.placeholder = isBudget ? "เช่น 1500000.00" : "เช่น 100";
+        budgetHint.hidden = !isBudget;
+    }
+
+    kpiSelect.addEventListener("change", syncTargetField);
+
+    if (kpiSelect.form) {
+        kpiSelect.form.addEventListener("reset", function () {
+            setTimeout(syncTargetField, 0);
+        });
+    }
+
+    syncTargetField();
+})();
 
 const yearInput =
     document.getElementById(

@@ -19,6 +19,8 @@
 |   เพิ่ม --db=ชื่อฐานข้อมูล เพื่อรันกับฐานอื่น (เช่นฐานทดสอบ)
 |
 | - แตะเฉพาะ Performance KPI ที่มีทั้ง actual และ score เท่านั้น
+| - KPI 9 มูลค่าไม่ต่อสัญญา: Achievement = Total R / Budget × 100 · Budget 0 / NULL → ข้าม (ไม่คำนวณ)
+| - ห้ามรัน --apply โดยไม่ได้รับอนุญาต: แบบไม่มี --apply ใช้เป็นรายงานตรวจคะแนนเดิมเทียบเกณฑ์ใหม่ได้
 | - Competency KPI ไม่ถูกแตะ (พนักงานเลือกคะแนน 1-5 เอง ไม่ได้คำนวณจาก Actual)
 | - ทำงานใน transaction เดียว ถ้าพลาดกลางทางจะ rollback ทั้งหมด
 |
@@ -102,11 +104,13 @@ foreach ($rows as $row) {
     $kpiId = (int) $row["kpi_id"];
     $target = $row["target_value"] !== null ? (float) $row["target_value"] : null;
 
-    $grade = kpiPerformanceGrade(
+    /* ฟังก์ชันกลางเดียวกับหน้ากรอกผลงาน (KPI 9: Total R / Budget × 100) */
+    $grade = kpiCalculateScore(
+        $row,
         $criteria[$kpiId] ?? [],
-        (float) $row["actual"],
-        $target !== null && $target > 0 ? $target : null
-    );
+        $row["actual"],
+        $row["target_value"]
+    )["grade"];
 
     if ($grade === null) {
         $skipped[$row["kpi_name"]] = ($skipped[$row["kpi_name"]] ?? 0) + 1;

@@ -431,7 +431,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                     </span>
                                 </td>
 
-                                <td class="col-number"><?= number_format((float) $assignment["target_value"]) ?>%</td>
+                                <td class="col-number"><?= isNonRenewalKpi($assignment)
+                                    ? "Budget " . kpiFormatMoney($assignment["target_value"])
+                                    : number_format((float) $assignment["target_value"]) . "%" ?></td>
 
                                 <td class="col-number"><strong><?= number_format((float) $assignment["weight"]) ?>%</strong></td>
 
@@ -441,7 +443,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                     <?php elseif ($filterMonth > 0): ?>
                                         <div class="stat-main"><?= kpiScoreLevel((float) $item["avg_score"]) ?> / <?= number_format((float) $assignment["max_score"]) ?></div>
                                         <div class="cell-sub">
-                                            <?php if ($item["latest"]["actual"] !== null): ?>Actual <?= number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
+                                            <?php if ($item["latest"]["actual"] !== null): ?><?= isNonRenewalKpi($assignment) ? "Total R " . kpiFormatMoney($item["latest"]["actual"]) : "Actual " . number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
                                             <?= htmlspecialchars($item["latest"]["status"], ENT_QUOTES, "UTF-8") ?>
                                         </div>
                                     <?php else: ?>

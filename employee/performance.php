@@ -8,6 +8,7 @@ require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/period-picker.php";
+require_once __DIR__ . "/../includes/kpi-score-helper.php";
 require_once __DIR__ . "/includes/layout.php";
 require_once __DIR__ . "/includes/feedback.php";
 
@@ -355,8 +356,10 @@ foreach ($assignments as $assignment) {
             $actual !== null
         ) {
 
-            $progress =
-                ($actual / $target) * 100;
+            /* KPI 9 ใช้ Achievement จากฟังก์ชันกลาง (Total R / Budget × 100) */
+            $progress = isNonRenewalKpi($assignment)
+                ? (float) nonRenewalAchievement($actual, $target)
+                : ($actual / $target) * 100;
 
 
             /*
@@ -921,6 +924,12 @@ if ($totalPerformanceRecords === 0) {
 
                                             <strong>
 
+                                                <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                                    Budget <?= kpiFormatMoney($kpi["target_value"]) ?>
+
+                                                <?php else: ?>
+
                                                 <?= number_format(
                                                     (int) $kpi["target_value"]
                                                 ) ?>
@@ -930,6 +939,8 @@ if ($totalPerformanceRecords === 0) {
                                                     ENT_QUOTES,
                                                     "UTF-8"
                                                 ) ?>
+
+                                                <?php endif; ?>
 
                                             </strong>
 
@@ -943,6 +954,13 @@ if ($totalPerformanceRecords === 0) {
 
                                             <strong>
 
+                                                <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                                    Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
+                                                    <small>(<?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["target_value"])) ?>)</small>
+
+                                                <?php else: ?>
+
                                                 <?= number_format(
                                                     (int) $kpi["actual_value"]
                                                 ) ?>
@@ -952,6 +970,8 @@ if ($totalPerformanceRecords === 0) {
                                                     ENT_QUOTES,
                                                     "UTF-8"
                                                 ) ?>
+
+                                                <?php endif; ?>
 
                                             </strong>
 

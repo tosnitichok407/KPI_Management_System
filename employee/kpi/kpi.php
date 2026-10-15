@@ -199,10 +199,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $assignment = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($assignment && isNonRenewalKpi($assignment)) {
-                $assignment["target_value"] = NON_RENEWAL_KPI_TARGET;
-            }
-
 
             if (!$assignment) {
 
@@ -235,51 +231,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         $error = "กรุณากรอกผลที่ทำได้เป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
                     } elseif (
-                        $assignment["target_value"] === null ||
-                        $assignment["target_value"] === ""
+                        !isNonRenewalKpi($assignment) &&
+                        ($assignment["target_value"] === null ||
+                            $assignment["target_value"] === "")
                     ) {
 
                         $error = "KPI นี้ยังไม่ได้กำหนด Target โดย Admin";
                     } else {
 
-                        $targetValue = (float) $assignment["target_value"];
-                        $actualValue = (float) $actual;
-
                         /*
-        |--------------------------------------------------------------------------
-        | เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนดไว้
-        |--------------------------------------------------------------------------
-        |
-        | ไม่ใช้สูตรสัดส่วน Actual / Target × 5 อีกต่อไป เพราะให้ผลไม่ตรงกับเกณฑ์
-        | ที่แสดงบนหน้าจอ เช่น เกณฑ์ "5 : >100%" กับ "4 : 100%" แต่สูตรสัดส่วน
-        | ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม ทั้งที่ต้องได้ 4
-        |
-        | รายละเอียดการตัดเกรดอยู่ใน includes/kpi-score-helper.php
-        |--------------------------------------------------------------------------
-        */
+                        | เกรดคำนวณที่ฟังก์ชันกลาง kpiCalculateScore() ใน includes/kpi-score-helper.php
+                        | (KPI 9 มูลค่าไม่ต่อสัญญา: Total R / Budget · KPI อื่น: เกณฑ์ที่ Admin กำหนด)
+                        | Budget เป็น 0 / NULL → ได้ error และไม่บันทึก
+                        */
 
-                        if (isNonRenewalKpi($assignment)) {
+                        $assignmentLevels =
+                            loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
 
-                            $grade = nonRenewalKpiGrade($actualValue);
+                        $result = kpiCalculateScore(
+                            $assignment,
+                            $assignmentLevels,
+                            $actual,
+                            $assignment["target_value"]
+                        );
+
+                        if ($result["error"] !== null || $result["grade"] === null) {
+
+                            $error = $result["error"]
+                                ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
                         } else {
 
-                            $assignmentLevels =
-                                loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
-
-                            $grade = kpiPerformanceGrade(
-                                $assignmentLevels,
-                                $actualValue,
-                                $targetValue > 0 ? $targetValue : null
-                            );
-                        }
-
-                        if ($grade === null) {
-
-                            $error = "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย"
-                                . " กรุณาติดต่อผู้ดูแลระบบ";
-                        } else {
-
-                            $score = (string) $grade;
+                            $score = (string) $result["grade"];
                         }
                     }
 
@@ -603,12 +585,6 @@ try {
     $assignments =
         $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    foreach ($assignments as &$row) {
-        if (isNonRenewalKpi($row)) {
-            $row["target_value"] = NON_RENEWAL_KPI_TARGET;
-        }
-    }
-    unset($row);
 } catch (PDOException $e) {
 
         error_log("employee/kpi/kpi: " . $e->getMessage());
@@ -1049,18 +1025,18 @@ $totalCompetency =
 
                                             $currentLevel = 0;
 
-                                            if ($kpi["actual"] !== null && $kpi["actual"] !== "" && isNonRenewalKpi($kpi)) {
+                                            /* ฟังก์ชันกลางเดียวกับตอนบันทึก (includes/kpi-score-helper.php) */
+                                            $isBudgetKpi = isNonRenewalKpi($kpi);
+                                            $scoreResult = kpiCalculateScore(
+                                                $kpi,
+                                                $levels,
+                                                $kpi["actual"],
+                                                $kpi["target_value"]
+                                            );
 
-                                                $currentLevel = nonRenewalKpiGrade((float) $kpi["actual"]);
-                                            } elseif ($kpi["actual"] !== null && $kpi["actual"] !== "") {
+                                            if ($kpi["actual"] !== null && $kpi["actual"] !== "") {
 
-                                                $currentLevel = (int) kpiPerformanceGrade(
-                                                    $levels,
-                                                    (float) $kpi["actual"],
-                                                    (float) $kpi["target_value"] > 0
-                                                        ? (float) $kpi["target_value"]
-                                                        : null
-                                                );
+                                                $currentLevel = (int) ($scoreResult["grade"] ?? 0);
                                             } elseif ($kpi["score"] !== null && $kpi["score"] !== "") {
 
                                                 $currentLevel = kpiScoreLevel((float) $kpi["score"]);
@@ -1106,6 +1082,22 @@ $totalCompetency =
 
                                                 <?php endfor; ?>
 
+                                                <?php if ($isBudgetKpi && $scoreResult["error"] !== null): ?>
+
+                                                    <div class="criteria-note">
+                                                        <?= htmlspecialchars($scoreResult["error"], ENT_QUOTES, "UTF-8") ?>
+                                                    </div>
+
+                                                <?php elseif ($isBudgetKpi && $scoreResult["achievement"] !== null): ?>
+
+                                                    <div class="criteria-note">
+                                                        Achievement = Total R <?= kpiFormatMoney($kpi["actual"]) ?>
+                                                        / Budget <?= kpiFormatMoney($kpi["target_value"]) ?> × 100
+                                                        = <strong><?= kpiFormatAchievement($scoreResult["achievement"]) ?></strong>
+                                                    </div>
+
+                                                <?php endif; ?>
+
                                                 <?php if ($currentLevel > 0): ?>
 
                                                     <div class="score-display">
@@ -1119,7 +1111,8 @@ $totalCompetency =
                                                             <br>
                                                             <small>
                                                                 คะแนนที่บันทึกไว้เดิมคือ <?= number_format($savedScore, 2) ?>
-                                                                (คำนวณด้วยสูตรเก่า) · บันทึกใหม่อีกครั้งเพื่อปรับให้ตรงเกณฑ์
+                                                                (คำนวณด้วยเกณฑ์เดิม) · เกรดด้านบนคำนวณตามเกณฑ์ปัจจุบัน
+                                                                · บันทึกใหม่อีกครั้งเพื่อปรับให้ตรงเกณฑ์
                                                             </small>
 
                                                         <?php endif; ?>
@@ -1167,11 +1160,17 @@ $totalCompetency =
 
                                                         <label>
 
-                                                            เป้าหมาย % (Target)
+                                                            <?= $isBudgetKpi ? "Budget (เป้าหมายจำนวนเงิน)" : "เป้าหมาย % (Target)" ?>
 
                                                         </label>
 
                                                         <div class="target-readonly">
+
+                                                            <?php if ($isBudgetKpi): ?>
+
+                                                                <?= kpiFormatMoney($kpi["target_value"]) ?>
+
+                                                            <?php else: ?>
 
                                                             <?= number_format((int) $kpi["target_value"]) ?>
 
@@ -1185,6 +1184,8 @@ $totalCompetency =
 
                                                             ) ?>
 
+                                                            <?php endif; ?>
+
                                                         </div>
 
                                                     </div>
@@ -1192,7 +1193,7 @@ $totalCompetency =
                                                     <div class="input-group">
 
                                                         <label>
-                                                            ที่ทำได้จริง % (Actual)
+                                                            <?= $isBudgetKpi ? "Total R (ไม่รวม Total N)" : "ที่ทำได้จริง % (Actual)" ?>
                                                         </label>
 
                                                         <input
@@ -1208,7 +1209,12 @@ $totalCompetency =
 
                                                         <div class="input-hint">
 
+                                                            <?php if ($isBudgetKpi): ?>
+                                                            กรอกยอด Total R เป็นจำนวนเงิน (ห้ามรวม Total N และห้ามใช้ Total R+N)
+                                                            ระบบคำนวณ Achievement = Total R / Budget × 100 แล้วเทียบเกณฑ์ด้านซ้าย
+                                                            <?php else: ?>
                                                             ระบบจะเทียบผลที่ทำได้กับเกณฑ์ด้านซ้ายเพื่อหาเกรด 1-5
+                                                            <?php endif; ?>
                                                             แล้วคิดคะแนนจริง = Weight × เกรด
 
                                                         </div>

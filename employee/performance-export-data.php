@@ -96,6 +96,13 @@ function evaluationActualLabel(array $kpi): string
         return "";
     }
 
+    /* KPI 9: แสดง Achievement (%) · Budget 0 / NULL → คำนวณไม่ได้ */
+    if (isNonRenewalKpi($kpi)) {
+        return $kpi["achievement_value"] !== null
+            ? kpiFormatAchievement($kpi["achievement_value"])
+            : "ไม่มี Budget";
+    }
+
     $actual = (float) $kpi["actual_value"];
     $text = floor($actual) == $actual ? number_format($actual) : number_format($actual, 2);
 
@@ -307,8 +314,12 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $competencyScore = 0;
     foreach ($kpis as &$kpi) {
         $kpi["criteria"] = $criteria[(int) $kpi["kpi_id"]] ?? [];
-        $kpi["target_value"] = kpiEffectiveTarget($kpi, $kpi["assignment_target"]);
+        $kpi["target_value"] = $kpi["assignment_target"];
         $kpi["actual_value"] = $kpi["actual"];
+        /* KPI 9: ช่อง "ที่ทำได้" แสดง Achievement = Total R / Budget × 100 (ฟังก์ชันกลาง) */
+        $kpi["achievement_value"] = isNonRenewalKpi($kpi)
+            ? nonRenewalAchievement($kpi["actual"], $kpi["assignment_target"])
+            : null;
         $kpi["score_value"] = $kpi["score"];
         $kpi["weight_value"] = (float) $kpi["assignment_weight"];
         $kpi["status_value"] = $kpi["performance_status"] ?? "ยังไม่มีผลงาน";

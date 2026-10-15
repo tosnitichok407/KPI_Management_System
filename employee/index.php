@@ -283,9 +283,6 @@ if ($selectedPeriodData !== null) {
 
     foreach ($kpiData as &$kpiRow) {
 
-        $kpiRow["assignment_target"] =
-            kpiEffectiveTarget($kpiRow, $kpiRow["assignment_target"]);
-
         $type = $kpiRow["kpi_type"];
 
         if (!isset($typeTotals[$type])) {
@@ -953,6 +950,12 @@ $avatar =
 
                                     <td>
 
+                                        <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                            Budget <?= kpiFormatMoney($kpi["assignment_target"]) ?>
+
+                                        <?php else: ?>
+
                                         <?= $kpi["assignment_target"] !== null
 
                                             ? htmlspecialchars(
@@ -963,9 +966,11 @@ $avatar =
                                             : "-"
                                         ?>
 
+                                        <?php endif; ?>
+
 
                                         <?php if (
-                                            !empty($kpi["unit"])
+                                            !empty($kpi["unit"]) && !isNonRenewalKpi($kpi)
                                         ): ?>
 
                                             <?= htmlspecialchars(
@@ -984,6 +989,14 @@ $avatar =
 
                                     <td>
 
+                                        <?php if (isNonRenewalKpi($kpi) && $kpi["actual_value"] !== null): ?>
+
+                                            Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
+                                            <br>
+                                            <small><?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["assignment_target"])) ?></small>
+
+                                        <?php else: ?>
+
                                         <?= $kpi["actual_value"] !== null
 
                                             ? htmlspecialchars(
@@ -993,6 +1006,8 @@ $avatar =
                                             )
                                             : "-"
                                         ?>
+
+                                        <?php endif; ?>
 
 
                                     </td>

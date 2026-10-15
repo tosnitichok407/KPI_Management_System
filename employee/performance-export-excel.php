@@ -233,7 +233,15 @@ function renderKpiSection(Worksheet $sheet, int $row, string $title, string $tot
         $sheet->setCellValue("I{$row}", "=C{$row}*" . FULL_GRADE);
 
         /* ที่ทำได้ (แสดงเป็น % ถ้าหน่วยเป็น %) */
-        if ($kpi["actual_value"] !== null) {
+        if ($kpi["actual_value"] !== null && isNonRenewalKpi($kpi)) {
+            /* KPI 9: Achievement = Total R / Budget × 100 (ฟังก์ชันกลาง) */
+            if ($kpi["achievement_value"] !== null) {
+                $sheet->setCellValue("J{$row}", $kpi["achievement_value"] / 100);
+                $sheet->getStyle("J{$row}")->getNumberFormat()->setFormatCode("0.00%");
+            } else {
+                $sheet->setCellValueExplicit("J{$row}", "ไม่มี Budget", \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            }
+        } elseif ($kpi["actual_value"] !== null) {
             $actual = (float) $kpi["actual_value"];
 
             if (trim((string) $kpi["unit"]) === "%") {

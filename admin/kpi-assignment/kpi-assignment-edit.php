@@ -3,6 +3,7 @@
 require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 
@@ -172,7 +173,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         ================================================= */
 
         $kpi_type_sql = "
-            SELECT kpi_type
+            SELECT kpi_id, kpi_name, kpi_type
             FROM kpi_indicators
             WHERE kpi_id = ?
             LIMIT 1
@@ -185,13 +186,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $kpi_id
         ]);
 
+        $kpi_row =
+            $kpi_type_stmt->fetch(PDO::FETCH_ASSOC);
+
         $kpi_type =
-            $kpi_type_stmt->fetchColumn();
+            $kpi_row["kpi_type"] ?? false;
+
+        /* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget จำนวนเงิน (> 0 และไม่เกินเพดานคอลัมน์) */
+        $budget_error = $kpi_row
+            ? kpiValidateBudgetInput($kpi_row, $target_value)
+            : null;
 
 
         if (!$kpi_type) {
 
             $error = "ไม่พบประเภทของ KPI";
+
+        } elseif ($budget_error !== null) {
+
+            $error = $budget_error;
 
         } else {
 
@@ -602,6 +615,7 @@ $kpis_result =
 
                     <select
                         name="kpi_id"
+                        id="assignment_kpi_select"
                         required
                     >
 
@@ -617,6 +631,7 @@ $kpis_result =
 
                             <option
                                 value="<?= (int) $kpi["kpi_id"] ?>"
+                                <?= isNonRenewalKpi($kpi) ? 'data-budget="1"' : "" ?>
 
                                 <?= $assignment["kpi_id"] ==
                                     $kpi["kpi_id"]
@@ -652,13 +667,14 @@ $kpis_result =
                 <div class="form-group">
 
                     <label>
-                        Target Value <span>*</span>
+                        <span id="target_label_text">Target Value</span> <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="target_value"
+                        id="target_value_input"
                         step="0.01"
                         min="0"
 
@@ -668,6 +684,11 @@ $kpis_result =
 
                         required
                     >
+
+                    <small id="target_budget_hint" hidden>
+                        KPI มูลค่าไม่ต่อสัญญา: กรอก Budget เป็นจำนวนเงิน (มากกว่า 0 ไม่เกิน <?= number_format(KPI_BUDGET_MAX, 2) ?>)
+                        · คะแนนคำนวณจาก Total R / Budget × 100
+                    </small>
 
                 </div>
 
@@ -823,6 +844,39 @@ $kpis_result =
 
 
 <script src="../../assets/js/admin.js"></script>
+
+<script>
+/* KPI 9 มูลค่าไม่ต่อสัญญา: ช่อง Target เป็น Budget จำนวนเงิน */
+(function () {
+    const kpiSelect = document.getElementById("assignment_kpi_select");
+    const targetInput = document.getElementById("target_value_input");
+    const targetLabel = document.getElementById("target_label_text");
+    const budgetHint = document.getElementById("target_budget_hint");
+
+    if (!kpiSelect || !targetInput) {
+        return;
+    }
+
+    function syncTargetField() {
+        const option = kpiSelect.options[kpiSelect.selectedIndex];
+        const isBudget = !!(option && option.dataset.budget === "1");
+
+        targetLabel.textContent = isBudget ? "Budget (เป้าหมายจำนวนเงิน)" : "Target Value";
+        targetInput.min = isBudget ? "0.01" : "0";
+
+        if (isBudget) {
+            targetInput.max = "<?= number_format(KPI_BUDGET_MAX, 2, ".", "") ?>";
+        } else {
+            targetInput.removeAttribute("max");
+        }
+
+        budgetHint.hidden = !isBudget;
+    }
+
+    kpiSelect.addEventListener("change", syncTargetField);
+    syncTargetField();
+})();
+</script>
 
 </body>
 
