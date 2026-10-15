@@ -72,6 +72,7 @@ $rows = $pdo->query("
         a.target_value,
         k.kpi_id,
         k.kpi_name,
+        k.kpi_type,
         k.score_5, k.score_4, k.score_3, k.score_2, k.score_1
     FROM kpi_performances p
     INNER JOIN kpi_assignments a ON a.assignment_id = p.assignment_id

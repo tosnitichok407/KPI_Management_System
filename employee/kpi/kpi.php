@@ -222,7 +222,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 |--------------------------------------------------------------------------
                 */
 
-                if ($realKpiType === "performance") {
+                /* KPI 9 ต้องเป็น Performance เท่านั้น · ประเภทผิด → ไม่บันทึก (ไม่ตกไปทาง Competency) */
+                $kpi9TypeError = nonRenewalKpiTypeError($assignment);
+
+                if ($kpi9TypeError !== null) {
+
+                    $error = $kpi9TypeError;
+                } elseif ($realKpiType === "performance") {
 
                     if ($actual === "") {
 

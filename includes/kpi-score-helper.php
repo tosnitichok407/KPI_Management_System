@@ -50,8 +50,11 @@ const KPI_CRITERIA_TARGET_TOLERANCE = 1.5;
 |
 | Budget เป็น 0 / NULL / ไม่ใช่ตัวเลข → ไม่คำนวณคะแนน (kpiCalculateScore คืน error)
 |
-| ระบุ KPI ด้วย kpi_id = 9 เป็นหลัก และต้องมีชื่อ "มูลค่าไม่ต่อสัญญา" ประกอบ
-| ถ้า ID ตรงแต่ชื่อไม่ตรง จะไม่ใช้กฎนี้ (บันทึก error_log ไว้ให้ตรวจสอบ)
+| ระบุ KPI ด้วย kpi_id = 9 เท่านั้น (ชื่อไม่ใช่เงื่อนไขเลือกกฎ)
+| ถ้าชื่อไม่ตรง "มูลค่าไม่ต่อสัญญา" → บันทึกคำเตือนลง error_log แต่ยังใช้กฎ KPI 9 ต่อ
+| (ไม่กลับไปใช้เกณฑ์ทั่วไป ซึ่งของ KPI 9 ในฐานข้อมูลเป็นเกณฑ์เก่ากลับทิศ)
+| KPI 9 ต้องเป็นประเภท Performance · ถ้าไม่ใช่ หรือไม่ได้ส่ง kpi_type มา
+| → kpiCalculateScore() คืน error ไม่คำนวณ ไม่บันทึก และไม่แก้ฐานข้อมูลเอง
 |
 | ทุกหน้าต้องคำนวณผ่าน kpiCalculateScore() / nonRenewalAchievement() เท่านั้น:
 | หน้า KPI ของฉัน · หน้ารายละเอียด KPI · หน้าผลงาน · แบบฟอร์ม Excel/PDF · สคริปต์คำนวณย้อนหลัง
@@ -87,21 +90,45 @@ function isNonRenewalKpi(array $kpi): bool
         return false;
     }
 
-    if (mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false) {
-        return true;
+    /* ชื่อใช้ตรวจความถูกต้องของข้อมูลเท่านั้น (เตือนครั้งเดียวต่อ request) */
+    if (array_key_exists("kpi_name", $kpi) && !nonRenewalKpiNameMatches($kpi)) {
+        static $warned = false;
+        if (!$warned) {
+            $warned = true;
+            error_log(
+                "kpi-score-helper: kpi_id " . NON_RENEWAL_KPI_ID . " name mismatch ("
+                . (string) $kpi["kpi_name"]
+                . ") · non-renewal rule still applied by kpi_id"
+            );
+        }
     }
 
-    static $warned = false;
-    if (!$warned) {
-        $warned = true;
-        error_log(
-            "kpi-score-helper: kpi_id " . NON_RENEWAL_KPI_ID . " name mismatch ("
-            . (string) ($kpi["kpi_name"] ?? "[not selected]")
-            . ") · non-renewal rule not applied"
-        );
+    return true;
+}
+
+/* ชื่อ KPI ตรงกับชื่อที่กฎ KPI 9 คาดไว้หรือไม่ (ใช้แสดงคำเตือน ไม่ใช่เงื่อนไขเลือกกฎ) */
+function nonRenewalKpiNameMatches(array $kpi): bool
+{
+    return mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false;
+}
+
+const NON_RENEWAL_TYPE_ERROR =
+    "ข้อมูล KPI มูลค่าไม่ต่อสัญญา (ID 9) ต้องเป็นประเภท Performance จึงจะคำนวณคะแนนได้"
+    . " ระบบไม่บันทึกคะแนน กรุณาติดต่อผู้ดูแลระบบ";
+
+/*
+| ตรวจประเภทของ KPI 9 · null = ถูกต้อง
+| ไม่ได้ส่ง kpi_type มา ถือว่าข้อมูลไม่ครบ (fail closed) เพื่อไม่ให้คำนวณจากข้อมูลที่ตรวจไม่ได้
+*/
+function nonRenewalKpiTypeError(array $kpi): ?string
+{
+    if (!isNonRenewalKpi($kpi)) {
+        return null;
     }
 
-    return false;
+    return strtolower(trim((string) ($kpi["kpi_type"] ?? ""))) === "performance"
+        ? null
+        : NON_RENEWAL_TYPE_ERROR;
 }
 
 /* แปลงจำนวนเงิน / ตัวเลข → หน่วยสตางค์ (จำนวนเต็ม) · null = ไม่ใช่ตัวเลข */
@@ -178,7 +205,7 @@ const NON_RENEWAL_BUDGET_ERROR =
 | ฟังก์ชันกลาง: คำนวณคะแนน Performance KPI หนึ่งรายการ
 |--------------------------------------------------------------------------
 |
-| $kpi ต้องมี kpi_id และ kpi_name · $levels = เกณฑ์จาก loadKpiScoreCriteria()
+| $kpi ต้องมี kpi_id, kpi_name และ kpi_type · $levels = เกณฑ์จาก loadKpiScoreCriteria()
 | คืน ["grade" => ?int, "achievement" => ?float, "error" => ?string]
 |   - KPI 9: ใช้ Budget / Total R ตามกฎด้านบน
 |   - KPI อื่น: ใช้ kpiPerformanceGrade() ตามเดิม (achievement = null)
@@ -189,6 +216,11 @@ function kpiCalculateScore(array $kpi, array $levels, $actual, $target): array
     $actualMissing = $actual === null || $actual === "";
 
     if (isNonRenewalKpi($kpi)) {
+
+        $typeError = nonRenewalKpiTypeError($kpi);
+        if ($typeError !== null) {
+            return ["grade" => null, "achievement" => null, "error" => $typeError];
+        }
 
         if (!kpiBudgetIsValid($target)) {
             return ["grade" => null, "achievement" => null, "error" => NON_RENEWAL_BUDGET_ERROR];

@@ -60,13 +60,42 @@ if (!$kpi) {
 | นำมาแสดงในฟอร์ม เพื่อให้สิ่งที่ Admin เห็นตรงกับสิ่งที่ใช้ตัดเกรด
 | (ไม่รวมกฎเฉพาะ KPI ที่กำหนดในโค้ด)
 */
-$currentLevels = loadKpiScoreCriteria($pdo, [$kpi], false)[(int) $kpi["kpi_id"]] ?? [];
+/*
+| KPI 9 มูลค่าไม่ต่อสัญญา: ระบุด้วย kpi_id เป็นหลัก (ไม่ขึ้นกับชื่อ)
+| เกณฑ์ / ชื่อ / ประเภท ถูกล็อก · แสดงเกณฑ์จากกฎในระบบ (NON_RENEWAL_KPI_CRITERIA)
+| และไม่อ่าน/ไม่เขียน kpi_score_criteria, kpi_score_levels, score_5..score_1 จากหน้านี้
+*/
+$isLockedKpi9 = (int) $kpi["kpi_id"] === NON_RENEWAL_KPI_ID;
 
-for ($level = 5; $level >= 1; $level--) {
-    $kpi["score_" . $level] = $currentLevels[$level] ?? "";
+if ($isLockedKpi9) {
+
+    for ($level = 5; $level >= 1; $level--) {
+        $kpi["score_" . $level] = NON_RENEWAL_KPI_CRITERIA[$level];
+    }
+} else {
+
+    $currentLevels = loadKpiScoreCriteria($pdo, [$kpi], false)[(int) $kpi["kpi_id"]] ?? [];
+
+    for ($level = 5; $level >= 1; $level--) {
+        $kpi["score_" . $level] = $currentLevels[$level] ?? "";
+    }
 }
 
-$hasSpecialRule = isNonRenewalKpi($kpi);
+/* ชื่อ / ประเภทเดิมในฐานข้อมูล (KPI 9 ใช้ค่านี้เสมอ ไม่รับค่าจากฟอร์ม) */
+$lockedKpiName = (string) $kpi["kpi_name"];
+$lockedKpiType = (string) $kpi["kpi_type"];
+
+/*
+| KPI 9: คะแนนสูงสุดตามกฎ = 5 เสมอ
+| กฎคะแนนเลือกจาก kpi_id = 9 เท่านั้น · ชื่อที่ไม่ตรงและประเภทที่ไม่ใช่ Performance
+| ตรวจแยกต่างหากและแสดงเป็นคำเตือนด้านล่าง
+*/
+if ($isLockedKpi9) {
+    $kpi["max_score"] = (string) KPI_MAX_LEVEL;
+}
+
+$kpi9NameMismatch = $isLockedKpi9 && !nonRenewalKpiNameMatches($kpi);
+$kpi9TypeError = $isLockedKpi9 ? nonRenewalKpiTypeError($kpi) : null;
 
 
 /*
@@ -111,6 +140,21 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $score_2 = trim($_POST["score_2"] ?? "");
     $score_1 = trim($_POST["score_1"] ?? "");
 
+    /*
+    | KPI 9: ไม่รับชื่อ ประเภท และเกณฑ์จากฟอร์ม (กันการเขียนทับฝั่ง server แม้มีการแก้ HTML)
+    | ค่า score_* ด้านล่างใช้แสดงผลกลับในฟอร์มเท่านั้น ไม่ถูกบันทึก
+    */
+    if ($isLockedKpi9) {
+        $kpi_name = $lockedKpiName;
+        $kpi_type = $lockedKpiType;
+        $max_score = (string) KPI_MAX_LEVEL;
+        $score_5 = NON_RENEWAL_KPI_CRITERIA[5];
+        $score_4 = NON_RENEWAL_KPI_CRITERIA[4];
+        $score_3 = NON_RENEWAL_KPI_CRITERIA[3];
+        $score_2 = NON_RENEWAL_KPI_CRITERIA[2];
+        $score_1 = NON_RENEWAL_KPI_CRITERIA[1];
+    }
+
 
         if (!csrfVerify()) {
 
@@ -147,76 +191,104 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             /* ตาราง KPI + ตารางเกณฑ์ ต้องสำเร็จพร้อมกัน */
             $pdo->beginTransaction();
 
-            $sql = "
-                UPDATE kpi_indicators
+            if ($isLockedKpi9) {
 
-                SET
-                    category_id = :category_id,
-                    kpi_name = :kpi_name,
-                    kpi_type = :kpi_type,
-                    description = :description,
-                    weight = :weight,
-                    unit = :unit,
-                    max_score = :max_score,
+                /*
+                | KPI 9: บันทึกเฉพาะฟิลด์ทั่วไป · ไม่แตะ kpi_name, kpi_type, score_5..score_1
+                | และไม่เรียก saveKpiScoreCriteria() (ไม่เพิ่ม/แก้ kpi_score_criteria · ไม่ลบ kpi_score_levels)
+                */
+                $stmt = $pdo->prepare("
+                    UPDATE kpi_indicators
+                    SET
+                        category_id = :category_id,
+                        description = :description,
+                        weight = :weight,
+                        unit = :unit,
+                        max_score = :max_score
+                    WHERE kpi_id = :id
+                ");
 
-                    score_5 = :score_5,
-                    score_4 = :score_4,
-                    score_3 = :score_3,
-                    score_2 = :score_2,
-                    score_1 = :score_1
+                $stmt->execute([
+                    ":category_id" => $category_id,
+                    ":description" => $description,
+                    ":weight" => $weight,
+                    ":unit" => $unit,
+                    ":max_score" => $max_score,
+                    ":id" => $id
+                ]);
+            } else {
 
-                WHERE kpi_id = :id
-            ";
+                $sql = "
+                    UPDATE kpi_indicators
 
-            $stmt = $pdo->prepare($sql);
+                    SET
+                        category_id = :category_id,
+                        kpi_name = :kpi_name,
+                        kpi_type = :kpi_type,
+                        description = :description,
+                        weight = :weight,
+                        unit = :unit,
+                        max_score = :max_score,
 
-            $stmt->execute([
+                        score_5 = :score_5,
+                        score_4 = :score_4,
+                        score_3 = :score_3,
+                        score_2 = :score_2,
+                        score_1 = :score_1
 
-                ":category_id" => $category_id,
-                ":kpi_name" => $kpi_name,
-                ":kpi_type" => $kpi_type,
-                ":description" => $description,
-                ":weight" => $weight,
-                ":unit" => $unit,
-                ":max_score" => $max_score !== ""
-                    ? $max_score
-                    : null,
+                    WHERE kpi_id = :id
+                ";
 
-                ":score_5" => $score_5 !== ""
-                    ? $score_5
-                    : null,
+                $stmt = $pdo->prepare($sql);
 
-                ":score_4" => $score_4 !== ""
-                    ? $score_4
-                    : null,
+                $stmt->execute([
 
-                ":score_3" => $score_3 !== ""
-                    ? $score_3
-                    : null,
+                    ":category_id" => $category_id,
+                    ":kpi_name" => $kpi_name,
+                    ":kpi_type" => $kpi_type,
+                    ":description" => $description,
+                    ":weight" => $weight,
+                    ":unit" => $unit,
+                    ":max_score" => $max_score !== ""
+                        ? $max_score
+                        : null,
 
-                ":score_2" => $score_2 !== ""
-                    ? $score_2
-                    : null,
+                    ":score_5" => $score_5 !== ""
+                        ? $score_5
+                        : null,
 
-                ":score_1" => $score_1 !== ""
-                    ? $score_1
-                    : null,
+                    ":score_4" => $score_4 !== ""
+                        ? $score_4
+                        : null,
 
-                ":id" => $id
+                    ":score_3" => $score_3 !== ""
+                        ? $score_3
+                        : null,
 
-            ]);
+                    ":score_2" => $score_2 !== ""
+                        ? $score_2
+                        : null,
 
-            /*
-            | เกณฑ์ที่ระบบใช้ตัดเกรดอยู่ใน kpi_score_criteria
-            | (เดิมหน้านี้บันทึกแค่ score_5..score_1 ซึ่งถูกมองข้ามเมื่อมีเกณฑ์ในตารางอื่น)
-            */
-            saveKpiScoreCriteria($pdo, $id, [
-                5 => $score_5,
-                4 => $score_4,
-                3 => $score_3,
-                2 => $score_2,
-                1 => $score_1
-            ]);
+                    ":score_1" => $score_1 !== ""
+                        ? $score_1
+                        : null,
+
+                    ":id" => $id
+
+                ]);
+
+                /*
+                | เกณฑ์ที่ระบบใช้ตัดเกรดอยู่ใน kpi_score_criteria
+                | (เดิมหน้านี้บันทึกแค่ score_5..score_1 ซึ่งถูกมองข้ามเมื่อมีเกณฑ์ในตารางอื่น)
+                */
+                saveKpiScoreCriteria($pdo, $id, [
+                    5 => $score_5,
+                    4 => $score_4,
+                    3 => $score_3,
+                    2 => $score_2,
+                    1 => $score_1
+                ]);
+            }
 
             $pdo->commit();
 
@@ -348,7 +420,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     <label>KPI Type</label>
 
-                    <select name="kpi_type" required>
+                    <select name="kpi_type" <?= $isLockedKpi9 ? "disabled" : "required" ?>>
 
                         <option value="Performance" <?= ($kpi["kpi_type"] ?? "") === "Performance" ? "selected" : "" ?>>
                             Performance (วัดจาก Target / Actual)
@@ -374,7 +446,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     ENT_QUOTES,
                                     "UTF-8"
                                 ) ?>"
-                        required>
+                        <?= $isLockedKpi9 ? "disabled" : "required" ?>>
+
+                    <?php if ($isLockedKpi9): ?>
+                        <small>ชื่อและประเภทของ KPI นี้ถูกล็อก เพราะกฎคะแนนในระบบผูกกับ KPI ID 9 และ KPI นี้ต้องเป็นประเภท Performance</small>
+                    <?php endif; ?>
 
                 </div>
 
@@ -438,6 +514,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         step="0.01"
                         min="1"
                         max="5"
+                        <?= $isLockedKpi9 ? "readonly" : "" ?>
                         value="<?= htmlspecialchars(
                                     $kpi["max_score"] ?? "5",
                                     ENT_QUOTES,
@@ -449,14 +526,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 <h3>เกณฑ์คะแนน</h3>
 
-                <?php if ($hasSpecialRule): ?>
+                <?php if ($isLockedKpi9): ?>
 
                     <div class="error">
-                        KPI นี้ใช้กฎตัดเกรดเฉพาะที่กำหนดไว้ในระบบ:
-                        Achievement = Total R / Budget × 100 (ไม่รวม Total N)
-                        (<?= htmlspecialchars(implode(" / ", NON_RENEWAL_KPI_CRITERIA), ENT_QUOTES, "UTF-8") ?>)
-                        · กำหนด Budget ที่หน้ามอบหมาย KPI
-                        เกณฑ์ที่กรอกด้านล่างจะถูกบันทึก แต่ไม่ถูกใช้ตัดเกรด
+                        เกณฑ์ของ KPI นี้กำหนดในระบบ แก้ไขที่หน้านี้ไม่ได้:
+                        Achievement = (Total R / Budget) × 100
+                        (ไม่รวม Total N และไม่ใช้ Total R+N) · กำหนด Budget ที่หน้ามอบหมาย KPI
+                        · คะแนนสูงสุดล็อกไว้ที่ <?= KPI_MAX_LEVEL ?>
+                        <?php if ($kpi9NameMismatch): ?>
+                            <br>
+                            คำเตือน: ชื่อ KPI ในฐานข้อมูลไม่ตรงกับ "<?= htmlspecialchars(NON_RENEWAL_KPI_NAME, ENT_QUOTES, "UTF-8") ?>"
+                            ระบบยังใช้กฎคะแนนของ KPI ID 9 ตามปกติ กรุณาตรวจสอบข้อมูลกับผู้พัฒนาระบบ
+                        <?php endif; ?>
+                        <?php if ($kpi9TypeError !== null): ?>
+                            <br>
+                            คำเตือน: <?= htmlspecialchars($kpi9TypeError, ENT_QUOTES, "UTF-8") ?>
+                        <?php endif; ?>
                     </div>
 
                 <?php endif; ?>
@@ -486,7 +571,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                             <input
                                 type="text"
-                                name="<?= $field ?>"
+                                <?= $isLockedKpi9 ? "disabled" : 'name="' . $field . '"' ?>
                                 value="<?= htmlspecialchars(
                                             $kpi[$field] ?? "",
                                             ENT_QUOTES,

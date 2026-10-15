@@ -68,6 +68,7 @@ $sql = "
         a.status AS assignment_status,
 
         k.kpi_name,
+        k.kpi_type,
         k.description,
         k.unit,
         k.max_score,
