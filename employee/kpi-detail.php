@@ -299,13 +299,18 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                     ------------------------------------------------------
                     */
 
+                    /*
+                    | ล็อกแถวผลงานเดิม (FOR UPDATE) และอ่านสถานะจากฐานข้อมูลภายใน Transaction
+                    | เพื่อตรวจว่าแก้ไขได้หรือไม่ ณ ตอนบันทึกจริง (ไม่อาศัยค่าที่โหลดตอนเปิดหน้า)
+                    */
                     $check = $pdo->prepare("
-                        SELECT performance_id
+                        SELECT performance_id, status
                         FROM kpi_performances
                         WHERE assignment_id = :assignment_id
                           AND employee_id = :employee_id
                           AND period_id = :period_id
                         LIMIT 1
+                        FOR UPDATE
                     ");
                     $check->execute([
                         ":assignment_id" => $assignmentId,
@@ -314,7 +319,18 @@ if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
                     ]);
                     $existingPerformance = $check->fetch(PDO::FETCH_ASSOC);
 
-                    if ($existingPerformance) {
+                    /*
+                    | Guard: สถานะที่แก้ไขได้ตาม Workflow เดิม (Draft / Submitted / Rejected)
+                    | Approved (หรือสถานะอื่นที่ไม่รู้จัก) → ปฏิเสธ ไม่เขียนข้อมูลใด ๆ
+                    */
+                    if ($existingPerformance && !in_array((string) $existingPerformance["status"], ["Draft", "Submitted", "Rejected"], true)) {
+
+                        $error = (string) $existingPerformance["status"] === "Approved"
+                            ? "ผลงาน KPI นี้ของเดือนที่เลือกได้รับการอนุมัติแล้ว จึงไม่สามารถแก้ไขหรือบันทึกทับได้"
+                                . " หากต้องการแก้ไข กรุณาติดต่อหัวหน้างานหรือผู้ดูแลระบบ"
+                            : "สถานะของผลงาน KPI นี้ไม่อนุญาตให้แก้ไข กรุณาติดต่อผู้ดูแลระบบ";
+
+                    } elseif ($existingPerformance) {
 
                         $isUpdate = true;
 

@@ -375,9 +375,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     |--------------------------------------------------------------------------
                     */
 
+                    /*
+                    | ล็อกแถวผลงานเดิม (FOR UPDATE) และอ่านสถานะจากฐานข้อมูลภายใน Transaction
+                    | เพื่อตรวจว่าแก้ไขได้หรือไม่ ณ ตอนบันทึกจริง (ไม่อาศัยค่าที่โหลดตอนเปิดหน้า)
+                    */
                     $existingStmt = $pdo->prepare("
                         SELECT
-                            performance_id
+                            performance_id,
+                            status
 
                         FROM kpi_performances
 
@@ -386,6 +391,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                           AND period_id = :period_id
 
                         LIMIT 1
+                        FOR UPDATE
                     ");
 
                     $existingStmt->execute([
@@ -400,11 +406,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     /*
                     |--------------------------------------------------------------------------
+                    | Guard: สถานะที่แก้ไขได้ตาม Workflow เดิม (Draft / Submitted / Rejected)
+                    |--------------------------------------------------------------------------
+                    | Approved (หรือสถานะอื่นที่ไม่รู้จัก) → ปฏิเสธ ไม่เขียนข้อมูลใด ๆ
+                    */
+
+                    if ($existing && !in_array((string) $existing["status"], ["Draft", "Submitted", "Rejected"], true)) {
+
+                        $error = (string) $existing["status"] === "Approved"
+                            ? "ผลงาน KPI นี้ของเดือน" . $thaiMonths[$selectedMonth] . " " . $selectedYear
+                                . " ได้รับการอนุมัติแล้ว จึงไม่สามารถแก้ไขหรือบันทึกทับได้"
+                                . " หากต้องการแก้ไข กรุณาติดต่อหัวหน้างานหรือผู้ดูแลระบบ"
+                            : "สถานะของผลงาน KPI นี้ไม่อนุญาตให้แก้ไข กรุณาติดต่อผู้ดูแลระบบ";
+
+                    /*
+                    |--------------------------------------------------------------------------
                     | UPDATE
                     |--------------------------------------------------------------------------
                     */
 
-                    if ($existing) {
+                    } elseif ($existing) {
 
                         $updateStmt = $pdo->prepare("
                             UPDATE kpi_performances
@@ -526,10 +547,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
 
 
-                    $pdo->commit();
+                    if ($error === "") {
 
-                    $success =
-                        "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
+                        $pdo->commit();
+
+                        $success =
+                            "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
+                    }
                 }
             }
 
