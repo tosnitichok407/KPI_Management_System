@@ -106,7 +106,7 @@ if ($selectedEmployee !== null) {
 
         $performances = $yearData["performances_by_assignment"][$assignmentId] ?? [];
 
-        /* การมอบหมายที่ปิดใช้งาน: แสดงเป็นประวัติเฉพาะช่วงที่มีผลงานจริง */
+        /* การมอบหมายที่ปิดใช้งาน: แสดงเป็นประวัติเฉพาะช่วงที่มีแถวผลงานจริง (รวมแถวที่ score เป็น NULL) */
         if (($assignment["status"] ?? "Active") !== "Active"
             && ($filterMonth > 0 ? !isset($performances[$filterMonth]) : empty($performances))) {
             continue;
@@ -115,6 +115,9 @@ if ($selectedEmployee !== null) {
         if ($filterMonth > 0) {
             $performances = isset($performances[$filterMonth]) ? [$filterMonth => $performances[$filterMonth]] : [];
         }
+
+        /* คะแนน / ล่าสุด / จำนวนเดือนที่ประเมิน: ใช้เฉพาะแถวที่มีคะแนน (score NULL = ยังไม่ประเมิน ไม่ใช่ 0) */
+        $performances = array_filter($performances, fn($performance) => $performance["score"] !== null);
 
         $scores = array_map(fn($p) => (float) $p["score"], $performances);
 

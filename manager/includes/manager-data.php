@@ -36,7 +36,7 @@ function managerLoadYearData(PDO $pdo, int $year): array
         "performances_by_assignment" => [],
         "periods" => [],
         "feedback" => [],
-        /* พนักงานที่ปิดใช้งานแต่มีผลงานในปีนี้ (ประวัติ · ไม่รวมตัวเลขหลักและอันดับ) */
+        /* พนักงานที่ปิดใช้งานแต่มีแถวผลงานในปีนี้ (ประวัติ · ไม่รวมตัวเลขหลักและอันดับ) */
         "history_employees" => []
     ];
 
@@ -78,7 +78,7 @@ function managerLoadYearData(PDO $pdo, int $year): array
 
 
     /*
-    | Assignment ของปี: Active ตามเดิม + Assignment ที่ปิดใช้งานซึ่งมีผลงาน (มีคะแนน) ในปีนี้
+    | Assignment ของปี: Active ตามเดิม + Assignment ที่ปิดใช้งานซึ่งมีแถวผลงานในปีนี้ (รวมแถวที่ score เป็น NULL)
     | Assignment ที่ปิดใช้งานถูกนับเฉพาะเดือนที่มีผลงาน (ดู managerStats)
     */
 
@@ -107,7 +107,6 @@ function managerLoadYearData(PDO $pdo, int $year): array
                   INNER JOIN evaluation_periods ex ON ex.period_id = kx.period_id
                   WHERE kx.assignment_id = a.assignment_id
                     AND ex.period_year = :history_year
-                    AND kx.score IS NOT NULL
               )
           )
         ORDER BY FIELD(k.kpi_type, 'Performance', 'Competency'), k.kpi_name ASC
@@ -136,7 +135,11 @@ function managerLoadYearData(PDO $pdo, int $year): array
     }
 
 
-    /* ผลประเมินของปี (เฉพาะที่มีคะแนน) */
+    /*
+    | แถวผลงานของปี (รวมแถวที่ score เป็น NULL)
+    | - performances_by_assignment: ทุกแถว ใช้ตัดสินว่า "มีผลงาน" (เกณฑ์เดียวกับหน้า Employee / Admin)
+    | - performances: เฉพาะแถวที่มีคะแนน ใช้คำนวณค่าเฉลี่ยและกราฟ (NULL ไม่ถูกนับเป็น 0)
+    */
 
     $performanceStmt = $pdo->prepare("
         SELECT
@@ -152,7 +155,6 @@ function managerLoadYearData(PDO $pdo, int $year): array
         FROM kpi_performances kp
         INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
         WHERE ep.period_year = :year
-          AND kp.score IS NOT NULL
     ");
     $performanceStmt->execute([":year" => $year]);
 
@@ -164,7 +166,10 @@ function managerLoadYearData(PDO $pdo, int $year): array
             continue;
         }
 
-        $data["performances"][] = $row;
+        if ($row["score"] !== null) {
+            $data["performances"][] = $row;
+        }
+
         $data["performances_by_assignment"][$assignmentId][(int) $row["period_month"]] = $row;
     }
 
@@ -192,7 +197,7 @@ function managerLoadYearData(PDO $pdo, int $year): array
         $data["feedback"][(int) $row["employee_id"]][(int) $row["period_month"]] = $row;
     }
 
-    /* พนักงานที่ปิดใช้งานแต่มีผลงานในปีนี้ → แสดงแยกเป็นประวัติ */
+    /* พนักงานที่ปิดใช้งานแต่มีแถวผลงานในปีนี้ (รวมแถวที่ score เป็น NULL) → แสดงแยกเป็นประวัติ */
     $historyStmt = $pdo->prepare("
         SELECT
             e.employee_id,
@@ -212,7 +217,6 @@ function managerLoadYearData(PDO $pdo, int $year): array
               INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
               WHERE kp.employee_id = e.employee_id
                 AND ep.period_year = :year
-                AND kp.score IS NOT NULL
           )
         ORDER BY d.department_name ASC, e.first_name ASC, e.last_name ASC
     ");
@@ -298,8 +302,8 @@ function managerStats(array $data, array $employeeIds, int $month = 0, string $t
             $performances = $data["performances_by_assignment"][$assignmentId] ?? [];
 
             /*
-            | Assignment ที่ปิดใช้งาน (และทุก Assignment ในโหมดประวัติ) นับเฉพาะเมื่อมีผลงานจริง
-            | ทั้งตัวนับและตัวหาร: รายเดือน = มีผลงานในเดือนนั้น · รายปี = มีผลงานในปีนี้
+            | Assignment ที่ปิดใช้งาน (และทุก Assignment ในโหมดประวัติ) นับเฉพาะเมื่อมีแถวผลงานจริง
+            | (รวมแถวที่ score เป็น NULL) ทั้งตัวนับและตัวหาร: รายเดือน = มีแถวในเดือนนั้น · รายปี = มีแถวในปีนี้
             */
             if (($historyOnly || ($assignment["status"] ?? "Active") !== "Active")
                 && ($month > 0 ? !isset($performances[$month]) : empty($performances))) {
@@ -312,21 +316,16 @@ function managerStats(array $data, array $employeeIds, int $month = 0, string $t
                     continue;
                 }
 
-                $stats["total_kpi"]++;
-
                 $performances = isset($performances[$month]) ? [$performances[$month]] : [];
+            }
 
-                if ($performances) {
-                    $stats["evaluated"]++;
-                }
+            $stats["total_kpi"]++;
 
-            } else {
+            /* ประเมินแล้ว / ค่าเฉลี่ย / ถ่วงน้ำหนัก: ใช้เฉพาะแถวที่มีคะแนน (score NULL ไม่ใช่ 0) */
+            $performances = array_filter($performances, fn($performance) => $performance["score"] !== null);
 
-                $stats["total_kpi"]++;
-
-                if ($performances) {
-                    $stats["evaluated"]++;
-                }
+            if ($performances) {
+                $stats["evaluated"]++;
             }
 
             foreach ($performances as $performance) {
@@ -384,7 +383,7 @@ function managerStats(array $data, array $employeeIds, int $month = 0, string $t
 |--------------------------------------------------------------------------
 */
 
-/* แถวประวัติพนักงานที่ปิดใช้งาน (กรองแผนก / เดือนได้) · แสดงเฉพาะคนที่มีผลงานในช่วงนั้น */
+/* แถวประวัติพนักงานที่ปิดใช้งาน (กรองแผนก / เดือนได้) · แสดงเฉพาะคนที่มีแถวผลงานในช่วงนั้น (รวม score NULL) */
 function managerHistoryRows(array $data, int $departmentId = 0, int $month = 0): array
 {
     $rows = [];
@@ -397,7 +396,8 @@ function managerHistoryRows(array $data, int $departmentId = 0, int $month = 0):
 
         $stats = managerStats($data, [$employeeId], $month, "", true);
 
-        if ($stats["evaluated"] === 0) {
+        /* โหมดประวัติ: total_kpi = จำนวน Assignment ที่มีแถวผลงานในช่วงนั้น */
+        if ($stats["total_kpi"] === 0) {
             continue;
         }
 
