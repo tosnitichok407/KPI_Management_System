@@ -113,6 +113,10 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
         $perfParams[] = $month;
     }
 
+    /* เงื่อนไขช่วงเวลาเดียวกัน ใช้กับ subquery อื่น (alias ต่างกัน) */
+    $perfWhereRows = str_replace("ep.", "ex.", $perfWhere);
+    $perfWhereHistory = str_replace("ep.", "ey.", $perfWhere);
+
     $sql = "
         SELECT
 
@@ -125,7 +129,15 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
             COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
             COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) AS end_date,
             a.status,
-
+            e.status AS employee_status,
+            /* แถวผลงานจริงในช่วงที่เลือก (ใช้แยกประวัติของ Assignment / พนักงานที่ปิดใช้งาน) */
+            (
+                SELECT COUNT(*)
+                FROM kpi_performances kx
+                INNER JOIN evaluation_periods ex ON ex.period_id = kx.period_id
+                WHERE kx.assignment_id = a.assignment_id
+                  AND {$perfWhereRows}
+            ) AS perf_rows,
             e.employee_code,
             e.first_name,
             e.last_name,
@@ -171,7 +183,8 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
         WHERE a.assignment_year = ?
     ";
 
-    $params = array_merge($perfParams, [$year]);
+    /* ลำดับ parameter ตามตำแหน่งใน SQL: perf_rows (SELECT) → perf (JOIN) → ปี */
+    $params = array_merge($perfParams, $perfParams, [$year]);
 
 
     /* เดือนที่เลือก: เฉพาะ KPI ที่มีผลในเดือนนั้น */
@@ -200,7 +213,26 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
         $params[] = $filters["kpi_type"];
     }
 
-    if ($filters["status"] !== "") {
+    if ($filters["status"] === "Active") {
+        /*
+        | ค่าเริ่มต้น Active: รวม Assignment ที่ปิดใช้งานเฉพาะเมื่อมีผลงานจริงในช่วงที่เลือก
+        | (แสดงเป็นประวัติพร้อมป้าย · ไม่นับน้ำหนักในยอดน้ำหนักรวม)
+        */
+        $sql .= "
+            AND (
+                a.status = 'Active'
+                OR EXISTS (
+                    SELECT 1
+                    FROM kpi_performances ky
+                    INNER JOIN evaluation_periods ey ON ey.period_id = ky.period_id
+                    WHERE ky.assignment_id = a.assignment_id
+                      AND {$perfWhereHistory}
+                )
+            )
+        ";
+        $params = array_merge($params, $perfParams);
+    } elseif ($filters["status"] !== "") {
+        /* Inactive / ทั้งหมด: แสดงตามสถานะที่เลือกเหมือนเดิม (รวมรายการที่ไม่มีผลงาน) */
         $sql .= " AND a.status = ? ";
         $params[] = $filters["status"];
     }
@@ -222,9 +254,23 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
 
     /* จัดกลุ่มตามพนักงาน */
 
+    /*
+    |--------------------------------------------------------------------------
+    | แยกข้อมูลปัจจุบัน / ประวัติ (กติกาเดียวกันทั้งหน้าจอและ PDF)
+    |--------------------------------------------------------------------------
+    |
+    | - แถวที่นับ (counted): Assignment Active หรือ Assignment ที่ปิดใช้งานแต่มีผลงานจริงในช่วงที่เลือก
+    |   ตัวนับ ตัวหาร และค่าเฉลี่ยทุกตัวใช้เฉพาะแถวที่นับ
+    | - น้ำหนักรวม (total_weight) นับเฉพาะ Assignment Active · Assignment ที่ปิดใช้งานแยกเป็น history_weight
+    | - พนักงาน Active → ตารางหลัก (employees) · พนักงานที่ปิดใช้งานและมีผลงาน → history_employees
+    | - แถวที่ไม่มีผลงานของพนักงานที่ปิดใช้งาน → other_rows (แสดงอ้างอิง ไม่นับ)
+    |
+    */
     $employees = [];
+    $historyEmployees = [];
+    $otherRows = [];
 
-    foreach ($details as $row) {
+    foreach ($details as &$row) {
 
         $row["period_label"] = $hasMonth
             ? $monthNames[$month]
@@ -234,19 +280,39 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
             ? getQuarterByMonth($month)
             : assignmentQuarterRangeLabel($row["start_date"], $row["end_date"]);
 
+        $row["is_inactive_assignment"] = $row["status"] !== "Active";
+        $row["has_perf"] = (int) $row["perf_rows"] > 0;
+        $row["counted"] = !$row["is_inactive_assignment"] || $row["has_perf"];
+        $row["employee_inactive"] = $row["employee_status"] !== "Active";
+
         $employeeId = (int) $row["employee_id"];
 
-        if (!isset($employees[$employeeId])) {
+        if ($row["employee_inactive"] && !$row["has_perf"]) {
+            $row["counted"] = false;
+            $otherRows[] = $row;
+            continue;
+        }
 
-            $employees[$employeeId] = [
+        if ($row["employee_inactive"]) {
+            $bucket = &$historyEmployees;
+        } else {
+            $bucket = &$employees;
+        }
+
+        if (!isset($bucket[$employeeId])) {
+
+            $bucket[$employeeId] = [
                 "employee_id" => $employeeId,
                 "employee_code" => $row["employee_code"],
                 "first_name" => $row["first_name"],
                 "last_name" => $row["last_name"],
                 "department_name" => $row["department_name"],
+                "employee_inactive" => $row["employee_inactive"],
                 "kpis" => [],
                 "count" => ["Performance" => 0, "Competency" => 0],
                 "weight" => ["Performance" => 0.0, "Competency" => 0.0],
+                "history_weight" => 0.0,
+                "counted_total" => 0,
                 "evaluated" => 0,
                 "score_sum" => 0.0,
                 "weighted_sum" => 0.0,
@@ -254,63 +320,72 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
             ];
         }
 
-        $summary = &$employees[$employeeId];
+        $summary = &$bucket[$employeeId];
 
         $type = $row["kpi_type"];
         $weight = (float) $row["weight"];
 
         $summary["kpis"][] = $row;
 
-        if (isset($summary["count"][$type])) {
-            $summary["count"][$type]++;
-            $summary["weight"][$type] += $weight;
+        if ($row["counted"]) {
+
+            $summary["counted_total"]++;
+
+            if (isset($summary["count"][$type])) {
+
+                $summary["count"][$type]++;
+
+                if ($row["is_inactive_assignment"]) {
+                    $summary["history_weight"] += $weight;
+                } else {
+                    $summary["weight"][$type] += $weight;
+                }
+            }
+
+            if ($row["avg_score"] !== null) {
+
+                $score = (float) $row["avg_score"];
+                $maxScore = (float) $row["max_score"] ?: 5;
+
+                $summary["evaluated"]++;
+                $summary["score_sum"] += $score;
+
+                // ถ่วงน้ำหนัก: สูตรเดียวกับ Dashboard (score / max × weight)
+                $summary["weighted_sum"] += ($score / $maxScore) * $weight;
+                $summary["weighted_weight"] += $weight;
+            }
         }
 
-        if ($row["avg_score"] !== null) {
+        unset($summary, $bucket);
+    }
+    unset($row);
 
-            $score = (float) $row["avg_score"];
-            $maxScore = (float) $row["max_score"] ?: 5;
+    foreach ([&$employees, &$historyEmployees] as &$group) {
+        foreach ($group as &$summary) {
 
-            $summary["evaluated"]++;
-            $summary["score_sum"] += $score;
+            $summary["kpi_total"] = $summary["counted_total"];
+            $summary["total_weight"] = $summary["weight"]["Performance"] + $summary["weight"]["Competency"];
 
-            // ถ่วงน้ำหนัก: สูตรเดียวกับ Dashboard (score / max × weight)
-            $summary["weighted_sum"] += ($score / $maxScore) * $weight;
-            $summary["weighted_weight"] += $weight;
+            $summary["evaluated_ratio"] = $summary["kpi_total"] > 0
+                ? $summary["evaluated"] / $summary["kpi_total"]
+                : 0;
+
+            $summary["avg_score"] = $summary["evaluated"] > 0
+                ? $summary["score_sum"] / $summary["evaluated"]
+                : null;
+
+            $summary["weighted_percent"] = $summary["weighted_weight"] > 0
+                ? $summary["weighted_sum"] / $summary["weighted_weight"] * 100
+                : null;
         }
-
         unset($summary);
     }
+    unset($group);
 
-
-    /* ค่าที่คำนวณต่อพนักงาน */
-
-    foreach ($employees as &$summary) {
-
-        $summary["kpi_total"] = count($summary["kpis"]);
-        $summary["total_weight"] = $summary["weight"]["Performance"] + $summary["weight"]["Competency"];
-
-        $summary["evaluated_ratio"] = $summary["kpi_total"] > 0
-            ? $summary["evaluated"] / $summary["kpi_total"]
-            : 0;
-
-        $summary["avg_score"] = $summary["evaluated"] > 0
-            ? $summary["score_sum"] / $summary["evaluated"]
-            : null;
-
-        $summary["weighted_percent"] = $summary["weighted_weight"] > 0
-            ? $summary["weighted_sum"] / $summary["weighted_weight"] * 100
-            : null;
-    }
-
-    unset($summary);
-
-
-    /* ยอดรวม (การ์ดด้านบน) */
-
+    /* ตัวเลขปัจจุบัน: เฉพาะพนักงาน Active และแถวที่นับ */
     $totals = [
         "employees" => count($employees),
-        "kpi" => count($details),
+        "kpi" => 0,
         "performance" => 0,
         "competency" => 0,
         "evaluated" => 0,
@@ -320,6 +395,7 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
     $scoreSum = 0.0;
 
     foreach ($employees as $summary) {
+        $totals["kpi"] += $summary["kpi_total"];
         $totals["performance"] += $summary["count"]["Performance"];
         $totals["competency"] += $summary["count"]["Competency"];
         $totals["evaluated"] += $summary["evaluated"];
@@ -330,11 +406,12 @@ function loadKpiSummaryReport(PDO $pdo, array $filters): array
         $totals["avg_score"] = $scoreSum / $totals["evaluated"];
     }
 
-
     return [
         "filters" => $filters,
         "details" => $details,
         "employees" => $employees,
+        "history_employees" => $historyEmployees,
+        "other_rows" => $otherRows,
         "totals" => $totals,
         "period" => $hasMonth ? findEvaluationPeriodByMonth($pdo, $year, $month) : null,
         "label" => $hasMonth

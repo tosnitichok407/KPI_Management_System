@@ -59,6 +59,9 @@ foreach (managerEmployeeIds($yearData, $filterDepartment) as $employeeId) {
     );
 }
 
+/* ประวัติพนักงานที่ปิดใช้งานซึ่งมีผลงานในช่วงที่เลือก (แยกจากรายชื่อ/อันดับหลัก) */
+$historyRows = managerHistoryRows($yearData, $filterDepartment, $filterMonth);
+
 usort($employeeRows, function ($a, $b) {
     if ($a["avg_score"] === $b["avg_score"]) {
         return strcmp($a["employee"]["first_name"], $b["employee"]["first_name"]);
@@ -102,6 +105,12 @@ if ($selectedEmployee !== null) {
         }
 
         $performances = $yearData["performances_by_assignment"][$assignmentId] ?? [];
+
+        /* การมอบหมายที่ปิดใช้งาน: แสดงเป็นประวัติเฉพาะช่วงที่มีผลงานจริง */
+        if (($assignment["status"] ?? "Active") !== "Active"
+            && ($filterMonth > 0 ? !isset($performances[$filterMonth]) : empty($performances))) {
+            continue;
+        }
 
         if ($filterMonth > 0) {
             $performances = isset($performances[$filterMonth]) ? [$filterMonth => $performances[$filterMonth]] : [];
@@ -422,6 +431,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
                                 <td>
                                     <strong><?= htmlspecialchars($assignment["kpi_name"], ENT_QUOTES, "UTF-8") ?></strong>
+                                    <?php if (($assignment["status"] ?? "Active") !== "Active"): ?>
+                                        <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                    <?php endif; ?>
                                     <div class="cell-sub">หน่วย: <?= htmlspecialchars($assignment["unit"] ?? "-", ENT_QUOTES, "UTF-8") ?></div>
                                 </td>
 
@@ -610,6 +622,63 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
             </div>
 
         </div>
+
+        <?php if (!empty($historyRows)): ?>
+
+            <!-- =====================================================
+                 ประวัติพนักงานที่ปิดใช้งาน (ไม่รวมในรายชื่อ/อันดับด้านบน)
+            ====================================================== -->
+
+            <div class="table-card">
+
+                <div class="table-header">
+                    <h2>ประวัติพนักงานที่ปิดใช้งาน</h2>
+                    <span><?= count($historyRows) ?> คน · ไม่นับรวมจำนวนพนักงานและอันดับด้านบน</span>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="manager-table">
+                        <thead>
+                            <tr>
+                                <th class="col-index">#</th>
+                                <th>พนักงาน</th>
+                                <th>แผนก / ตำแหน่ง</th>
+                                <th>ประเมินแล้ว</th>
+                                <th class="col-number">Performance</th>
+                                <th class="col-number">Competency</th>
+                                <th>คะแนนเฉลี่ย</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($historyRows as $historyIndex => $historyRow): ?>
+                                <?php $historyEmployee = $historyRow["employee"]; ?>
+                                <tr>
+                                    <td class="col-index"><?= $historyIndex + 1 ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($historyEmployee["first_name"] . " " . $historyEmployee["last_name"], ENT_QUOTES, "UTF-8") ?></strong>
+                                        <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                        <div class="cell-sub"><?= htmlspecialchars($historyEmployee["employee_code"], ENT_QUOTES, "UTF-8") ?></div>
+                                    </td>
+                                    <td>
+                                        <?= htmlspecialchars($historyEmployee["department_name"] ?? "-", ENT_QUOTES, "UTF-8") ?>
+                                        <div class="cell-sub"><?= htmlspecialchars($historyEmployee["position_name"] ?? "-", ENT_QUOTES, "UTF-8") ?></div>
+                                    </td>
+                                    <td><?= $historyRow["evaluated"] ?> / <?= $historyRow["total_kpi"] ?> KPI</td>
+                                    <td class="col-number"><?= managerFormat($historyRow["avg_performance"]) ?></td>
+                                    <td class="col-number"><?= managerFormat($historyRow["avg_competency"]) ?></td>
+                                    <td>
+                                        <?= managerFormat($historyRow["avg_score"]) ?>
+                                        <div class="cell-sub">ถ่วงน้ำหนัก <?= managerFormat($historyRow["weighted_percent"], 1, "%") ?></div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+        <?php endif; ?>
 
     <?php endif; ?>
 

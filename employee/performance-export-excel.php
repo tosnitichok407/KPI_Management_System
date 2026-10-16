@@ -214,7 +214,7 @@ function renderKpiSection(Worksheet $sheet, int $row, string $title, string $tot
 
     foreach (array_values($kpis) as $index => $kpi) {
 
-        $sheet->setCellValue("A{$row}", ($index + 1) . "." . $kpi["kpi_name"]);
+        $sheet->setCellValue("A{$row}", ($index + 1) . "." . $kpi["kpi_name"] . (!empty($kpi["is_inactive"]) ? " (ปิดใช้งาน)" : ""));
         $sheet->setCellValue("B{$row}", $kpi["description"] ?? "");
         $sheet->setCellValue("C{$row}", (float) $kpi["weight_value"]);
 

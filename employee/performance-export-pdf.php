@@ -88,7 +88,7 @@ foreach ($form["sections"] as $sectionIndex => $section) {
         }
 
         $rows .= "<tr>"
-            . "<td class='topic'>" . thaiPdfWrap($pdf, ($index + 1) . "." . $kpi["kpi_name"], $innerWidth(0), 14) . "</td>"
+            . "<td class='topic'>" . thaiPdfWrap($pdf, ($index + 1) . "." . $kpi["kpi_name"] . (!empty($kpi["is_inactive"]) ? " (ปิดใช้งาน)" : ""), $innerWidth(0), 14) . "</td>"
             . "<td class='indicator'>" . thaiPdfWrap($pdf, (string) ($kpi["description"] ?? ""), $innerWidth(1), 12.5) . "</td>"
             . "<td class='c weight'>" . $fmt($row["weight"]) . "</td>"
             . $levels

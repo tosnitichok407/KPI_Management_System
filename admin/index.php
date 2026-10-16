@@ -146,6 +146,9 @@ $kpiScores = [];
 /* การ์ดรายไตรมาส: กำหนดค่าเริ่มต้นไว้เสมอ (ใช้ใน HTML ของหน้า home) */
 $quarterScores = [];
 $selectedDashboardYear = (int) date("Y");
+
+/* ประวัติพนักงานที่ปิดใช้งานแต่มีผลงานในรอบที่เลือก (แสดงแยก ไม่รวมตัวเลขหลัก) */
+$inactiveHistory = [];
 $dashboardError = "";
 
 
@@ -157,8 +160,9 @@ if ($page === "home") {
         INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
         INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
         INNER JOIN employees e ON e.employee_id = ka.employee_id
-        WHERE ka.status = 'Active'
-          AND e.status = 'Active'
+        /* ประวัติรายไตรมาส: พนักงาน Active ทุกผลงานที่มีจริง (รวม Assignment ที่ปิดใช้งาน ซึ่งมีแถวเฉพาะเดือนที่มีผลงาน)
+           พนักงานที่ปิดใช้งานไม่รวมในกราฟหลัก */
+        WHERE e.status = 'Active'
           AND kp.score IS NOT NULL
     ");
 
@@ -249,11 +253,27 @@ if ($page === "home") {
             /*
             | เงื่อนไข "KPI ที่มีผลในเดือนนี้" (ชุดเดียวกับหน้าพนักงานและหน้า Summary)
             */
+            /*
+            | ตัวนับและตัวหารทุกตัวของรอบที่เลือกใช้เงื่อนไขเดียวกัน:
+            | พนักงาน Active · Assignment ที่มีผลในเดือน · Assignment Active
+            | หรือ Assignment ที่ปิดใช้งานแต่มีผลงานจริงในรอบนี้ (นับเป็นประวัติของเดือนนั้น)
+            | พนักงานที่ปิดใช้งานแสดงแยกใน $inactiveHistory
+            */
+            $periodParams[":history_period_id"] = $selectedPeriod;
+
             $activeInMonth = "
-                ka.status = 'Active'
-                AND e.status = 'Active'
+                e.status = 'Active'
                 AND COALESCE(ka.start_date, CONCAT(ka.assignment_year, '-01-01')) <= :month_end
                 AND COALESCE(ka.end_date, CONCAT(ka.assignment_year, '-12-31')) >= :month_start
+                AND (
+                    ka.status = 'Active'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM kpi_performances hx
+                        WHERE hx.assignment_id = ka.assignment_id
+                          AND hx.period_id = :history_period_id
+                    )
+                )
             ";
 
 
@@ -372,6 +392,32 @@ if ($page === "home") {
                 $kpiLabels[] = $row["kpi_name"];
                 $kpiScores[] = (float) $row["average_score"];
             }
+
+            /* ประวัติพนักงานที่ปิดใช้งาน: ผลงานจริงในรอบนี้ · สูตร % เดียวกับกราฟพนักงาน */
+            $stmt = $pdo->prepare("
+                SELECT
+                    e.employee_id,
+                    e.employee_code,
+                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+                    COUNT(kp.performance_id) AS evaluated,
+                    ROUND(AVG(kp.score), 2) AS average_score,
+                    ROUND(
+                        SUM(kp.score / COALESCE(NULLIF(ki.max_score, 0), 5) * ka.weight)
+                            / NULLIF(SUM(ka.weight), 0) * 100,
+                        2
+                    ) AS performance_percentage
+                FROM kpi_performances kp
+                INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                WHERE kp.period_id = :period_id
+                  AND kp.score IS NOT NULL
+                  AND e.status = 'Inactive'
+                GROUP BY e.employee_id, e.employee_code, e.first_name, e.last_name
+                ORDER BY e.first_name, e.last_name
+            ");
+            $stmt->execute([":period_id" => $selectedPeriod]);
+            $inactiveHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
     } catch (PDOException $e) {
@@ -989,9 +1035,47 @@ if ($page === "home") {
 
                 </div>
 
+                <?php if (!empty($inactiveHistory)): ?>
+
+                    <!-- =================================================
+                     ประวัติพนักงานที่ปิดใช้งาน (แยกจากตัวเลขหลัก)
+                ================================================= -->
+
+                    <div class="chart-card">
+
+                        <h2>ประวัติพนักงานที่ปิดใช้งาน</h2>
+
+                        <p>ผลงานในรอบที่เลือกของพนักงานที่ปิดใช้งานแล้ว · ไม่นับรวมในตัวเลขและอันดับด้านบน</p>
+
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>พนักงาน</th>
+                                    <th>KPI ที่ประเมิน</th>
+                                    <th>คะแนนเฉลี่ย</th>
+                                    <th>ผลงาน (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($inactiveHistory as $historyRow): ?>
+                                    <tr>
+                                        <td>
+                                            <?= htmlspecialchars($historyRow["employee_code"] . " - " . $historyRow["employee_name"], ENT_QUOTES, "UTF-8") ?>
+                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;">ปิดใช้งาน</span>
+                                        </td>
+                                        <td><?= (int) $historyRow["evaluated"] ?></td>
+                                        <td><?= number_format((float) $historyRow["average_score"], 2) ?></td>
+                                        <td><?= number_format((float) $historyRow["performance_percentage"], 2) ?>%</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+
+                    </div>
+
+                <?php endif; ?>
 
             <?php else: ?>
-
 
                 <!-- =================================================
                  OTHER ADMIN PAGES

@@ -173,13 +173,18 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
         SELECT
             a.assignment_id,
             a.weight,
+            a.status,
             COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
             COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) AS end_date
         FROM kpi_assignments a
         WHERE a.employee_id = :employee_id
           AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :year_end
           AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :year_start
-          AND a.status = 'Active'
+          /* Inactive: ใช้เฉพาะเป็นประวัติ (มีผลงานจริง) · นับเฉพาะเดือนที่มีผลงานในลูปด้านล่าง */
+          AND (
+              a.status = 'Active'
+              OR EXISTS (SELECT 1 FROM kpi_performances kx WHERE kx.assignment_id = a.assignment_id)
+          )
     ");
     $assignmentStmt->execute([
         ":employee_id" => $employeeId,
@@ -218,6 +223,11 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
         foreach ($assignments as $assignment) {
 
             if ($assignment["start_date"] > $monthEnd || $assignment["end_date"] < $monthStart) {
+                continue;
+            }
+
+            /* Assignment ที่ปิดใช้งาน: นับทั้งคะแนนเต็มและคะแนนที่ได้ เฉพาะเดือนที่มีผลงานจริง */
+            if ($assignment["status"] !== "Active" && !isset($scores[$month][(int) $assignment["assignment_id"]])) {
                 continue;
             }
 
@@ -287,6 +297,7 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $periodId = (int) ($periodStmt->fetchColumn() ?: 0);
     $stmt = $pdo->prepare("
         SELECT a.assignment_id, a.target_value AS assignment_target, a.weight AS assignment_weight,
+               a.status AS assignment_status,
                k.kpi_id, k.kpi_type, c.category_name, k.kpi_name, k.description, k.unit,
                COALESCE(k.max_score, 5) AS max_score,
                k.score_5, k.score_4, k.score_3, k.score_2, k.score_1,
@@ -304,7 +315,8 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
         WHERE a.employee_id = :employee_id
           AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
           AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
-          AND a.status = 'Active'
+          /* Inactive แสดงเป็นประวัติเฉพาะเมื่อมีผลงานในเดือนที่เลือก */
+          AND (a.status = 'Active' OR p.performance_id IS NOT NULL)
         ORDER BY k.kpi_type, a.assignment_id
     ");
     $stmt->execute([":period_id" => $periodId, ":employee_id" => $employeeId, ":month_start" => $start, ":month_end" => $end]);
@@ -314,6 +326,8 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $competencyScore = 0;
     foreach ($kpis as &$kpi) {
         $kpi["criteria"] = $criteria[(int) $kpi["kpi_id"]] ?? [];
+        /* ป้ายสำหรับแบบฟอร์ม PDF / Excel */
+        $kpi["is_inactive"] = ($kpi["assignment_status"] ?? "Active") !== "Active";
         $kpi["target_value"] = $kpi["assignment_target"];
         $kpi["actual_value"] = $kpi["actual"];
         /* KPI 9: ช่อง "ที่ทำได้" แสดง Achievement = Total R / Budget × 100 (ฟังก์ชันกลาง) */

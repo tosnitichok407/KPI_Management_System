@@ -31,6 +31,21 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 $message = "";
 $error = "";
 
+/* ผลจากหน้าลบ Assignment (redirect กลับมาพร้อมพารามิเตอร์) */
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    $assignmentResultMessages = [
+        "deleted" => "ลบ KPI Assignment เรียบร้อยแล้ว",
+    ];
+    $assignmentErrorMessages = [
+        "has_performances" => "ไม่สามารถลบ KPI Assignment นี้ได้ เนื่องจากมีผลงานบันทึกไว้แล้ว · แก้ไขสถานะเป็น Inactive แทนเพื่อเก็บประวัติไว้",
+        "busy" => "มีการบันทึกผลงานของ KPI Assignment นี้อยู่ในขณะนี้ ระบบยังไม่ได้ลบ กรุณาลองใหม่อีกครั้ง",
+        "not_found" => "ไม่พบ KPI Assignment ที่ต้องการลบ",
+        "delete_failed" => "ไม่สามารถลบ KPI Assignment ได้ กรุณาลองใหม่อีกครั้ง",
+    ];
+    $message = $assignmentResultMessages[(string) ($_GET["success"] ?? "")] ?? "";
+    $error = $assignmentErrorMessages[(string) ($_GET["error"] ?? "")] ?? "";
+}
+
 
 /* =========================================================
    ADD KPI ASSIGNMENT
@@ -725,6 +740,9 @@ $assignment_sql = "
         a.start_date,
         a.end_date,
         a.status,
+
+        /* ใช้ปิดปุ่มลบ (ฝั่ง server ตรวจซ้ำใน kpi-assignment-delete.php) */
+        (SELECT COUNT(*) FROM kpi_performances kp WHERE kp.assignment_id = a.assignment_id) AS performance_count,
 
         e.employee_code,
         e.first_name,
@@ -1898,17 +1916,28 @@ $form_year =
                                             <?= icon("square-pen") ?>แก้ไข
                                         </a>
 
+                                        <?php if ((int) ($assignment["performance_count"] ?? 0) > 0): ?>
+
+                                            <button type="button" class="btn-small btn-delete" disabled
+                                                title="มีผลงานบันทึกไว้แล้ว · แก้ไขสถานะเป็น Inactive แทนเพื่อเก็บประวัติ">
+                                                <?= icon("trash-2") ?>ลบ
+                                            </button>
+
+                                        <?php else: ?>
+
                                         <form
                                             method="POST"
                                             action="kpi-assignment/kpi-assignment-delete.php"
                                             class="inline-form"
-                                            onsubmit="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
+                                            onsubmit="return confirm('ลบ KPI Assignment นี้ถาวรหรือไม่? (ลบได้เฉพาะ Assignment ที่ยังไม่มีผลงาน)')">
                                             <?= csrfField() ?>
                                             <input type="hidden" name="id" value="<?= (int) $assignment["assignment_id"] ?>">
                                             <button type="submit" class="btn-small btn-delete">
                                                 <?= icon("trash-2") ?>ลบ
                                             </button>
                                         </form>
+
+                                        <?php endif; ?>
 
                                     </div>
 

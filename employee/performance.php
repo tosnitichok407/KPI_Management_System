@@ -89,7 +89,7 @@ $quarterScoreStmt = $pdo->prepare("
     INNER JOIN kpi_assignments a ON a.assignment_id = p.assignment_id
     INNER JOIN kpi_indicators k ON k.kpi_id = a.kpi_id
     WHERE a.employee_id = :employee_id
-      AND a.status = 'Active'
+    /* ประวัติรายไตรมาส: ทุกผลงานที่มีจริง รวม Assignment ที่ปิดใช้งาน (แถวผลงาน = เดือนที่มีผลงาน) */
     AND p.score IS NOT NULL
     ORDER BY p.performance_date
 ");
@@ -125,7 +125,10 @@ $yearStmt = $pdo->prepare("
         a.assignment_year
     FROM kpi_assignments a
     WHERE a.employee_id = :employee_id
-      AND a.status = 'Active'
+      AND (
+          a.status = 'Active'
+          OR EXISTS (SELECT 1 FROM kpi_performances kx WHERE kx.assignment_id = a.assignment_id)
+      )
     ORDER BY a.assignment_year DESC
 ");
 $yearStmt->execute([":employee_id" => $employeeId]);
@@ -193,7 +196,8 @@ $sql = "
 
     WHERE a.employee_id = :employee_id
 
-    AND a.status = 'Active'
+    /* Inactive แสดงเป็นประวัติเฉพาะเมื่อมีผลงานในเดือนที่เลือก (นับรวมในสรุปของเดือนนั้นด้วย) */
+    AND (a.status = 'Active' OR p.performance_id IS NOT NULL)
 
     -- KPI ที่มีผลในเดือนที่เลือก (Assignment เดียวใช้ได้ทุกเดือนในช่วงเวลา)
     AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
@@ -859,6 +863,10 @@ if ($totalPerformanceRecords === 0) {
                                                 ENT_QUOTES,
                                                 "UTF-8"
                                             ) ?>
+
+                                            <?php if (($kpi["assignment_status"] ?? "Active") !== "Active"): ?>
+                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="การมอบหมายนี้ปิดใช้งานแล้ว แสดงเป็นประวัติเพราะมีผลงานในเดือนนี้">ปิดใช้งาน</span>
+                                            <?php endif; ?>
 
                                         </h3>
 

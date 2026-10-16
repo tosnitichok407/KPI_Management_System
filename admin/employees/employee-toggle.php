@@ -38,6 +38,12 @@ if ($action === "activate") {
 
 } elseif ($action === "deactivate") {
 
+    /* ห้าม Admin ปิดใช้งานตัวเอง (session จะถูกตัดและเข้าระบบไม่ได้) */
+    if ($id === (int) ($_SESSION["employee_id"] ?? 0)) {
+        header("Location: ../index.php?page=employees&error=self_deactivate");
+        exit;
+    }
+
     $newStatus = "Inactive";
 
 } else {
