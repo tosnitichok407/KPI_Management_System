@@ -21,7 +21,7 @@
 | 4 | KPI ที่สร้างผ่านหน้า "เพิ่ม KPI" ตั้งเกณฑ์ไม่ได้จริง | หน้าเพิ่มและหน้าแก้ไขมีช่องเกณฑ์ 5..1 และบันทึกลง `kpi_score_criteria` ผ่าน `saveKpiScoreCriteria()` | `kpi-add.php`, `kpi-edit.php` |
 | 5 | หน้าจอไม่มีช่องเลือกประเภท KPI | เพิ่มตัวเลือก Performance / Competency ทั้งหน้าเพิ่มและแก้ไข | `kpi-add.php:98`, `kpi-edit.php:124` |
 | 6 | น้ำหนัก 100% ตรวจแยกประเภท รวมได้ถึง 200% | ตรวจยอดรวม Performance + Competency | `kpi-assignment.php:294-452`, `kpi-assignment-edit.php` |
-| 7 | รอบประเมินที่ Closed ยังบันทึกได้ | ตรวจ `status === "Open"` ก่อนบันทึก ทั้งสองเส้นทาง | `kpi.php:149`, `kpi-detail.php:188` |
+| 7 | รอบประเมินที่ Closed ยังบันทึกได้ | ตรวจ `status === "Open"` ก่อนบันทึก | เดิม `kpi.php` / `kpi-detail.php` (ปิดแล้ว) · ปัจจุบัน `kpiImportValidate()` |
 | 8 | Login เปิดเผยว่า username มีอยู่จริง และมีช่อง Remember Me ที่ไม่ทำงาน | ตรวจรหัสผ่านก่อนสถานะบัญชี และลบช่อง Remember Me | `login.php:167-192` |
 | 9 | ไม่มี session timeout และไม่ตรวจสถานะบัญชีซ้ำ | หมดอายุเมื่อไม่ใช้งาน 30 นาที และตรวจสถานะบัญชีทุก request | `security.php:50-122`, `database.php:32` |
 | 10 | Logout ไม่มี CSRF token | ลิงก์ออกจากระบบสร้างด้วย `logoutUrl()` และ `logout.php` ตรวจ token | `security.php:200`, `logout.php:10` |
@@ -37,6 +37,17 @@
 | **ไม่มีขั้นอนุมัติคะแนน** | คอลัมน์ `status` มีค่า Draft / Submitted / Approved / Rejected แต่ไม่มีหน้าอนุมัติ และรายงานไม่กรองตาม status | "เป็นการประเมินตนเอง ฐานข้อมูลรองรับ status ไว้แล้ว ถ้าพัฒนาต่อจะเพิ่มหน้าอนุมัติของหัวหน้า" |
 | **Manager เห็นทุกแผนก** | `manager/index.php:48` อ่าน `department_id` แต่ไม่ได้กรอง | "ออกแบบให้ผู้บริหารเปรียบเทียบข้ามแผนกได้ ถ้าต้องจำกัดจะกรองด้วยแผนกใน session" |
 | Partial ของ Admin เปิดผ่าน URL ตรงได้ | ได้ HTML ไม่ครบหน้า แต่ยังตรวจ role | ไม่ใช่ช่องโหว่ข้ามสิทธิ์ |
+
+### 0.4 อัปเดตตุลาคม 2026: การบันทึกผล KPI
+
+- บันทึกผลได้ทางเดียว: `employee/kpi-import.php` นำเข้าจาก **ไฟล์ Excel จริงของบริษัท** (เลือกปี/เดือน → Preview → ยืนยัน)
+- ปิดแล้ว: หน้ากรอกเอง (`employee/kpi/kpi.php` ส่งต่อไปหน้านำเข้า · `employee/kpi-detail.php` ดูอย่างเดียว) และ **System-generated Template** (ดาวน์โหลด / อัปโหลด / Preview / Commit ถูกปฏิเสธฝั่ง Server)
+- KPI ที่ยืนยัน Mapping แล้ว: **KPI 14 "บรรลุเป้าหมายการต่อสัญญา" เท่านั้น** — Actual = Total R ÷ Budget × 100 (ตัดลง 2 ตำแหน่ง) จากชีต `สรุปทั้งปี..` ตาราง `Portfolio(มูลค่า)` (Q = G/C, G = SUM(D:F) ไม่รวม New) · Target 100 · คะแนนจาก `kpiCalculateScore()`
+- KPI อื่นยังไม่มี Mapping ที่ยืนยัน → นำเข้าไม่ได้
+- ผลที่นำเข้าเป็น `Draft` เสมอ · ไม่เขียนทับ Submitted / Approved / Rejected · นำเข้าซ้ำไม่สร้างแถวซ้ำ
+- Budget > 0 แต่ Total R = 0: เดือนยังไม่สิ้นสุด → ไม่บันทึก · สิ้นสุดแล้ว → เตือนและต้องติ๊กยืนยันรายแถว (ไม่ติ๊ก = ไม่บันทึก)
+- การทดสอบ: ฐานทดสอบแยกด้วยข้อมูลสังเคราะห์ · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน · **ยังไม่ได้ทดสอบบันทึกกับ Production**
+- หัวข้อด้านล่างที่อ้าง `kpi.php` / `kpi-detail.php` พร้อมเลขบรรทัด เป็นโค้ดเดิมก่อนปิด (ไว้อ้างอิง) · โค้ดปัจจุบันอยู่ใน `includes/kpi-import-helper.php`
 
 ### 0.3 เรื่องที่คุณต้องตัดสินใจเอง
 
@@ -81,8 +92,10 @@ php database/migrations/20260921_recalculate_kpi_scores.php --apply    # เข�
 | `manager/includes/manager-data.php` | โหลดข้อมูลทั้งปีและฟังก์ชันสรุปผล |
 | `manager/dashboard, departments, employees` | หน้าเนื้อหาของ Manager |
 | `manager/feedback.php` | รับ POST บันทึก Feedback |
-| `employee/kpi/kpi.php` | **หน้าบันทึกผลงาน (เส้นทางหลักของระบบ)** |
-| `employee/kpi-detail.php` | บันทึกผลงานอีกเส้นทางหนึ่ง + ประวัติ |
+| `employee/kpi-import.php` | **หน้าบันทึกผล KPI (ช่องทางเดียว)**: นำเข้าไฟล์ Excel ของบริษัท → Preview → ยืนยัน |
+| `includes/kpi-import-company-reader.php` / `kpi-import-company-map.php` / `kpi-import-helper.php` | อ่านแบบฟอร์มบริษัท / Mapping ที่ยืนยัน / Validate + Commit |
+| `employee/kpi/kpi.php` | (ปิดแล้ว) ส่งต่อไปหน้านำเข้า |
+| `employee/kpi-detail.php` | รายละเอียด + ประวัติ (ดูอย่างเดียว) |
 | `employee/performance.php` | ดูผลรายเดือน + ปุ่ม Export |
 | `employee/performance-export-*.php` | ข้อมูลและไฟล์ Excel / PDF |
 | `database/schema.sql` | โครงสร้างตารางทั้งหมด |
@@ -105,7 +118,28 @@ if (!array_key_exists($page, $pages)) { $page = "home"; }
 - ผลคือป้องกันการ include ไฟล์ตามใจผู้ใช้ (Local File Inclusion)
 - Employee ไม่มี router แต่ละหน้าเรียก `employeeLayoutStart()` / `employeeLayoutEnd()` ครอบเนื้อหา
 
-### 1.4 Request flow ตัวอย่าง: พนักงานบันทึกผลงาน
+### 1.4 Request flow ตัวอย่าง: พนักงานบันทึกผลงาน (ปัจจุบัน · ตุลาคม 2026)
+
+ช่องทางเดียว: นำเข้าจาก **ไฟล์ Excel จริงของบริษัท** · หน้ากรอกเองและ System-generated Template ปิดแล้ว
+
+```text
+Browser  POST employee/kpi-import.php  (action=upload, format=company, ปี, เดือน, ไฟล์ .xlsx)
+   │
+   ├─ includes/security.php + config/database.php       session, $pdo, ตรวจสถานะบัญชี
+   ├─ ตรวจ user_id, role_id = 3, employee_id จาก session
+   ├─ csrfVerify()
+   ├─ ตรวจไฟล์ (ขนาด / ZIP / Macro)                      kpiImportCheckUploadedFile()
+   ├─ อ่านแบบฟอร์ม KPI AM เฉพาะเดือนที่เลือก              kpiCompanyPrepare() → kpiCompanyRead()
+   │    รหัสพนักงานในไฟล์ต้องตรงกับผู้ใช้ · เฉพาะหัวข้อที่ยืนยัน Mapping (ปัจจุบัน KPI 14)
+   ├─ ตรวจกับฐานข้อมูล (ไม่เขียน)                        kpiImportValidate(..., origin = company)
+   │    Assignment ของผู้ใช้ · รอบ Open · แก้ได้เฉพาะ Draft · คะแนนจาก kpiCalculateScore()
+   └─ Preview (token ใช้ครั้งเดียวใน session)
+Browser  POST action=confirm  → kpiImportCommit()      Transaction + ล็อก · ตรวจซ้ำ · INSERT/UPDATE เป็น Draft
+```
+
+ผลทดสอบมาจากฐานทดสอบแยก (ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน · ยังไม่ได้ทดสอบการบันทึกกับ Production
+
+### 1.4 (เดิม — ปิดแล้ว) Request flow ของหน้ากรอกผลงาน `employee/kpi/kpi.php`
 
 ```text
 Browser  POST employee/kpi/kpi.php?tab=performance&year=2026&month=9
@@ -228,7 +262,8 @@ LIMIT 1
 | ทุกไฟล์ใน `admin/` ที่รับ request | `role_id === 1` | เช่น `admin/index.php:31`, `kpi-delete.php:21` |
 | `manager/index.php`, `manager/feedback.php` | `role_id` อยู่ใน `[1, 2]` | `index.php:32`, `feedback.php:15` |
 | `employee/index.php`, `profile.php` | `role_id === 3` | `index.php:36` |
-| `employee/kpi/kpi.php`, `performance.php`, `kpi-detail.php`, `feedback.php`, ไฟล์ Export | login แล้ว และมี `employee_id` ใน session | `kpi.php:20-43`, `performance-export-data.php:229-245` |
+| `employee/kpi-import.php`, `employee/kpi/kpi.php` | login แล้ว · `role_id === 3` · มี `employee_id` ใน session | ส่วนหัวของแต่ละไฟล์ |
+| `performance.php`, `kpi-detail.php`, `feedback.php`, ไฟล์ Export | login แล้ว และมี `employee_id` ใน session | `performance-export-data.php:229-245` |
 
 โค้ดตัวอย่างที่ต้องจำ
 
@@ -440,7 +475,7 @@ WHERE u.user_id IS NULL
 
 ### 5.3 พนักงานกรอก Actual
 
-`employee/kpi/kpi.php` — ดู flow ในหัวข้อ 1.4
+ปัจจุบัน: `employee/kpi-import.php` + `includes/kpi-import-helper.php` — ดู flow ในหัวข้อ 1.4 · ด้านล่างคือหน้ากรอกเดิม `employee/kpi/kpi.php` (ปิดแล้ว ไว้อ้างอิง)
 
 เงื่อนไขก่อนบันทึก: ต้องมีรอบประเมินของเดือนนั้น (บรรทัด 144) และรอบต้องมีสถานะ `Open` (บรรทัด 149)
 
@@ -516,8 +551,8 @@ return kpiGradeFromCriteria($levels, $actual, $target)   // 1. ใช้เก�
 - กันเดือนซ้ำด้วย UNIQUE key ถ้าซ้ำฐานข้อมูลตอบ error รหัส `23000` โค้ดแปลงเป็นข้อความ "มีรอบประเมินสำหรับปีและเดือนนี้แล้ว" (`evaluation-periods-add.php:120-125`)
 - ลบไม่ได้ถ้ามีข้อมูลอ้างอิง (`evaluationPeriodUsage()`)
 - ย้ายปี/เดือนไม่ได้ถ้ามีผลงานแล้ว (`evaluation-periods-edit.php:167-176`)
-- ถ้าเดือนนั้นไม่มีรอบ พนักงานบันทึกไม่ได้ (`kpi.php:144`)
-- ถ้ารอบมีสถานะ `Closed` พนักงานบันทึกและแก้ไขไม่ได้ (`kpi.php:149`, `kpi-detail.php:188`) Admin เปิด-ปิดรอบได้จากหน้าแก้ไขรอบประเมิน
+- ถ้าเดือนนั้นไม่มีรอบ พนักงานนำเข้าไม่ได้ (`kpiImportValidate()`)
+- ถ้ารอบมีสถานะ `Closed` พนักงานนำเข้าและแก้ไขไม่ได้ (`kpiImportValidate()` และตรวจซ้ำตอน `kpiImportCommit()`) Admin เปิด-ปิดรอบได้จากหน้าแก้ไขรอบประเมิน
 
 ---
 
@@ -683,9 +718,9 @@ return hash_equals($_SESSION["csrf_token"], $token);   // เทียบแบ�
 | 7 | `login.php:241-285` | regenerate + เขียน session | กัน session fixation | ใช้เลข session ที่เตรียมไว้ได้ | "หลัง login สำเร็จผมเปลี่ยนเลข session ใหม่ทันที" |
 | 8 | `admin/index.php:18-34` | ตรวจ login และ role | แยกสิทธิ์ | พนักงานเปิดหน้า Admin ได้ | "ตรวจ 2 ชั้น คือ login หรือยัง และ role ตรงไหม" |
 | 9 | `admin/index.php:70-107` | router แบบ whitelist | กัน include ไฟล์ตามใจ | เปิดไฟล์อื่นในเครื่องได้ | "ค่า page เป็นแค่ key ของ array ไม่ได้เป็นชื่อไฟล์" |
-| 10 | `employee/kpi/kpi.php:164-198` | ตรวจเจ้าของ assignment | กัน IDOR | แก้คะแนนคนอื่นได้ | "employee_id มาจาก session ไม่เคยมาจากฟอร์ม" |
+| 10 | `includes/kpi-import-helper.php` `kpiImportValidate()` (เดิม `kpi.php:164-198`) | ตรวจเจ้าของ assignment | กัน IDOR | แก้คะแนนคนอื่นได้ | "employee_id มาจาก session ไม่เคยมาจากฟอร์ม" |
 | 11 | `includes/kpi-score-helper.php:389-456` | ตัดเกรด | กฎธุรกิจหลัก | คะแนนไม่ตรงเกณฑ์ | "แปลงเกณฑ์เป็นกฎ แล้วไล่จากระดับ 5 ลงมา" |
-| 12 | `employee/kpi/kpi.php:348-495` | มีแล้ว UPDATE ไม่มี INSERT | 1 KPI 1 เดือนมี 1 แถว | ข้อมูลซ้ำ | "กุญแจของผลงานคือ assignment กับ period" |
+| 12 | `includes/kpi-import-helper.php` `kpiImportCommit()` (เดิม `kpi.php:348-495`) | มีแล้ว UPDATE (เฉพาะ Draft ที่ยืนยัน) ไม่มี INSERT | 1 KPI 1 เดือนมี 1 แถว | ข้อมูลซ้ำ | "กุญแจของผลงานคือ assignment กับ period" |
 | 13 | `admin/kpi-assignment/kpi-assignment.php:261-539` | transaction + ตรวจน้ำหนักรวม | ข้อมูลครบหรือไม่ทำเลย | มอบหมายค้างครึ่งเดียว | "ถ้าใครน้ำหนักรวมเกิน 100 ผม rollback ทั้งชุด" |
 | 14 | `manager/includes/manager-data.php:223-323` | `managerStats()` | ตัวสรุปกลาง | ตัวเลขแต่ละหน้าไม่ตรงกัน | "ฟังก์ชันเดียวใช้ได้ทั้งรายคนและรายแผนก แค่เปลี่ยนชุดรหัสพนักงาน" |
 | 15 | `admin/index.php:252-375` และ `manager/dashboard/dashboard.php:456-461` | query สรุป และส่งข้อมูลให้ Chart.js | เชื่อม backend กับกราฟ | กราฟไม่มีข้อมูล | "PHP แปลง array เป็น JSON ฝังในหน้า" |
@@ -724,10 +759,10 @@ return hash_equals($_SESSION["csrf_token"], $token);   // เทียบแบ�
 | 19 | KPI มีผลในเดือนไหน รู้ได้อย่างไร | ช่วง start-end ของ assignment ซ้อนกับเดือน | `COALESCE` | `kpi.php:584-585` |
 | 20 | น้ำหนักตรวจอย่างไร | รวมน้ำหนัก Active ทุกประเภทของพนักงานในปีนั้น บวกของใหม่ ต้องไม่เกิน 100 | Performance + Competency รวมกัน | `kpi-assignment.php:294-452` |
 | 21 | Transaction ใช้ตรงไหน ทำไม | มอบหมาย KPI หลายคน เพิ่ม/แก้ไข KPI พร้อมเกณฑ์ และลบพนักงาน เพื่อให้สำเร็จทั้งหมดหรือไม่ทำเลย | begin, commit, rollBack | 4.5 |
-| 22 | กรอกผลซ้ำเดือนเดิมจะเป็นอย่างไร | ตรวจว่ามีแถวเดิมไหม มีก็ UPDATE | ไม่มีแถวซ้ำ | `kpi.php:348-377` |
+| 22 | นำเข้าซ้ำเดือนเดิมจะเป็นอย่างไร | ค่าเหมือนเดิม = ไม่เปลี่ยนแปลง · ต่าง = UPDATE เฉพาะ Draft ที่ผู้ใช้ยืนยัน | ไม่มีแถวซ้ำ | `kpiImportValidate()` / `kpiImportCommit()` |
 | 23 | Chart.js ได้ข้อมูลจากไหน | PHP `json_encode` ฝังใน script ไม่มี AJAX | `JSON_HEX_TAG` | `dashboard.php:456` |
 | 24 | Excel กับ PDF ต่างกันอย่างไร | Excel ใส่สูตรให้คำนวณในไฟล์ PDF คำนวณใน PHP แล้วแปลง HTML | ข้อมูลชุดเดียวกัน | 7 |
-| 25 | ตรวจ Actual อย่างไร | regex รับตัวเลขไม่ติดลบ ทศนิยมไม่เกิน 2 ตำแหน่ง | ตรงกับ decimal(15,2) | `kpi.php:234` |
+| 25 | ตรวจ Actual อย่างไร | regex รับตัวเลขไม่ติดลบ ทศนิยมไม่เกิน 2 ตำแหน่ง | ตรงกับ decimal(15,2) | `kpiImportDecimal()` (เดิม `kpi.php:234`) |
 | 26 | ทำไมลบ KPI ที่มอบหมายแล้วไม่ได้ | ฐานข้อมูลลบต่อเนื่อง ผลงานจะหายตาม จึงตรวจก่อน | CASCADE | `kpi-delete.php:51-69` |
 
 ### ระดับเจาะลึก
@@ -908,7 +943,7 @@ PHP ทำงานบนเซิร์ฟเวอร์ก่อน พิม
 ### เช็กลิสต์ก่อนสอบ
 - [ ] เปิด Apache และ MySQL ใน XAMPP แล้ว login ให้ครบ 3 บทบาท
 - [ ] เปิด Dashboard ของ Admin ดูว่าตัวเลขและกราฟขึ้น
-- [ ] ทดสอบบันทึกผลงาน 1 รายการ ทั้ง Performance และ Competency
+- [ ] ทดสอบนำเข้า KPI 14 จากไฟล์บริษัท 1 เดือนบนฐานทดสอบ (Competency และ KPI อื่นยังไม่มี Mapping จึงนำเข้าไม่ได้)
 - [ ] ทดสอบ Export PDF และ Excel
 - [ ] ทดสอบเพิ่ม KPI ใหม่พร้อมเกณฑ์ แล้วลบทิ้ง
 - [x] ตัดสินใจเรื่องทิศทางของกฎ "มูลค่าไม่ต่อสัญญา" (หัวข้อ 0.3 · ใช้ Total R / Budget ตามเกณฑ์บริษัท)

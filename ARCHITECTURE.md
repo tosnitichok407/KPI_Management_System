@@ -168,7 +168,7 @@ $selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
 ```
 
 ถ้าเดือนนั้นยังไม่มีรอบประเมิน ระบบ **ปฏิเสธการบันทึก** ไม่ใช่สร้างรอบให้อัตโนมัติ
-— [`employee/kpi/kpi.php:144-148`](employee/kpi/kpi.php#L144-L148)
+— ปัจจุบันอยู่ใน `kpiImportValidate()` ([`includes/kpi-import-helper.php`](includes/kpi-import-helper.php)) · เดิมอยู่ใน `employee/kpi/kpi.php` ซึ่งปิดแล้ว
 
 ### 2.5 "KPI มีผลในเดือนไหน" — เงื่อนไข SQL ชุดเดียวทั้งระบบ
 
@@ -181,7 +181,7 @@ AND COALESCE(a.end_date,   CONCAT(a.assignment_year, '-12-31')) >= :month_start
 AND a.status = 'Active'
 ```
 
-ใช้อยู่ที่: `employee/kpi/kpi.php` (ทั้งตอน POST และตอนโหลด) · `employee/performance-export-data.php`
+ใช้อยู่ที่: `includes/kpi-import-helper.php` (`kpiImportValidate` ตอนนำเข้า) · `employee/performance-export-data.php`
 · `employee/performance.php` · `admin/kpi-summary/kpi-summary-data.php`
 
 ฝั่ง Manager ทำเรื่องเดียวกันแต่เป็น PHP เพราะโหลดข้อมูลทั้งปีมาไว้ในหน่วยความจำแล้ว
@@ -205,7 +205,7 @@ LEFT JOIN kpi_performances kp
     )
 ```
 
-> ระวัง: `employee/kpi/kpi.php` เรียงด้วย `performance_id DESC` อย่างเดียว
+> ระวัง (ข้อมูลเดิม): หน้ากรอกเดิม `employee/kpi/kpi.php` (ปิดแล้ว) เรียงด้วย `performance_id DESC` อย่างเดียว
 > แต่ `employee/performance-export-data.php:326` เรียงด้วย `performance_date DESC, performance_id DESC`
 > ปกติให้ผลเท่ากัน แต่จะต่างกันถ้ามีข้อมูลซ้ำที่วันที่ไม่เรียงตาม id
 
@@ -236,7 +236,7 @@ $legacyIds = array_values(array_filter(
 // ... KPI ที่ตกมาถึงข้อ 3 แต่ผู้เรียกไม่ได้ส่งคอลัมน์มา → query เพิ่ม
 ```
 
-ผู้ใช้: `employee/kpi/kpi.php` (แสดง + ตัดเกรด) · `employee/kpi-detail.php` (ตัดเกรด)
+ผู้ใช้: `includes/kpi-import-helper.php` (ตัดเกรดตอนนำเข้า) · `employee/kpi-detail.php` (แสดง + ตัดเกรดในประวัติ)
 · `employee/performance-export-data.php` (แบบฟอร์ม Excel/PDF) · สคริปต์คำนวณย้อนหลัง
 
 ### 2.8 สูตรคะแนน — สองสำนวน ผลลัพธ์เดียวกัน
@@ -296,7 +296,7 @@ employeeLayoutEnd("../../");
 ```
 
 `$rootPath` คือ path กลับไป root ของโปรเจกต์ — `"../"` สำหรับ `employee/*.php`
-และ `"../../"` สำหรับ `employee/kpi/kpi.php` **ส่งผิดแล้ว logo กับ logout จะพัง**
+และ `"../../"` สำหรับหน้าใน `employee/kpi/` **ส่งผิดแล้ว logo กับ logout จะพัง** (ปัจจุบัน `employee/kpi/kpi.php` ส่งต่อไปหน้านำเข้าโดยไม่ render หน้า)
 
 Sidebar ของ Admin/Manager เป็น partial ที่ป้องกันการเข้าตรงด้วยการเช็คว่า `$pages` มีอยู่ไหม
 — [`manager/includes/sidebar.php:3-7`](manager/includes/sidebar.php#L3-L7)
@@ -453,9 +453,9 @@ function kpiPerformanceGrade(array $levels, float $actual, ?float $target): ?int
 
 ### 4.4 Competency ไม่ผ่านเส้นทางนี้
 
-Competency KPI พนักงานเลือกระดับ 1-5 เองโดยตรง ไม่มี Actual ไม่มีการคำนวณ
-— [`employee/kpi/kpi.php`](employee/kpi/kpi.php) ในสาขา `$realKpiType === "competency"`
-ตรวจแค่ว่าเป็นตัวเลข 1-5
+Competency KPI ไม่มี Actual ไม่มีการคำนวณ — คะแนน 1-5 มาจากไฟล์บริษัทเมื่อ Mapping ของหัวข้อนั้นยืนยันแล้ว
+(`kpiImportValidate()` ตรวจแค่ว่าเป็นจำนวนเต็ม 1-5) · ปัจจุบันยังไม่มี Competency ที่ยืนยัน Mapping จึงยังนำเข้าไม่ได้
+(เดิมพนักงานเลือกระดับเองในหน้า `employee/kpi/kpi.php` ซึ่งปิดแล้ว)
 
 ---
 
@@ -480,9 +480,47 @@ login.php
 ผู้ที่ไม่รู้รหัสผ่านจึงได้ข้อความเดียวกันเสมอ (`Invalid Employee ID or Password.`)
 ข้อความ "บัญชีถูกปิด" แสดงเฉพาะเมื่อรหัสผ่านถูกต้อง
 
-### เส้นทาง B — พนักงานบันทึกผลงาน (เส้นทางหลักของระบบ)
+### เส้นทาง B — พนักงานบันทึกผลงาน (ปัจจุบัน: นำเข้าจากไฟล์ Excel ของบริษัทเท่านั้น)
 
-`employee/kpi/kpi.php` รับทั้ง GET และ POST ในไฟล์เดียว
+ตั้งแต่ตุลาคม 2026 ช่องทางเดียวที่เขียน `kpi_performances` คือ `kpiImportCommit()` ผ่านหน้า `employee/kpi-import.php`
+หน้ากรอกเอง (`employee/kpi/kpi.php`, ฟอร์มใน `employee/kpi-detail.php`) และ System-generated Template ถูกปิดแล้ว
+
+```text
+POST /employee/kpi-import.php  action=upload  format=company  company_year  company_month  import_file
+  │
+  ├─ 1. csrfVerify() · role_id = 3 · employee_id จาก session
+  ├─ 2. ตรวจไฟล์: .xlsx ≤ 2 MB · ZIP ≤ 200 entries · ไม่มี Macro · ส่วนที่อ่านจริง ≤ 20 MB
+  ├─ 3. includes/kpi-import-company-reader.php (อ่านอย่างเดียว)
+  │      - รหัสพนักงานในชีต KPI AM ต้องตรงกับผู้ใช้ทุกตัวอักษร · ปีในชื่อชีตต้องตรงกับปีที่เลือก
+  │      - อ่านเฉพาะเดือนที่เลือก · โหลดเฉพาะเซลล์ที่สูตรอ้างถึง (allowlist ชีต) · ไล่ตรวจสูตรทุกชั้น
+  │      - เฉพาะหัวข้อที่ Mapping ยืนยันแล้ว (includes/kpi-import-company-map.php) → READY
+  │        ปัจจุบัน: KPI 14 "บรรลุเป้าหมายการต่อสัญญา" เท่านั้น
+  │          ชีต สรุปทั้งปี.. ตาราง Portfolio(มูลค่า) แถวเดือนจากคอลัมน์ B
+  │          C = Budget ('เดือน'!O41 = SUM(O5:O39) ← Port26) · G = Total R = SUM(D:F) (ไม่รวม New) · Q = G/C
+  │          Actual = Total R ÷ Budget × 100 ตัดลง 2 ตำแหน่ง · Target ต้องเป็น 100
+  │          Budget > 0 แต่ Total R = 0: เดือนยังไม่สิ้นสุด → REJECTED · สิ้นสุดแล้ว → READY + ต้องยืนยันรายแถว
+  │      - หัวข้ออื่น → NEEDS_CONFIRMATION (ไม่บันทึก) · ข้อมูล/สูตรผิด → REJECTED (ไม่บันทึกทั้งไฟล์)
+  ├─ 4. kpiImportValidate(..., origin = company) — Assignment ของผู้ใช้, รอบ Open, Draft เท่านั้น, ซ้ำในไฟล์
+  │      คะแนนจาก kpiCalculateScore() (เกณฑ์ของ KPI ในระบบ) → เก็บ Preview ใน Session (token ใช้ครั้งเดียว)
+  │
+POST action=confirm  import_token  confirm_update[]  confirm_flag[]
+  │
+  ├─ origin มาจาก Session: ไม่ใช่ company → ปฏิเสธ (ปิด Template)
+  ├─ kpiImportCommit(): Transaction + ล็อก → ตรวจซ้ำ ต่างจาก Preview แม้แถวเดียว → Rollback ทั้งชุด
+  │      INSERT เป็น Draft · UPDATE เฉพาะ Draft ที่ติ๊ก confirm_update · แถวที่ต้องยืนยัน (0%) ไม่ติ๊ก
+  │      หรือเดือนยังไม่สิ้นสุด → ไม่บันทึก (declined)
+  └─ ไม่เขียนทับ Submitted / Approved / Rejected · ไม่เปลี่ยน Draft เป็นสถานะอื่น
+```
+
+ผลทดสอบของเส้นทางนี้มาจาก **ฐานข้อมูลทดสอบแยก** (MariaDB socket-only + ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน/ตรวจโครงสร้าง
+**ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI อื่นยังไม่มี Mapping ที่ยืนยัน จึงนำเข้าไม่ได้
+
+### เส้นทาง B (เดิม — ก่อนตุลาคม 2026 · ปิดแล้ว ไว้อ้างอิง)
+
+> ส่วนนี้อธิบายหน้ากรอกผลงานเดิม ซึ่งปิดแล้ว: `employee/kpi/kpi.php` ส่งต่อไปหน้านำเข้า และ `employee/kpi-detail.php` ไม่มีฟอร์มบันทึกแล้ว
+> หลักการเดียวกันยังใช้ในการนำเข้า (employee_id จาก session, Assignment ของผู้ใช้, รอบ Open, ตัดเกรดที่ฟังก์ชันกลาง)
+
+`employee/kpi/kpi.php` (เดิม) รับทั้ง GET และ POST ในไฟล์เดียว
 
 ```text
 POST /employee/kpi/kpi.php?tab=performance&year=2026&month=9
@@ -616,18 +654,18 @@ includes/security.php ────────── ทุกไฟล์ที
 config/database.php ──────────── ทุกไฟล์ที่แตะฐานข้อมูล → ให้ $pdo
 
 includes/kpi-score-helper.php
-    ├── employee/kpi/kpi.php
-    ├── employee/kpi-detail.php
+    ├── includes/kpi-import-helper.php (Validate/Commit การนำเข้า)
+    ├── employee/kpi-detail.php (แสดงผล)
     ├── employee/performance-export-data.php
     └── database/migrations/20260921_recalculate_kpi_scores.php
 
 includes/monthly-period-helper.php
-    ├── employee/kpi/kpi.php · kpi-detail.php · performance.php
+    ├── employee/kpi-detail.php · performance.php · includes/kpi-import-company-reader.php
     ├── admin/evaluation/* · admin/kpi-assignment/ · admin/kpi-summary/kpi-summary-data.php
     ├── manager/includes/manager-data.php
     └── includes/period-picker.php
 
-includes/quarter-helper.php ──── admin/index.php · employee/index.php · employee/kpi/kpi.php
+includes/quarter-helper.php ──── admin/index.php · employee/index.php
                                  manager/includes/manager-data.php · includes/period-picker.php
 
 includes/period-picker.php ───── employee/performance.php · admin/kpi-summary/kpi-summary.php

@@ -1102,10 +1102,7 @@ if ($totalPerformanceRecords === 0) {
                                         href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>&amp;year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>&amp;period_id=<?= $selectedPeriodId ?>"
                                         class="performance-button">
 
-                                        <?= icon("square-pen") ?><?= !empty($kpi["performance_id"])
-                                            ? "เพิ่ม/ดูผลงาน"
-                                            : "บันทึกผลงาน"
-                                        ?>
+                                        <?= icon("eye") ?>ดูรายละเอียด
 
                                     </a>
 

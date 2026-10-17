@@ -30,7 +30,8 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
 
     $navItems = [
         "home" => ["employee/index.php", "house", "หน้าแรก"],
-        "kpi" => ["employee/kpi/kpi.php", "target", "KPI ของฉัน"],
+        /* บันทึกผล KPI ผ่าน Excel เท่านั้น · หน้ากรอกเอง (employee/kpi/kpi.php) redirect มาที่นี่ */
+        "import" => ["employee/kpi-import.php", "file-spreadsheet", "บันทึกผล KPI (Excel)"],
         "performance" => ["employee/performance.php", "chart-column", "ผลการปฏิบัติงาน"],
         "feedback" => ["employee/feedback.php", "message-square", "Feedback จากหัวหน้า"],
         "profile" => ["employee/profile.php", "circle-user", "ข้อมูลส่วนตัว"]
