@@ -59,6 +59,9 @@ foreach (managerEmployeeIds($yearData, $filterDepartment) as $employeeId) {
     );
 }
 
+/* ประวัติพนักงานที่ปิดใช้งานซึ่งมีผลงานในช่วงที่เลือก (แยกจากรายชื่อ/อันดับหลัก) */
+$historyRows = managerHistoryRows($yearData, $filterDepartment, $filterMonth);
+
 usort($employeeRows, function ($a, $b) {
     if ($a["avg_score"] === $b["avg_score"]) {
         return strcmp($a["employee"]["first_name"], $b["employee"]["first_name"]);
@@ -103,9 +106,18 @@ if ($selectedEmployee !== null) {
 
         $performances = $yearData["performances_by_assignment"][$assignmentId] ?? [];
 
+        /* การมอบหมายที่ปิดใช้งาน: แสดงเป็นประวัติเฉพาะช่วงที่มีแถวผลงานจริง (รวมแถวที่ score เป็น NULL) */
+        if (($assignment["status"] ?? "Active") !== "Active"
+            && ($filterMonth > 0 ? !isset($performances[$filterMonth]) : empty($performances))) {
+            continue;
+        }
+
         if ($filterMonth > 0) {
             $performances = isset($performances[$filterMonth]) ? [$filterMonth => $performances[$filterMonth]] : [];
         }
+
+        /* คะแนน / ล่าสุด / จำนวนเดือนที่ประเมิน: ใช้เฉพาะแถวที่มีคะแนน (score NULL = ยังไม่ประเมิน ไม่ใช่ 0) */
+        $performances = array_filter($performances, fn($performance) => $performance["score"] !== null);
 
         $scores = array_map(fn($p) => (float) $p["score"], $performances);
 
@@ -263,12 +275,12 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                         data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                         data-month="<?= $feedbackDefaultMonth ?>"
                         data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
-                        ✎ ให้ Feedback
+                        <?= icon("message-square") ?> ให้ Feedback
                     </button>
                 <?php endif; ?>
 
                 <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment]) ?>" class="btn btn-secondary">
-                    ดูทุกคน
+                    <?= icon("users") ?>ดูทุกคน
                 </a>
 
             </div>
@@ -351,7 +363,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                             <td>
                                 <?php if ($row["period"]): ?>
                                     <div class="action-buttons">
-                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit">ดูเดือนนี้</a>
+                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $month, "department_id" => $filterDepartment, "employee_id" => $filterEmployee]) ?>" class="btn-small edit"><?= icon("eye") ?>ดูเดือนนี้</a>
                                         <button
                                             type="button"
                                             class="btn-small feedback-btn"
@@ -359,7 +371,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                             data-name="<?= htmlspecialchars($selectedEmployee["first_name"] . " " . $selectedEmployee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                                             data-month="<?= $month ?>"
                                             data-feedback-map="<?= $feedbackMap($filterEmployee) ?>">
-                                            Feedback
+                                            <?= icon("message-square") ?>Feedback
                                         </button>
                                     </div>
                                 <?php endif; ?>
@@ -422,6 +434,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
                                 <td>
                                     <strong><?= htmlspecialchars($assignment["kpi_name"], ENT_QUOTES, "UTF-8") ?></strong>
+                                    <?php if (($assignment["status"] ?? "Active") !== "Active"): ?>
+                                        <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                    <?php endif; ?>
                                     <div class="cell-sub">หน่วย: <?= htmlspecialchars($assignment["unit"] ?? "-", ENT_QUOTES, "UTF-8") ?></div>
                                 </td>
 
@@ -431,7 +446,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                     </span>
                                 </td>
 
-                                <td class="col-number"><?= number_format((float) $assignment["target_value"]) ?>%</td>
+                                <td class="col-number"><?= isNonRenewalKpi($assignment)
+                                    ? "Budget " . kpiFormatMoney($assignment["target_value"])
+                                    : number_format((float) $assignment["target_value"]) . "%" ?></td>
 
                                 <td class="col-number"><strong><?= number_format((float) $assignment["weight"]) ?>%</strong></td>
 
@@ -439,9 +456,9 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                     <?php if ($item["avg_score"] === null): ?>
                                         <span class="cell-muted">ยังไม่ประเมิน</span>
                                     <?php elseif ($filterMonth > 0): ?>
-                                        <div class="stat-main"><?= number_format($item["avg_score"], 2) ?> / <?= number_format((float) $assignment["max_score"]) ?></div>
+                                        <div class="stat-main"><?= kpiScoreLevel((float) $item["avg_score"]) ?> / <?= number_format((float) $assignment["max_score"]) ?></div>
                                         <div class="cell-sub">
-                                            <?php if ($item["latest"]["actual"] !== null): ?>Actual <?= number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
+                                            <?php if ($item["latest"]["actual"] !== null): ?><?= isNonRenewalKpi($assignment) ? "Total R " . kpiFormatMoney($item["latest"]["actual"]) : "Actual " . number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
                                             <?= htmlspecialchars($item["latest"]["status"], ENT_QUOTES, "UTF-8") ?>
                                         </div>
                                     <?php else: ?>
@@ -578,7 +595,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                 <td>
                                     <div class="action-buttons">
 
-                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit">รายละเอียด</a>
+                                        <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit"><?= icon("eye") ?>รายละเอียด</a>
 
                                         <?php if ($canFeedback): ?>
                                             <button
@@ -588,7 +605,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                                 data-name="<?= htmlspecialchars($employee["first_name"] . " " . $employee["last_name"], ENT_QUOTES, "UTF-8") ?>"
                                                 data-month="<?= $feedbackDefaultMonth ?>"
                                                 data-feedback-map="<?= $feedbackMap((int) $employee["employee_id"]) ?>">
-                                                Feedback
+                                                <?= icon("message-square") ?>Feedback
                                             </button>
                                         <?php endif; ?>
 
@@ -609,6 +626,63 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
         </div>
 
+        <?php if (!empty($historyRows)): ?>
+
+            <!-- =====================================================
+                 ประวัติพนักงานที่ปิดใช้งาน (ไม่รวมในรายชื่อ/อันดับด้านบน)
+            ====================================================== -->
+
+            <div class="table-card">
+
+                <div class="table-header">
+                    <h2>ประวัติพนักงานที่ปิดใช้งาน</h2>
+                    <span><?= count($historyRows) ?> คน · ไม่นับรวมจำนวนพนักงานและอันดับด้านบน</span>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="manager-table">
+                        <thead>
+                            <tr>
+                                <th class="col-index">#</th>
+                                <th>พนักงาน</th>
+                                <th>แผนก / ตำแหน่ง</th>
+                                <th>ประเมินแล้ว</th>
+                                <th class="col-number">Performance</th>
+                                <th class="col-number">Competency</th>
+                                <th>คะแนนเฉลี่ย</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($historyRows as $historyIndex => $historyRow): ?>
+                                <?php $historyEmployee = $historyRow["employee"]; ?>
+                                <tr>
+                                    <td class="col-index"><?= $historyIndex + 1 ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($historyEmployee["first_name"] . " " . $historyEmployee["last_name"], ENT_QUOTES, "UTF-8") ?></strong>
+                                        <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                        <div class="cell-sub"><?= htmlspecialchars($historyEmployee["employee_code"], ENT_QUOTES, "UTF-8") ?></div>
+                                    </td>
+                                    <td>
+                                        <?= htmlspecialchars($historyEmployee["department_name"] ?? "-", ENT_QUOTES, "UTF-8") ?>
+                                        <div class="cell-sub"><?= htmlspecialchars($historyEmployee["position_name"] ?? "-", ENT_QUOTES, "UTF-8") ?></div>
+                                    </td>
+                                    <td><?= $historyRow["evaluated"] ?> / <?= $historyRow["total_kpi"] ?> KPI</td>
+                                    <td class="col-number"><?= managerFormat($historyRow["avg_performance"]) ?></td>
+                                    <td class="col-number"><?= managerFormat($historyRow["avg_competency"]) ?></td>
+                                    <td>
+                                        <?= managerFormat($historyRow["avg_score"]) ?>
+                                        <div class="cell-sub">ถ่วงน้ำหนัก <?= managerFormat($historyRow["weighted_percent"], 1, "%") ?></div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+        <?php endif; ?>
+
     <?php endif; ?>
 
 
@@ -627,7 +701,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
             <?= csrfField() ?>
 
-            <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด">×</button>
+            <button type="button" class="dialog-close" onclick="feedbackDialog.close()" aria-label="ปิด"><?= icon("x", "icon-only") ?></button>
 
             <h2>Feedback ถึงพนักงาน</h2>
 
@@ -663,8 +737,8 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
             </label>
 
             <div class="dialog-actions">
-                <button type="button" class="btn btn-secondary" onclick="feedbackDialog.close()">ยกเลิก</button>
-                <button type="submit" class="btn btn-primary">ส่ง Feedback</button>
+                <button type="button" class="btn btn-secondary" onclick="feedbackDialog.close()"><?= icon("x") ?>ยกเลิก</button>
+                <button type="submit" class="btn btn-primary"><?= icon("send") ?>ส่ง Feedback</button>
             </div>
 
         </form>

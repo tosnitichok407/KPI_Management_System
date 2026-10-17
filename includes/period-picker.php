@@ -124,14 +124,14 @@ function renderPeriodPicker(array $options): void
                 <a
                     class="year-step <?= $year <= 2000 ? "is-disabled" : "" ?>"
                     href="<?= $e($urlFor($year - 1, $selectedMonth)) ?>"
-                    aria-label="ปีก่อนหน้า">‹</a>
+                    aria-label="ปีก่อนหน้า"><?= icon("chevron-left", "icon-only") ?></a>
 
                 <span class="year-value"><?= $year ?></span>
 
                 <a
                     class="year-step <?= $year >= 2100 ? "is-disabled" : "" ?>"
                     href="<?= $e($urlFor($year + 1, $selectedMonth)) ?>"
-                    aria-label="ปีถัดไป">›</a>
+                    aria-label="ปีถัดไป"><?= icon("chevron-right", "icon-only") ?></a>
 
             </div>
 

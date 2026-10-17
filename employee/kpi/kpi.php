@@ -9,7 +9,6 @@ require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 require_once __DIR__ . "/../includes/layout.php";
-require_once __DIR__ . "/../performance-export-data.php";
 
 
 /*
@@ -147,13 +146,54 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $error = "ยังไม่มีรอบประเมินของเดือน"
             . $thaiMonths[$selectedMonth] . " " . $selectedYear
             . " กรุณาติดต่อผู้ดูแลระบบ";
+    } elseif (($selectedPeriod["status"] ?? "") !== "Open") {
+
+        $error = "รอบประเมินของเดือน"
+            . $thaiMonths[$selectedMonth] . " " . $selectedYear
+            . " ปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
     } else {
 
         try {
 
             /*
             |--------------------------------------------------------------------------
-            | Get Assignment
+            | Transaction + ล็อกแถว Assignment จนบันทึกผลงานเสร็จ
+            |--------------------------------------------------------------------------
+            |
+            | กัน Race Condition: ถ้า Admin เปลี่ยน KPI / พนักงาน / ช่วงวันที่ ระหว่างที่
+            | หน้านี้อ่าน Assignment กับบันทึกผลงาน คะแนนจะถูกตัดด้วยเกณฑ์ของ KPI เดิม
+            | แต่ไปผูกกับ KPI ใหม่ · SELECT ... FOR UPDATE ทำให้การแก้ Assignment ต้องรอ
+            | และข้อมูลที่ใช้ตัดเกรดด้านล่างอ่านหลังได้ล็อกแล้วเท่านั้น
+            |
+            */
+
+            $pdo->beginTransaction();
+
+            $lockStmt = $pdo->prepare("
+                SELECT assignment_id
+                FROM kpi_assignments
+                WHERE assignment_id = :assignment_id
+                  AND employee_id = :employee_id
+                FOR UPDATE
+            ");
+            $lockStmt->execute([
+                ":assignment_id" => $assignmentId,
+                ":employee_id" => $employeeId
+            ]);
+
+            /* สถานะรอบประเมิน ณ ตอนบันทึก (กันรอบถูกปิดระหว่างนั้น) */
+            $periodLockStmt = $pdo->prepare("
+                SELECT status
+                FROM evaluation_periods
+                WHERE period_id = :period_id
+                LOCK IN SHARE MODE
+            ");
+            $periodLockStmt->execute([":period_id" => $selectedPeriodId]);
+            $lockedPeriodStatus = (string) $periodLockStmt->fetchColumn();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Get Assignment (locking read · อ่านค่าล่าสุดที่ commit แล้วเสมอ)
             |--------------------------------------------------------------------------
             */
 
@@ -184,6 +224,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                   AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
 
                 LIMIT 1
+                LOCK IN SHARE MODE
             ");
 
             $checkStmt->execute([
@@ -196,7 +237,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $assignment = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
 
-            if (!$assignment) {
+            if ($lockedPeriodStatus !== "Open") {
+
+                $error = "รอบประเมินของเดือน"
+                    . $thaiMonths[$selectedMonth] . " " . $selectedYear
+                    . " ปิดแล้ว ไม่สามารถบันทึกหรือแก้ไขผลงานได้";
+            } elseif (!$assignment) {
 
                 $error = "ไม่สามารถบันทึก KPI นี้ในเดือนที่เลือกได้";
             } else {
@@ -218,7 +264,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 |--------------------------------------------------------------------------
                 */
 
-                if ($realKpiType === "performance") {
+                /* KPI 9 ต้องเป็น Performance เท่านั้น · ประเภทผิด → ไม่บันทึก (ไม่ตกไปทาง Competency) */
+                $kpi9TypeError = nonRenewalKpiTypeError($assignment);
+
+                if ($kpi9TypeError !== null) {
+
+                    $error = $kpi9TypeError;
+                } elseif ($realKpiType === "performance") {
 
                     if ($actual === "") {
 
@@ -227,45 +279,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         $error = "กรุณากรอกผลที่ทำได้เป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
                     } elseif (
-                        $assignment["target_value"] === null ||
-                        $assignment["target_value"] === ""
+                        !isNonRenewalKpi($assignment) &&
+                        ($assignment["target_value"] === null ||
+                            $assignment["target_value"] === "")
                     ) {
 
                         $error = "KPI นี้ยังไม่ได้กำหนด Target โดย Admin";
                     } else {
 
-                        $targetValue = (float) $assignment["target_value"];
-                        $actualValue = (float) $actual;
-
                         /*
-        |--------------------------------------------------------------------------
-        | เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนดไว้
-        |--------------------------------------------------------------------------
-        |
-        | ไม่ใช้สูตรสัดส่วน Actual / Target × 5 อีกต่อไป เพราะให้ผลไม่ตรงกับเกณฑ์
-        | ที่แสดงบนหน้าจอ เช่น เกณฑ์ "5 : >100%" กับ "4 : 100%" แต่สูตรสัดส่วน
-        | ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม ทั้งที่ต้องได้ 4
-        |
-        | รายละเอียดการตัดเกรดอยู่ใน includes/kpi-score-helper.php
-        |--------------------------------------------------------------------------
-        */
+                        | เกรดคำนวณที่ฟังก์ชันกลาง kpiCalculateScore() ใน includes/kpi-score-helper.php
+                        | (KPI 9 มูลค่าไม่ต่อสัญญา: Total R / Budget · KPI อื่น: เกณฑ์ที่ Admin กำหนด)
+                        | Budget เป็น 0 / NULL → ได้ error และไม่บันทึก
+                        */
 
                         $assignmentLevels =
                             loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
 
-                        $grade = kpiPerformanceGrade(
+                        $result = kpiCalculateScore(
+                            $assignment,
                             $assignmentLevels,
-                            $actualValue,
-                            $targetValue > 0 ? $targetValue : null
+                            $actual,
+                            $assignment["target_value"]
                         );
 
-                        if ($grade === null) {
+                        if ($result["error"] !== null || $result["grade"] === null) {
 
-                            $error = "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย"
-                                . " กรุณาติดต่อผู้ดูแลระบบ";
+                            $error = $result["error"]
+                                ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
                         } else {
 
-                            $score = (string) $grade;
+                            $score = (string) $result["grade"];
                         }
                     }
 
@@ -331,9 +375,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     |--------------------------------------------------------------------------
                     */
 
+                    /*
+                    | ล็อกแถวผลงานเดิม (FOR UPDATE) และอ่านสถานะจากฐานข้อมูลภายใน Transaction
+                    | เพื่อตรวจว่าแก้ไขได้หรือไม่ ณ ตอนบันทึกจริง (ไม่อาศัยค่าที่โหลดตอนเปิดหน้า)
+                    */
                     $existingStmt = $pdo->prepare("
                         SELECT
-                            performance_id
+                            performance_id,
+                            status
 
                         FROM kpi_performances
 
@@ -342,6 +391,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                           AND period_id = :period_id
 
                         LIMIT 1
+                        FOR UPDATE
                     ");
 
                     $existingStmt->execute([
@@ -356,11 +406,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     /*
                     |--------------------------------------------------------------------------
+                    | Guard: สถานะที่แก้ไขได้ตาม Workflow เดิม (Draft / Submitted / Rejected)
+                    |--------------------------------------------------------------------------
+                    | Approved (หรือสถานะอื่นที่ไม่รู้จัก) → ปฏิเสธ ไม่เขียนข้อมูลใด ๆ
+                    */
+
+                    if ($existing && !in_array((string) $existing["status"], ["Draft", "Submitted", "Rejected"], true)) {
+
+                        $error = (string) $existing["status"] === "Approved"
+                            ? "ผลงาน KPI นี้ของเดือน" . $thaiMonths[$selectedMonth] . " " . $selectedYear
+                                . " ได้รับการอนุมัติแล้ว จึงไม่สามารถแก้ไขหรือบันทึกทับได้"
+                                . " หากต้องการแก้ไข กรุณาติดต่อหัวหน้างานหรือผู้ดูแลระบบ"
+                            : "สถานะของผลงาน KPI นี้ไม่อนุญาตให้แก้ไข กรุณาติดต่อผู้ดูแลระบบ";
+
+                    /*
+                    |--------------------------------------------------------------------------
                     | UPDATE
                     |--------------------------------------------------------------------------
                     */
 
-                    if ($existing) {
+                    } elseif ($existing) {
 
                         $updateStmt = $pdo->prepare("
                             UPDATE kpi_performances
@@ -482,16 +547,34 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
 
 
-                    $success =
-                        "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
+                    if ($error === "") {
+
+                        $pdo->commit();
+
+                        $success =
+                            "บันทึกข้อมูล KPI เรียบร้อยแล้ว";
+                    }
                 }
+            }
+
+            /* ไม่ผ่านเงื่อนไข → ไม่บันทึกอะไรเลย และปล่อยล็อก */
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
                 } catch (PDOException $e) {
 
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             error_log("Save KPI performance failed: " . $e->getMessage());
 
-            $error =
-                "ไม่สามารถบันทึกข้อมูล KPI ได้";
+            $success = "";
+
+            /* 1205 = lock wait timeout · 1213 = deadlock (มีการแก้ไขข้อมูลนี้พร้อมกัน) */
+            $error = in_array((int) ($e->errorInfo[1] ?? 0), [1205, 1213], true)
+                ? "มีการแก้ไขข้อมูล KPI นี้พร้อมกัน ระบบยังไม่ได้บันทึก กรุณาลองใหม่อีกครั้ง"
+                : "ไม่สามารถบันทึกข้อมูล KPI ได้";
         }
     }
 }
@@ -588,7 +671,10 @@ try {
 
     $assignments =
         $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
+
+        error_log("employee/kpi/kpi: " . $e->getMessage());
 
     $assignments = [];
 
@@ -638,8 +724,16 @@ foreach ($assignments as $assignment) {
 try {
     $kpiCriteria = loadKpiScoreCriteria($pdo, $assignments);
 } catch (PDOException $e) {
+
+        error_log("employee/kpi/kpi: " . $e->getMessage());
     // ถ้าตารางเกณฑ์มีปัญหา ไม่ให้ทั้งหน้า KPI พัง
     $kpiCriteria = [];
+}
+
+foreach ($assignments as $row) {
+    if (isNonRenewalKpi($row)) {
+        $kpiCriteria[(int) $row["kpi_id"]] = NON_RENEWAL_KPI_CRITERIA;
+    }
 }
 
 
@@ -680,6 +774,8 @@ $totalCompetency =
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
 
     <link
@@ -802,7 +898,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    🎯
+                    <?= icon("target") ?>
                 </div>
 
                 <div>
@@ -822,7 +918,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    📈
+                    <?= icon("trending-up") ?>
                 </div>
 
                 <div>
@@ -842,7 +938,7 @@ $totalCompetency =
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    ⭐
+                    <?= icon("award") ?>
                 </div>
 
                 <div>
@@ -871,7 +967,7 @@ $totalCompetency =
                 href="kpi.php?tab=performance&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "performance" ? "active" : "" ?>">
 
-                📈 Performance KPI
+                <?= icon("trending-up") ?> Performance KPI
 
                 (<?= $totalPerformance ?>)
 
@@ -881,7 +977,7 @@ $totalCompetency =
                 href="kpi.php?tab=competency&amp;<?= htmlspecialchars($monthQuery, ENT_QUOTES, "UTF-8") ?>"
                 class="kpi-tab <?= $activeTab === "competency" ? "active" : "" ?>">
 
-                ⭐ Competency KPI
+                <?= icon("award") ?> Competency KPI
 
                 (<?= $totalCompetency ?>)
 
@@ -918,7 +1014,7 @@ $totalCompetency =
                     <div class="empty-kpi">
 
                         <div class="empty-kpi-icon">
-                            📈
+                            <?= icon("trending-up") ?>
                         </div>
 
                         <h3>
@@ -1016,18 +1112,21 @@ $totalCompetency =
 
                                             $currentLevel = 0;
 
+                                            /* ฟังก์ชันกลางเดียวกับตอนบันทึก (includes/kpi-score-helper.php) */
+                                            $isBudgetKpi = isNonRenewalKpi($kpi);
+                                            $scoreResult = kpiCalculateScore(
+                                                $kpi,
+                                                $levels,
+                                                $kpi["actual"],
+                                                $kpi["target_value"]
+                                            );
+
                                             if ($kpi["actual"] !== null && $kpi["actual"] !== "") {
 
-                                                $currentLevel = (int) kpiPerformanceGrade(
-                                                    $levels,
-                                                    (float) $kpi["actual"],
-                                                    (float) $kpi["target_value"] > 0
-                                                        ? (float) $kpi["target_value"]
-                                                        : null
-                                                );
+                                                $currentLevel = (int) ($scoreResult["grade"] ?? 0);
                                             } elseif ($kpi["score"] !== null && $kpi["score"] !== "") {
 
-                                                $currentLevel = (int) round((float) $kpi["score"]);
+                                                $currentLevel = kpiScoreLevel((float) $kpi["score"]);
                                             }
 
                                             $savedScore = ($kpi["score"] !== null && $kpi["score"] !== "")
@@ -1070,6 +1169,22 @@ $totalCompetency =
 
                                                 <?php endfor; ?>
 
+                                                <?php if ($isBudgetKpi && $scoreResult["error"] !== null): ?>
+
+                                                    <div class="criteria-note">
+                                                        <?= htmlspecialchars($scoreResult["error"], ENT_QUOTES, "UTF-8") ?>
+                                                    </div>
+
+                                                <?php elseif ($isBudgetKpi && $scoreResult["achievement"] !== null): ?>
+
+                                                    <div class="criteria-note">
+                                                        Achievement = Total R <?= kpiFormatMoney($kpi["actual"]) ?>
+                                                        / Budget <?= kpiFormatMoney($kpi["target_value"]) ?> × 100
+                                                        = <strong><?= kpiFormatAchievement($scoreResult["achievement"]) ?></strong>
+                                                    </div>
+
+                                                <?php endif; ?>
+
                                                 <?php if ($currentLevel > 0): ?>
 
                                                     <div class="score-display">
@@ -1083,7 +1198,8 @@ $totalCompetency =
                                                             <br>
                                                             <small>
                                                                 คะแนนที่บันทึกไว้เดิมคือ <?= number_format($savedScore, 2) ?>
-                                                                (คำนวณด้วยสูตรเก่า) · บันทึกใหม่อีกครั้งเพื่อปรับให้ตรงเกณฑ์
+                                                                (คำนวณด้วยเกณฑ์เดิม) · เกรดด้านบนคำนวณตามเกณฑ์ปัจจุบัน
+                                                                · บันทึกใหม่อีกครั้งเพื่อปรับให้ตรงเกณฑ์
                                                             </small>
 
                                                         <?php endif; ?>
@@ -1131,11 +1247,17 @@ $totalCompetency =
 
                                                         <label>
 
-                                                            เป้าหมาย % (Target)
+                                                            <?= $isBudgetKpi ? "Budget (เป้าหมายจำนวนเงิน)" : "เป้าหมาย % (Target)" ?>
 
                                                         </label>
 
                                                         <div class="target-readonly">
+
+                                                            <?php if ($isBudgetKpi): ?>
+
+                                                                <?= kpiFormatMoney($kpi["target_value"]) ?>
+
+                                                            <?php else: ?>
 
                                                             <?= number_format((int) $kpi["target_value"]) ?>
 
@@ -1149,6 +1271,8 @@ $totalCompetency =
 
                                                             ) ?>
 
+                                                            <?php endif; ?>
+
                                                         </div>
 
                                                     </div>
@@ -1156,7 +1280,7 @@ $totalCompetency =
                                                     <div class="input-group">
 
                                                         <label>
-                                                            ที่ทำได้จริง % (Actual)
+                                                            <?= $isBudgetKpi ? "Total R (ไม่รวม Total N)" : "ที่ทำได้จริง % (Actual)" ?>
                                                         </label>
 
                                                         <input
@@ -1172,7 +1296,12 @@ $totalCompetency =
 
                                                         <div class="input-hint">
 
+                                                            <?php if ($isBudgetKpi): ?>
+                                                            กรอกยอด Total R เป็นจำนวนเงิน (ห้ามรวม Total N และห้ามใช้ Total R+N)
+                                                            ระบบคำนวณ Achievement = Total R / Budget × 100 แล้วเทียบเกณฑ์ด้านซ้าย
+                                                            <?php else: ?>
                                                             ระบบจะเทียบผลที่ทำได้กับเกณฑ์ด้านซ้ายเพื่อหาเกรด 1-5
+                                                            <?php endif; ?>
                                                             แล้วคิดคะแนนจริง = Weight × เกรด
 
                                                         </div>
@@ -1184,7 +1313,7 @@ $totalCompetency =
                                                     type="submit"
                                                     class="save-button">
 
-                                                    บันทึกข้อมูล
+                                                    <?= icon("save") ?>บันทึกข้อมูล
 
                                                 </button>
                                             </form>
@@ -1231,7 +1360,7 @@ $totalCompetency =
                     <div class="empty-kpi">
 
                         <div class="empty-kpi-icon">
-                            ⭐
+                            <?= icon("award") ?>
                         </div>
 
                         <h3>
@@ -1278,7 +1407,7 @@ $totalCompetency =
                                     $levels = $kpiCriteria[$kpiId] ?? [];
 
                                     $currentScore = ($kpi["score"] !== null && $kpi["score"] !== "")
-                                        ? (int) round((float) $kpi["score"])
+                                        ? kpiScoreLevel((float) $kpi["score"])
                                         : 0;
 
                                     $realScore = (float) ($kpi["weight"] ?? 0) * $currentScore;
@@ -1389,7 +1518,7 @@ $totalCompetency =
                                                     type="submit"
                                                     class="save-button">
 
-                                                    บันทึกข้อมูล
+                                                    <?= icon("save") ?>บันทึกข้อมูล
 
                                                 </button>
 

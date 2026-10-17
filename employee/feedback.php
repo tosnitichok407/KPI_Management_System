@@ -73,6 +73,8 @@ $yearFilter .= '</select><noscript><button type="submit">ดู</button></noscri
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Feedback จากหัวหน้า | KPI Management System</title>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
     <link rel="stylesheet" href="../assets/css/employee-kpi.css?v=layout-employee-2">
     <link rel="stylesheet" href="../assets/css/employee-feedback.css?v=1">
 </head>

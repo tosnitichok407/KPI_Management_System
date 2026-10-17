@@ -159,6 +159,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/employees/employee-add: " . $e->getMessage());
+
             if ($e->getCode() === "23000") {
                 $error = "Employee ID already exists.";
             } else {
@@ -188,6 +190,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="stylesheet"
@@ -418,14 +422,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกข้อมูลพนักงาน
+                    <?= icon("save") ?>บันทึกข้อมูลพนักงาน
                 </button>
 
                 <a
                     href="../index.php?page=employees"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
             </div>

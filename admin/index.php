@@ -6,6 +6,7 @@ require_once __DIR__ . "/../config/database.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/quarter-helper.php";
+require_once __DIR__ . "/../includes/monthly-period-helper.php";
 
 
 /*
@@ -146,22 +147,27 @@ $kpiScores = [];
 $quarterScores = [];
 $selectedDashboardYear = (int) date("Y");
 
+/* ประวัติพนักงานที่ปิดใช้งานแต่มีผลงานในรอบที่เลือก (แสดงแยก ไม่รวมตัวเลขหลัก) */
+$inactiveHistory = [];
+$dashboardError = "";
+
 
 if ($page === "home") {
 
     $quarterScoreStmt = $pdo->query("
-                SELECT kp.performance_date, ki.kpi_type, kp.score
-                FROM kpi_performances kp
-                INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
-                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
-                WHERE ka.status = 'Active'
-                    AND kp.score IS NOT NULL
-        ORDER BY kp.performance_date
+        SELECT ep.period_year, ep.quarter, kp.score
+        FROM kpi_performances kp
+        INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
+        INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+        INNER JOIN employees e ON e.employee_id = ka.employee_id
+        /* ประวัติรายไตรมาส: พนักงาน Active ทุกผลงานที่มีจริง (รวม Assignment ที่ปิดใช้งาน ซึ่งมีแถวเฉพาะเดือนที่มีผลงาน)
+           พนักงานที่ปิดใช้งานไม่รวมในกราฟหลัก */
+        WHERE e.status = 'Active'
+          AND kp.score IS NOT NULL
     ");
-        foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
-        $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
-        $quarter = getQuarterFromDate($quarterRow["performance_date"]);
-        $key = $year . "-" . $quarter;
+
+    foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
+        $key = (int) $quarterRow["period_year"] . "-" . $quarterRow["quarter"];
         $quarterScores[$key][] = (float) $quarterRow["score"];
     }
 
@@ -169,436 +175,256 @@ if ($page === "home") {
 
     /*
     |--------------------------------------------------------------------------
-    | Get Evaluation Periods
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $pdo->query("
-        SELECT
-            period_id,
-            period_name,
-            start_date,
-            end_date,
-            status
-        FROM evaluation_periods
-        ORDER BY start_date DESC, period_id DESC
-    ");
-
-    $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Default Period
-    |--------------------------------------------------------------------------
-    */
-
-        if ($selectedPeriod <= 0 && !empty($periods)) {
-
-        $selectedPeriod =
-            (int) $periods[0]["period_id"];
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Dashboard Year (ปีของรอบประเมินที่เลือก สำหรับการ์ดรายไตรมาส)
+    | Dashboard Data
     |--------------------------------------------------------------------------
     |
-    | เดิมคำนวณจาก $periods ก่อนโหลดข้อมูล จึงได้ปีปัจจุบันเสมอ
+    | แหล่งข้อมูล: kpi_assignments (มอบหมายรายปี) + kpi_performances (ผลงานรายเดือน)
+    | ผูกกับรอบประเมินที่เลือกด้วย kpi_performances.period_id
+    |
+    | เดิมหน้านี้อ่านจาก employee_kpi และ kpi_assignments.period_id ซึ่งเป็นโครงสร้าง
+    | ก่อนเปลี่ยนเป็นรอบรายเดือน (ไม่มีโค้ดเขียนข้อมูลลงไปแล้ว) ตัวเลขจึงเป็น 0
     |
     */
 
-    foreach ($periods as $period) {
+    try {
 
-        if ((int) $period["period_id"] === $selectedPeriod) {
+        /* รอบประเมินทั้งหมด (dropdown) */
 
-            $selectedDashboardYear =
-                (int) date("Y", strtotime($period["start_date"]));
-
-            break;
-        }
-    }
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Total Employees
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $pdo->query("
-        SELECT COUNT(*)
-        FROM employees
-        WHERE status = 'Active'
-    ");
-
-    $totalEmployees =
-        (int) $stmt->fetchColumn();
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | KPI Assignments
-    |--------------------------------------------------------------------------
-    */
-
-    if ($selectedPeriod > 0) {
-
-        $stmt = $pdo->prepare("
-            SELECT COUNT(*)
-            FROM kpi_assignments
-            WHERE period_id = :period_id
-            AND status = 'Active'
-        ");
-
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
-
-        $totalAssignments =
-            (int) $stmt->fetchColumn();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Evaluated KPI
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $pdo->prepare("
-            SELECT COUNT(*)
-            FROM employee_kpi
-            WHERE period_id = :period_id
-            AND score IS NOT NULL
-        ");
-
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
-
-        $evaluatedKpis =
-            (int) $stmt->fetchColumn();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Average Score
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $pdo->prepare("
-            SELECT COALESCE(AVG(score), 0)
-            FROM employee_kpi
-            WHERE period_id = :period_id
-            AND score IS NOT NULL
-        ");
-
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
-
-        $averageScore =
-            (float) $stmt->fetchColumn();
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Employee Performance
-        |--------------------------------------------------------------------------
-        */
-
-        $sql = "
-
+        $stmt = $pdo->query("
             SELECT
+                period_id,
+                period_name,
+                period_year,
+                period_month,
+                start_date,
+                end_date,
+                status
+            FROM evaluation_periods
+            ORDER BY start_date DESC, period_id DESC
+        ");
 
-                e.employee_id,
-
-                CONCAT(
-                    e.first_name,
-                    ' ',
-                    e.last_name
-                ) AS employee_name,
-
-                COALESCE(
-
-                    SUM(
-
-                        ek.score *
-
-                        COALESCE(
-                            ka.weight,
-                            ki.weight,
-                            0
-                        )
-
-                        / NULLIF(
-                            ki.max_score,
-                            0
-                        )
-
-                    )
-
-                    /
-
-                    NULLIF(
-
-                        SUM(
-
-                            CASE
-
-                                WHEN ek.score IS NOT NULL
-
-                                THEN COALESCE(
-                                    ka.weight,
-                                    ki.weight,
-                                    0
-                                )
-
-                                ELSE 0
-
-                            END
-
-                        ),
-
-                        0
-
-                    )
-
-                    * 100,
-
-                    0
-
-                ) AS performance_percentage
+        $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
-            FROM employees e
+        /* รอบที่เลือก (ต้องเป็นรอบที่มีอยู่จริง) */
+
+        $selectedPeriodData = null;
+
+        foreach ($periods as $period) {
+            if ((int) $period["period_id"] === $selectedPeriod) {
+                $selectedPeriodData = $period;
+                break;
+            }
+        }
+
+        if ($selectedPeriodData === null) {
+
+            $selectedPeriod = defaultEvaluationPeriodId($periods);
+
+            foreach ($periods as $period) {
+                if ((int) $period["period_id"] === $selectedPeriod) {
+                    $selectedPeriodData = $period;
+                    break;
+                }
+            }
+        }
+
+        if ($selectedPeriodData !== null) {
+            $selectedDashboardYear = (int) $selectedPeriodData["period_year"];
+        }
 
 
-            INNER JOIN kpi_assignments ka
+        /* พนักงาน Active */
 
-                ON e.employee_id =
-                   ka.employee_id
-
-
-            INNER JOIN kpi_indicators ki
-
-                ON ka.kpi_id =
-                   ki.kpi_id
+        $totalEmployees = (int) $pdo->query("
+            SELECT COUNT(*)
+            FROM employees
+            WHERE status = 'Active'
+        ")->fetchColumn();
 
 
-            LEFT JOIN employee_kpi ek
+        if ($selectedPeriodData !== null) {
 
-                ON ek.employee_id =
-                   e.employee_id
+            $periodParams = [
+                ":month_start" => $selectedPeriodData["start_date"],
+                ":month_end" => $selectedPeriodData["end_date"]
+            ];
 
-                AND ek.kpi_id =
-                    ka.kpi_id
+            /*
+            | เงื่อนไข "KPI ที่มีผลในเดือนนี้" (ชุดเดียวกับหน้าพนักงานและหน้า Summary)
+            */
+            /*
+            | ตัวนับและตัวหารทุกตัวของรอบที่เลือกใช้เงื่อนไขเดียวกัน:
+            | พนักงาน Active · Assignment ที่มีผลในเดือน · Assignment Active
+            | หรือ Assignment ที่ปิดใช้งานแต่มีผลงานจริงในรอบนี้ (นับเป็นประวัติของเดือนนั้น)
+            | พนักงานที่ปิดใช้งานแสดงแยกใน $inactiveHistory
+            */
+            $periodParams[":history_period_id"] = $selectedPeriod;
 
-                AND ek.period_id =
-                    ka.period_id
-
-
-            WHERE
-
+            $activeInMonth = "
                 e.status = 'Active'
-
-                AND ka.status = 'Active'
-
-                AND ka.period_id =
-                    :period_id
-
-
-            GROUP BY
-
-                e.employee_id,
-                e.first_name,
-                e.last_name
-
-
-            ORDER BY
-
-                performance_percentage DESC
-
-        ";
+                AND COALESCE(ka.start_date, CONCAT(ka.assignment_year, '-01-01')) <= :month_end
+                AND COALESCE(ka.end_date, CONCAT(ka.assignment_year, '-12-31')) >= :month_start
+                AND (
+                    ka.status = 'Active'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM kpi_performances hx
+                        WHERE hx.assignment_id = ka.assignment_id
+                          AND hx.period_id = :history_period_id
+                    )
+                )
+            ";
 
 
-        $stmt =
-            $pdo->prepare($sql);
+            /* KPI ที่มอบหมาย (มีผลในเดือนของรอบที่เลือก) */
+
+            $stmt = $pdo->prepare("
+                SELECT COUNT(*)
+                FROM kpi_assignments ka
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                WHERE {$activeInMonth}
+            ");
+            $stmt->execute($periodParams);
+
+            $totalAssignments = (int) $stmt->fetchColumn();
 
 
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
+            /* KPI ที่ประเมินแล้ว + คะแนนเฉลี่ย ของรอบที่เลือก */
+
+            $stmt = $pdo->prepare("
+                SELECT
+                    COUNT(kp.performance_id) AS evaluated,
+                    COALESCE(AVG(kp.score), 0) AS average_score
+                FROM kpi_assignments ka
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_performances kp
+                    ON kp.assignment_id = ka.assignment_id
+                   AND kp.period_id = :period_id
+                   AND kp.score IS NOT NULL
+                WHERE {$activeInMonth}
+            ");
+            $stmt->execute($periodParams + [":period_id" => $selectedPeriod]);
+
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $evaluatedKpis = (int) ($row["evaluated"] ?? 0);
+            $averageScore = (float) ($row["average_score"] ?? 0);
 
 
-        $employeePerformance =
-            $stmt->fetchAll(PDO::FETCH_ASSOC);
+            /*
+            | ผลรายพนักงาน (% ถ่วงน้ำหนัก)
+            | Σ(score ÷ max_score × weight) ÷ Σ(weight ของ KPI ที่ประเมินแล้ว) × 100
+            | สูตรเดียวกับ managerStats() และหน้า Summary
+            */
+
+            $stmt = $pdo->prepare("
+                SELECT
+                    e.employee_id,
+                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+                    SUM(kp.score / COALESCE(NULLIF(ki.max_score, 0), 5) * ka.weight)
+                        / NULLIF(SUM(ka.weight), 0) * 100 AS performance_percentage
+                FROM kpi_assignments ka
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                INNER JOIN kpi_performances kp
+                    ON kp.assignment_id = ka.assignment_id
+                   AND kp.period_id = :period_id
+                   AND kp.score IS NOT NULL
+                WHERE {$activeInMonth}
+                GROUP BY e.employee_id, e.first_name, e.last_name
+                ORDER BY performance_percentage DESC
+            ");
+            $stmt->execute($periodParams + [":period_id" => $selectedPeriod]);
+
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $employeeLabels[] = $row["employee_name"];
+                $employeeScores[] = round((float) $row["performance_percentage"], 2);
+            }
 
 
-        foreach (
-            $employeePerformance
-            as $row
-        ) {
+            /* คะแนนเฉลี่ยตามประเภท KPI */
 
-            $employeeLabels[] =
-                $row["employee_name"];
+            $stmt = $pdo->prepare("
+                SELECT
+                    ki.kpi_type,
+                    ROUND(AVG(kp.score), 2) AS average_score
+                FROM kpi_assignments ka
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                INNER JOIN kpi_performances kp
+                    ON kp.assignment_id = ka.assignment_id
+                   AND kp.period_id = :period_id
+                   AND kp.score IS NOT NULL
+                WHERE {$activeInMonth}
+                GROUP BY ki.kpi_type
+                ORDER BY FIELD(ki.kpi_type, 'Performance', 'Competency')
+            ");
+            $stmt->execute($periodParams + [":period_id" => $selectedPeriod]);
+
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $typeLabels[] = $row["kpi_type"];
+                $typeScores[] = (float) $row["average_score"];
+            }
 
 
-            $employeeScores[] =
-                round(
-                    (float)
-                    $row["performance_percentage"],
-                    2
-                );
+            /* คะแนนเฉลี่ยราย KPI (สูงสุด 10 รายการ) */
+
+            $stmt = $pdo->prepare("
+                SELECT
+                    ki.kpi_name,
+                    ROUND(AVG(kp.score), 2) AS average_score
+                FROM kpi_assignments ka
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                INNER JOIN kpi_performances kp
+                    ON kp.assignment_id = ka.assignment_id
+                   AND kp.period_id = :period_id
+                   AND kp.score IS NOT NULL
+                WHERE {$activeInMonth}
+                GROUP BY ki.kpi_id, ki.kpi_name
+                ORDER BY average_score DESC
+                LIMIT 10
+            ");
+            $stmt->execute($periodParams + [":period_id" => $selectedPeriod]);
+
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $kpiLabels[] = $row["kpi_name"];
+                $kpiScores[] = (float) $row["average_score"];
+            }
+
+            /* ประวัติพนักงานที่ปิดใช้งาน: ผลงานจริงในรอบนี้ · สูตร % เดียวกับกราฟพนักงาน */
+            $stmt = $pdo->prepare("
+                SELECT
+                    e.employee_id,
+                    e.employee_code,
+                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+                    COUNT(kp.performance_id) AS evaluated,
+                    ROUND(AVG(kp.score), 2) AS average_score,
+                    ROUND(
+                        SUM(kp.score / COALESCE(NULLIF(ki.max_score, 0), 5) * ka.weight)
+                            / NULLIF(SUM(ka.weight), 0) * 100,
+                        2
+                    ) AS performance_percentage
+                FROM kpi_performances kp
+                INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+                INNER JOIN employees e ON e.employee_id = ka.employee_id
+                INNER JOIN kpi_indicators ki ON ki.kpi_id = ka.kpi_id
+                WHERE kp.period_id = :period_id
+                  AND kp.score IS NOT NULL
+                  AND e.status = 'Inactive'
+                GROUP BY e.employee_id, e.employee_code, e.first_name, e.last_name
+                ORDER BY e.first_name, e.last_name
+            ");
+            $stmt->execute([":period_id" => $selectedPeriod]);
+            $inactiveHistory = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
+    } catch (PDOException $e) {
 
-        /*
-        |--------------------------------------------------------------------------
-        | KPI Type Performance
-        |--------------------------------------------------------------------------
-        */
+        error_log("Admin dashboard query failed: " . $e->getMessage());
 
-        $stmt = $pdo->prepare("
-
-            SELECT
-
-                ki.kpi_type,
-
-                ROUND(
-                    AVG(ek.score),
-                    2
-                ) AS average_score
-
-
-            FROM employee_kpi ek
-
-
-            INNER JOIN kpi_indicators ki
-
-                ON ek.kpi_id =
-                   ki.kpi_id
-
-
-            WHERE
-
-                ek.period_id =
-                    :period_id
-
-                AND ek.score IS NOT NULL
-
-
-            GROUP BY
-
-                ki.kpi_type
-
-
-            ORDER BY
-
-                ki.kpi_type
-
-        ");
-
-
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
-
-
-        $typePerformance =
-            $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-        foreach (
-            $typePerformance
-            as $row
-        ) {
-
-            $typeLabels[] =
-                $row["kpi_type"];
-
-
-            $typeScores[] =
-                (float)
-                $row["average_score"];
-        }
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | KPI Performance
-        |--------------------------------------------------------------------------
-        */
-
-        $stmt = $pdo->prepare("
-
-            SELECT
-
-                ki.kpi_name,
-
-                ROUND(
-                    AVG(ek.score),
-                    2
-                ) AS average_score
-
-
-            FROM employee_kpi ek
-
-
-            INNER JOIN kpi_indicators ki
-
-                ON ek.kpi_id =
-                   ki.kpi_id
-
-
-            WHERE
-
-                ek.period_id =
-                    :period_id
-
-                AND ek.score IS NOT NULL
-
-
-            GROUP BY
-
-                ki.kpi_id,
-                ki.kpi_name
-
-
-            ORDER BY
-
-                average_score DESC
-
-
-            LIMIT 10
-
-        ");
-
-
-        $stmt->execute([
-            ":period_id" => $selectedPeriod
-        ]);
-
-
-        $kpiPerformance =
-            $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-        foreach (
-            $kpiPerformance
-            as $row
-        ) {
-
-            $kpiLabels[] =
-                $row["kpi_name"];
-
-
-            $kpiScores[] =
-                (float)
-                $row["average_score"];
-        }
+        $dashboardError = "ไม่สามารถโหลดข้อมูล Dashboard ได้";
     }
 }
 
@@ -626,6 +452,8 @@ if ($page === "home") {
     <link
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
 
 
     <!-- Admin CSS -->
@@ -717,7 +545,7 @@ if ($page === "home") {
                 aria-label="Open navigation menu"
                 aria-expanded="false">
 
-                ☰
+                <?= icon("menu", "icon-only") ?><?= icon("x", "icon-only") ?>
 
             </button>
 
@@ -869,11 +697,7 @@ if ($page === "home") {
                                             : ""
                                         ?>>
 
-                                        <?= htmlspecialchars(
-                                            $period["period_name"],
-                                            ENT_QUOTES,
-                                            "UTF-8"
-                                        ) ?>
+                                        <?= htmlspecialchars($period["period_name"] . " " . $period["period_year"], ENT_QUOTES, "UTF-8") ?>
 
                                     </option>
 
@@ -887,6 +711,15 @@ if ($page === "home") {
 
 
                     </div>
+
+
+                    <?php if ($dashboardError !== ""): ?>
+
+                        <div class="alert alert-error">
+                            <?= htmlspecialchars($dashboardError, ENT_QUOTES, "UTF-8") ?>
+                        </div>
+
+                    <?php endif; ?>
 
 
                     <!-- =================================================
@@ -911,7 +744,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    👥
+                                    <?= icon("users") ?>
 
                                 </div>
 
@@ -946,7 +779,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    🎯
+                                    <?= icon("clipboard-list") ?>
 
                                 </div>
 
@@ -981,7 +814,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    ✅
+                                    <?= icon("clipboard-check") ?>
 
                                 </div>
 
@@ -1016,7 +849,7 @@ if ($page === "home") {
 
                                 <div class="stat-icon">
 
-                                    ⭐
+                                    <?= icon("star") ?>
 
                                 </div>
 
@@ -1202,9 +1035,47 @@ if ($page === "home") {
 
                 </div>
 
+                <?php if (!empty($inactiveHistory)): ?>
+
+                    <!-- =================================================
+                     ประวัติพนักงานที่ปิดใช้งาน (แยกจากตัวเลขหลัก)
+                ================================================= -->
+
+                    <div class="chart-card">
+
+                        <h2>ประวัติพนักงานที่ปิดใช้งาน</h2>
+
+                        <p>ผลงานในรอบที่เลือกของพนักงานที่ปิดใช้งานแล้ว · ไม่นับรวมในตัวเลขและอันดับด้านบน</p>
+
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>พนักงาน</th>
+                                    <th>KPI ที่ประเมิน</th>
+                                    <th>คะแนนเฉลี่ย</th>
+                                    <th>ผลงาน (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($inactiveHistory as $historyRow): ?>
+                                    <tr>
+                                        <td>
+                                            <?= htmlspecialchars($historyRow["employee_code"] . " - " . $historyRow["employee_name"], ENT_QUOTES, "UTF-8") ?>
+                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;">ปิดใช้งาน</span>
+                                        </td>
+                                        <td><?= (int) $historyRow["evaluated"] ?></td>
+                                        <td><?= number_format((float) $historyRow["average_score"], 2) ?></td>
+                                        <td><?= number_format((float) $historyRow["performance_percentage"], 2) ?>%</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+
+                    </div>
+
+                <?php endif; ?>
 
             <?php else: ?>
-
 
                 <!-- =================================================
                  OTHER ADMIN PAGES
@@ -1578,8 +1449,6 @@ if ($page === "home") {
                 "true"
             );
 
-            mobileMenuButton.textContent =
-                "✕";
 
         }
 
@@ -1599,8 +1468,6 @@ if ($page === "home") {
                 "false"
             );
 
-            mobileMenuButton.textContent =
-                "☰";
 
         }
 

@@ -101,7 +101,7 @@ function renderFeedbackCard(array $items, array $options = []): void
         <div class="feedback-card__header">
 
             <div>
-                <h2><?= $e($options["title"] ?? "💬 Feedback จากหัวหน้า") ?></h2>
+                <h2><?= icon("message-square") ?><?= $e($options["title"] ?? "Feedback จากหัวหน้า") ?></h2>
                 <?php if (!empty($options["subtitle"])): ?>
                     <p><?= $e($options["subtitle"]) ?></p>
                 <?php endif; ?>
@@ -110,7 +110,7 @@ function renderFeedbackCard(array $items, array $options = []): void
             <?= $options["header_extra"] ?? "" ?>
 
             <?php if ($link): ?>
-                <a href="<?= $e($link["href"]) ?>" class="feedback-card__link"><?= $e($link["label"]) ?></a>
+                <a href="<?= $e($link["href"]) ?>" class="feedback-card__link"><?= $e($link["label"]) ?><?= icon("arrow-right", "icon-after") ?></a>
             <?php endif; ?>
 
         </div>

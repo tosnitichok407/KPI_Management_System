@@ -92,7 +92,9 @@ foreach ($report["employees"] as $summary) {
         . "<td>" . $e($summary["department_name"] ?? "ไม่ระบุแผนก") . "</td>"
         . "<td class='num'>" . $summary["count"]["Performance"] . " KPI<br><span class='small'>" . number_format($summary["weight"]["Performance"]) . "%</span></td>"
         . "<td class='num'>" . $summary["count"]["Competency"] . " KPI<br><span class='small'>" . number_format($summary["weight"]["Competency"]) . "%</span></td>"
-        . "<td class='num {$weightClass}'><b>" . number_format($summary["total_weight"]) . "%</b></td>"
+        . "<td class='num {$weightClass}'><b>" . number_format($summary["total_weight"]) . "%</b>"
+            . (($summary["history_weight"] ?? 0) > 0 ? "<br><span class='small'>+ " . number_format($summary["history_weight"]) . "% ปิดใช้งาน</span>" : "")
+            . "</td>"
         . "<td class='num'>" . $summary["evaluated"] . " / " . $summary["kpi_total"] . "</td>"
         . "<td class='num'>" . ($summary["avg_score"] === null ? "<span class='muted'>ยังไม่ประเมิน</span>" : "<b>" . $num($summary["avg_score"]) . "</b> / 5") . "</td>"
         . "<td class='num'>" . ($summary["weighted_percent"] === null ? "-" : $num($summary["weighted_percent"], 1) . "%") . "</td>"
@@ -110,9 +112,55 @@ if ($summaryRows === "") {
 |--------------------------------------------------------------------------
 */
 
+/*
+| ประวัติพนักงานที่ปิดใช้งาน (กติกาเดียวกับหน้าจอ · ไม่นับรวมตัวเลขปัจจุบัน)
+*/
+$historyRows = "";
+$historyNo = 1;
+
+foreach ($report["history_employees"] ?? [] as $summary) {
+    $historyRows .= "<tr>"
+        . "<td class='center muted'>" . $historyNo++ . "</td>"
+        . "<td><b>" . $e($summary["first_name"] . " " . $summary["last_name"]) . "</b> <span class='small'>(ปิดใช้งาน)</span><br><span class='small'>" . $e($summary["employee_code"]) . "</span></td>"
+        . "<td>" . $e($summary["department_name"] ?? "ไม่ระบุแผนก") . "</td>"
+        . "<td class='num'>" . $summary["count"]["Performance"] . " KPI</td>"
+        . "<td class='num'>" . $summary["count"]["Competency"] . " KPI</td>"
+        . "<td class='num'>" . number_format($summary["total_weight"] + $summary["history_weight"]) . "%</td>"
+        . "<td class='num'>" . $summary["evaluated"] . " / " . $summary["kpi_total"] . "</td>"
+        . "<td class='num'>" . ($summary["avg_score"] === null ? "-" : "<b>" . $num($summary["avg_score"]) . "</b> / 5") . "</td>"
+        . "<td class='num'>" . ($summary["weighted_percent"] === null ? "-" : $num($summary["weighted_percent"], 1) . "%") . "</td>"
+        . "</tr>";
+}
+
+/* แถวของพนักงานที่ปิดใช้งานซึ่งไม่มีผลงาน: แสดงอ้างอิง ไม่นับ */
+$otherSummaries = [];
+foreach ($report["other_rows"] ?? [] as $otherRow) {
+    $otherId = (int) $otherRow["employee_id"];
+    $otherSummaries[$otherId] ??= [
+        "first_name" => $otherRow["first_name"], "last_name" => $otherRow["last_name"],
+        "employee_code" => $otherRow["employee_code"], "department_name" => $otherRow["department_name"],
+        "kpi_total" => 0, "evaluated" => 0, "total_weight" => 0.0, "kpis" => []
+    ];
+    $otherSummaries[$otherId]["kpis"][] = $otherRow;
+}
+
+$detailGroups = [["title" => "", "summaries" => $report["employees"]]];
+if (!empty($report["history_employees"])) {
+    $detailGroups[] = ["title" => "ประวัติพนักงานที่ปิดใช้งาน (ไม่นับรวมตัวเลขปัจจุบัน)", "summaries" => $report["history_employees"]];
+}
+if (!empty($otherSummaries)) {
+    $detailGroups[] = ["title" => "รายการของพนักงานที่ปิดใช้งานซึ่งไม่มีผลงานในช่วงนี้ (แสดงเพื่ออ้างอิง ไม่นับ)", "summaries" => $otherSummaries];
+}
+
 $detailRows = "";
 
-foreach ($report["employees"] as $summary) {
+foreach ($detailGroups as $detailGroup) {
+
+  if ($detailGroup["title"] !== "") {
+    $detailRows .= "<tr class='group'><td colspan='8'><b>" . $e($detailGroup["title"]) . "</b></td></tr>";
+  }
+
+  foreach ($detailGroup["summaries"] as $summary) {
 
     $detailRows .= "<tr class='group'><td colspan='8'>"
         . $e($summary["first_name"] . " " . $summary["last_name"])
@@ -128,9 +176,9 @@ foreach ($report["employees"] as $summary) {
         if ($kpi["avg_score"] === null) {
             $result = "<span class='muted'>ยังไม่ประเมิน</span>";
         } elseif ($hasMonth) {
-            $result = "<b>" . $num((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"])
+            $result = "<b>" . kpiScoreLevel((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"])
                 . "<br><span class='small'>"
-                . ($kpi["last_actual"] !== null ? "Actual " . number_format((float) $kpi["last_actual"]) . " · " : "")
+                . ($kpi["last_actual"] !== null ? (isNonRenewalKpi($kpi) ? "Total R สูงสุด " . kpiFormatMoney($kpi["last_actual"]) : "Actual " . number_format((float) $kpi["last_actual"])) . " · " : "")
                 . $e($kpi["last_status"]) . "</span>";
         } else {
             $result = "<b>" . $num((float) $kpi["avg_score"]) . "</b> / " . number_format((float) $kpi["max_score"]) . " เฉลี่ย"
@@ -141,9 +189,14 @@ foreach ($report["employees"] as $summary) {
 
         $detailRows .= "<tr" . ($kpi["status"] === "Active" ? "" : " class='inactive'") . ">"
             . "<td class='center muted'>" . ($index + 1) . "</td>"
-            . "<td>" . $e($kpi["kpi_name"]) . "<br><span class='small'>หน่วย: " . $e($kpi["unit"] ?? "-") . "</span></td>"
+            . "<td>" . $e($kpi["kpi_name"])
+                . ((!empty($kpi["is_inactive_assignment"]) || !empty($kpi["employee_inactive"])) ? " <span class='small'>(ปิดใช้งาน)</span>" : "")
+                . ((array_key_exists("counted", $kpi) && !$kpi["counted"]) ? " <span class='small'>· ไม่มีผลงานในช่วงนี้ ไม่นับในสรุป</span>" : "")
+                . "<br><span class='small'>หน่วย: " . $e($kpi["unit"] ?? "-") . "</span></td>"
             . "<td class='{$typeClass}'>" . $e($kpi["kpi_type"]) . "</td>"
-            . "<td class='num'>" . number_format((float) $kpi["target_value"]) . "%</td>"
+            . "<td class='num'>" . (isNonRenewalKpi($kpi)
+                ? "Budget " . kpiFormatMoney($kpi["target_value"])
+                : number_format((float) $kpi["target_value"]) . "%") . "</td>"
             . "<td class='num'><b>" . number_format((float) $kpi["weight"]) . "%</b></td>"
             . "<td>" . $e($kpi["period_label"]) . " " . (int) $kpi["assignment_year"] . " (" . $e($kpi["quarter_label"]) . ")"
                 . "<br><span class='small'>" . date("d/m/Y", strtotime($kpi["start_date"])) . " – " . date("d/m/Y", strtotime($kpi["end_date"])) . "</span></td>"
@@ -151,6 +204,7 @@ foreach ($report["employees"] as $summary) {
             . "<td>" . $e($kpi["status"]) . "</td>"
             . "</tr>";
     }
+  }
 }
 
 if ($detailRows === "") {
@@ -221,7 +275,18 @@ table.data tr.inactive td { color: #98a2b3; }
     </tr></thead>
     <tbody>{$summaryRows}</tbody>
 </table>
-
+" . ($historyRows !== "" ? "
+<h2>ประวัติพนักงานที่ปิดใช้งาน</h2>
+<p class='filters'>ไม่นับรวมจำนวนพนักงาน ตัวเลข KPI และค่าเฉลี่ยด้านบน</p>
+<table class='data'>
+    <thead><tr>
+        <th style='width:26px' class='center'>#</th><th>พนักงาน</th><th>แผนก</th>
+        <th class='num'>Performance</th><th class='num'>Competency</th><th class='num'>Weight</th>
+        <th class='num'>ประเมินแล้ว</th><th class='num'>คะแนนเฉลี่ย</th><th class='num'>ถ่วงน้ำหนัก</th>
+    </tr></thead>
+    <tbody>{$historyRows}</tbody>
+</table>
+" : "") . "
 <h2 class='detail'>รายละเอียด KPI</h2>
 <table class='data'>
     <thead><tr>

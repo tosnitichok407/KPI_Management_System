@@ -7,6 +7,7 @@ require_once __DIR__ . "/../../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../../includes/quarter-helper.php";
 require_once __DIR__ . "/../../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 
 /* =========================================================
@@ -29,6 +30,21 @@ if ((int) ($_SESSION["role_id"] ?? 0) !== 1) {
 
 $message = "";
 $error = "";
+
+/* ผลจากหน้าลบ Assignment (redirect กลับมาพร้อมพารามิเตอร์) */
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    $assignmentResultMessages = [
+        "deleted" => "ลบ KPI Assignment เรียบร้อยแล้ว",
+    ];
+    $assignmentErrorMessages = [
+        "has_performances" => "ไม่สามารถลบ KPI Assignment นี้ได้ เนื่องจากมีผลงานบันทึกไว้แล้ว · แก้ไขสถานะเป็น Inactive แทนเพื่อเก็บประวัติไว้",
+        "busy" => "มีการบันทึกผลงานของ KPI Assignment นี้อยู่ในขณะนี้ ระบบยังไม่ได้ลบ กรุณาลองใหม่อีกครั้ง",
+        "not_found" => "ไม่พบ KPI Assignment ที่ต้องการลบ",
+        "delete_failed" => "ไม่สามารถลบ KPI Assignment ได้ กรุณาลองใหม่อีกครั้ง",
+    ];
+    $message = $assignmentResultMessages[(string) ($_GET["success"] ?? "")] ?? "";
+    $error = $assignmentErrorMessages[(string) ($_GET["error"] ?? "")] ?? "";
+}
 
 
 /* =========================================================
@@ -227,6 +243,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             $kpi_type_sql = "
                 SELECT
+                    kpi_id,
+                    kpi_name,
                     kpi_type
                 FROM kpi_indicators
                 WHERE kpi_id = ?
@@ -242,14 +260,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $kpi_id
             ]);
 
+            $kpi_row =
+                $kpi_type_stmt->fetch(PDO::FETCH_ASSOC);
+
             $kpi_type =
-                $kpi_type_stmt->fetchColumn();
+                $kpi_row["kpi_type"] ?? false;
+
+            /* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget จำนวนเงิน (> 0 และไม่เกินเพดานคอลัมน์) */
+            $budget_error = $kpi_row
+                ? kpiValidateBudgetInput($kpi_row, $target_value)
+                : null;
 
 
             if (!$kpi_type) {
 
                 $error =
                     "ไม่พบประเภทของ KPI";
+
+            } elseif ($budget_error !== null) {
+
+                $error = $budget_error;
 
             } else {
 
@@ -300,14 +330,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         FROM kpi_assignments a
 
-                        INNER JOIN kpi_indicators k
-                            ON a.kpi_id = k.kpi_id
-
                         WHERE a.employee_id = ?
                         AND a.assignment_year = ?
-                        AND k.kpi_type = ?
                         AND a.status = 'Active'
                     ";
+
+                    /*
+                    | น้ำหนักรวมของพนักงาน 1 คนใน 1 ปี = Performance + Competency ไม่เกิน 100%
+                    | (เดิมตรวจแยกประเภท จึงมอบหมายรวมได้ถึง 200%)
+                    */
 
                     $weight_stmt =
                         $pdo->prepare(
@@ -418,8 +449,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                         $weight_stmt->execute([
                             $employee_id,
-                            $assignment_year,
-                            $kpi_type
+                            $assignment_year
                         ]);
 
                         $current_weight =
@@ -428,9 +458,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             );
 
 
+                        /* Assignment ที่สถานะ Inactive ไม่นับน้ำหนัก */
                         $new_total_weight =
                             $current_weight
-                            + floatval($weight);
+                            + ($status === "Active" ? floatval($weight) : 0);
 
 
                         /* =============================================
@@ -442,11 +473,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ) {
 
                             throw new Exception(
-                                "Weight ของพนักงาน ID "
+                                "Weight รวมของพนักงาน ID "
                                 . $employee_id
-                                . " ในประเภท "
-                                . $kpi_type
-                                . " จะเกิน 100%"
+                                . " (Performance + Competency) จะเป็น "
+                                . number_format($new_total_weight, 2)
+                                . "% ซึ่งเกิน 100%"
                             );
                         }
 
@@ -709,6 +740,9 @@ $assignment_sql = "
         a.start_date,
         a.end_date,
         a.status,
+
+        /* ใช้ปิดปุ่มลบ (ฝั่ง server ตรวจซ้ำใน kpi-assignment-delete.php) */
+        (SELECT COUNT(*) FROM kpi_performances kp WHERE kp.assignment_id = a.assignment_id) AS performance_count,
 
         e.employee_code,
         e.first_name,
@@ -1182,6 +1216,7 @@ $form_year =
 
                     <select
                         name="kpi_id"
+                        id="assignment_kpi_select"
                         required>
 
                         <option value="">
@@ -1195,7 +1230,8 @@ $form_year =
                         ): ?>
 
                             <option
-                                value="<?= (int) $kpi["kpi_id"] ?>">
+                                value="<?= (int) $kpi["kpi_id"] ?>"
+                                <?= isNonRenewalKpi($kpi) ? 'data-budget="1"' : "" ?>>
 
                                 [<?= htmlspecialchars(
                                     $kpi["kpi_type"]
@@ -1228,18 +1264,24 @@ $form_year =
                 <div class="form-group">
 
                     <label>
-                        เป้าหมาย (%) <span>*</span>
+                        <span id="target_label_text">เป้าหมาย (%)</span> <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="target_value"
+                        id="target_value_input"
                         step="1"
                         min="0"
                         max="100"
                         placeholder="เช่น 100"
                         required>
+
+                    <small id="target_budget_hint" hidden>
+                        KPI มูลค่าไม่ต่อสัญญา: กรอก Budget เป็นจำนวนเงิน (มากกว่า 0 ไม่เกิน <?= number_format(KPI_BUDGET_MAX, 2) ?>)
+                        · คะแนนคำนวณจาก Total R / Budget × 100
+                    </small>
 
                 </div>
 
@@ -1306,7 +1348,7 @@ $form_year =
                     type="reset"
                     class="btn btn-secondary">
 
-                    ล้างข้อมูล
+                    <?= icon("rotate-ccw") ?>ล้างข้อมูล
 
                 </button>
 
@@ -1315,7 +1357,7 @@ $form_year =
                     type="submit"
                     class="btn btn-primary">
 
-                    + เพิ่ม KPI
+                    <?= icon("plus") ?>เพิ่ม KPI
 
                 </button>
 
@@ -1546,7 +1588,7 @@ $form_year =
                         type="submit"
                         class="btn btn-primary">
 
-                        ค้นหา
+                        <?= icon("search") ?>ค้นหา
 
                     </button>
 
@@ -1555,7 +1597,7 @@ $form_year =
                         <a
                             href="index.php?page=kpi-assignment"
                             class="btn btn-secondary">
-                            ล้างตัวกรอง
+                            <?= icon("rotate-ccw") ?>ล้างตัวกรอง
                         </a>
 
                     <?php endif; ?>
@@ -1811,7 +1853,9 @@ $form_year =
 
                                 <td class="col-number">
 
-                                    <?= number_format($assignment["target_value"]) ?>%
+                                    <?= isNonRenewalKpi($assignment)
+                                        ? "Budget " . kpiFormatMoney($assignment["target_value"])
+                                        : number_format($assignment["target_value"]) . "%" ?>
 
                                 </td>
 
@@ -1869,20 +1913,31 @@ $form_year =
                                         <a
                                             href="kpi-assignment/kpi-assignment-edit.php?id=<?= (int) $assignment["assignment_id"] ?>"
                                             class="btn-small btn-edit">
-                                            แก้ไข
+                                            <?= icon("square-pen") ?>แก้ไข
                                         </a>
+
+                                        <?php if ((int) ($assignment["performance_count"] ?? 0) > 0): ?>
+
+                                            <button type="button" class="btn-small btn-delete" disabled
+                                                title="มีผลงานบันทึกไว้แล้ว · แก้ไขสถานะเป็น Inactive แทนเพื่อเก็บประวัติ">
+                                                <?= icon("trash-2") ?>ลบ
+                                            </button>
+
+                                        <?php else: ?>
 
                                         <form
                                             method="POST"
                                             action="kpi-assignment/kpi-assignment-delete.php"
                                             class="inline-form"
-                                            onsubmit="return confirm('คุณต้องการลบ KPI Assignment นี้หรือไม่?')">
+                                            onsubmit="return confirm('ลบ KPI Assignment นี้ถาวรหรือไม่? (ลบได้เฉพาะ Assignment ที่ยังไม่มีผลงาน)')">
                                             <?= csrfField() ?>
                                             <input type="hidden" name="id" value="<?= (int) $assignment["assignment_id"] ?>">
                                             <button type="submit" class="btn-small btn-delete">
-                                                ลบ
+                                                <?= icon("trash-2") ?>ลบ
                                             </button>
                                         </form>
+
+                                        <?php endif; ?>
 
                                     </div>
 
@@ -1914,6 +1969,40 @@ $form_year =
 /* =========================================================
    FORM ELEMENTS
 ========================================================= */
+
+/* KPI 9 มูลค่าไม่ต่อสัญญา: ช่อง Target เป็น Budget จำนวนเงิน */
+(function () {
+    const kpiSelect = document.getElementById("assignment_kpi_select");
+    const targetInput = document.getElementById("target_value_input");
+    const targetLabel = document.getElementById("target_label_text");
+    const budgetHint = document.getElementById("target_budget_hint");
+
+    if (!kpiSelect || !targetInput) {
+        return;
+    }
+
+    function syncTargetField() {
+        const option = kpiSelect.options[kpiSelect.selectedIndex];
+        const isBudget = !!(option && option.dataset.budget === "1");
+
+        targetLabel.textContent = isBudget ? "Budget (เป้าหมายจำนวนเงิน)" : "เป้าหมาย (%)";
+        targetInput.step = isBudget ? "0.01" : "1";
+        targetInput.min = isBudget ? "0.01" : "0";
+        targetInput.max = isBudget ? "<?= number_format(KPI_BUDGET_MAX, 2, ".", "") ?>" : "100";
+        targetInput.placeholder = isBudget ? "เช่น 1500000.00" : "เช่น 100";
+        budgetHint.hidden = !isBudget;
+    }
+
+    kpiSelect.addEventListener("change", syncTargetField);
+
+    if (kpiSelect.form) {
+        kpiSelect.form.addEventListener("reset", function () {
+            setTimeout(syncTargetField, 0);
+        });
+    }
+
+    syncTargetField();
+})();
 
 const yearInput =
     document.getElementById(
