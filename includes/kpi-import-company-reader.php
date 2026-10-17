@@ -60,6 +60,15 @@ const KPI_COMPANY_SUMMARY_SHEET_PREFIX = "สรุปทั้งปี";
 const KPI_COMPANY_SUMMARY_SCAN_ROWS = 40;
 const KPI_COMPANY_SUMMARY_SCAN_COLUMNS = ["B", "C", "D", "E", "F", "G", "Q"];
 const KPI_COMPANY_RENEWAL_TARGET = "100.00";
+
+/*
+| ชื่อชีตเดือนตามแบบฟอร์มที่ยืนยันแล้ว: "<ตัวย่อเดือน>.<ปี พ.ศ. 2 หลัก>" เช่น ม.ค.69 · เม.ษ.69 (ตัวสะกดของแบบฟอร์ม)
+| จับคู่โดยตัดช่องว่างหัว/ท้ายชื่อชีตเท่านั้น (เช่น "ส.ค.69 ") ต้องตรงทุกตัวอักษรและพบชีตเดียว
+*/
+const KPI_COMPANY_RENEWAL_MONTH_SHEETS = [
+    1 => "ม.ค", 2 => "ก.พ", 3 => "มี.ค", 4 => "เม.ษ", 5 => "พ.ค", 6 => "มิ.ย",
+    7 => "ก.ค", 8 => "ส.ค", 9 => "ก.ย", 10 => "ต.ค", 11 => "พ.ย", 12 => "ธ.ค"
+];
 const KPI_COMPANY_CONFIRM_ZERO_TOTAL_R = "zero_total_r";
 
 /* ฟังก์ชันที่ผลขึ้นกับค่าที่อ้างอิงเท่านั้น (นอกจากนี้ → ตรวจสอบไม่ได้ → ปฏิเสธ) */
@@ -1045,6 +1054,117 @@ function kpiCompanyFormulaKey(?string $formula): string
     return strtoupper(str_replace([" ", "$"], "", (string) $formula));
 }
 
+/* ค่าจริงมีทศนิยมไม่เกิน 2 ตำแหน่ง (เผื่อความคลาดเคลื่อนของ float เล็กน้อย ไม่ได้ปัดค่า) */
+function kpiCompanyHasAtMostTwoDecimals(float $value): bool
+{
+    $cents = $value * 100;
+
+    return abs($cents - round($cents)) <= 1e-4;
+}
+
+/* สูตรที่เป็นการอ้างอิงเซลล์เดียวข้ามชีต เช่น ='ม.ค.69'!O41 → [sheet, col, row] · รูปแบบอื่น → null */
+function kpiCompanySingleCellRef(?string $formula): ?array
+{
+    if ($formula === null || !preg_match(
+        '/^=\s*(?:\'((?:[^\']|\'\')+)\'|([^\s\'!(),=+\-*\/^&<>%";:{}\[\]]+))!\$?([A-Z]{1,3})\$?([0-9]+)\s*$/u',
+        $formula,
+        $m
+    )) {
+        return null;
+    }
+
+    return ["sheet" => $m[1] !== "" ? str_replace("''", "'", $m[1]) : $m[2], "col" => $m[3], "row" => (int) $m[4]];
+}
+
+/*
+| แหล่งข้อมูลของแถวเดือนในชีตสรุป (KPI การต่อสัญญา) ต้องตรงกับโครงสร้างที่ยืนยัน:
+|   ชีตเดือน = "<ตัวย่อเดือน>.<ปี พ.ศ. 2 หลัก>" ของเดือนนั้น (จับคู่ด้วยการตัดช่องว่างหัว/ท้ายเท่านั้น และต้องพบชีตเดียว)
+|   C (Budget) = '<ชีตเดือน>'!O<n>  และ  O<n> = SUM(O5:O<n-2>)
+|   D / E / F  = '<ชีตเดือน>'!D<k> / D<k+1> / D<k+2>  และในชีตเดือน D<k-1> = O<n> (Budget Renew),
+|                D<k> = AB<n>, D<k+1> = AC<n>, D<k+2> = AD<n> (Renew 1Y / 2Y / Bait 3Y)
+| คืน ["reasons" => [...], "need" => [ชีต => [เซลล์ => true]]] · need ไม่ว่าง = ยังโหลดเซลล์ต้นทางไม่ครบ (ตรวจในรอบถัดไป)
+*/
+function kpiCompanyRenewalSourceReasons(Spreadsheet $spreadsheet, array $workbookSheets, array $loadedCells, Worksheet $summary, int $row, int $month, string $monthName, int $year): array
+{
+    $out = ["reasons" => [], "need" => []];
+    $expected = KPI_COMPANY_RENEWAL_MONTH_SHEETS[$month] . "." . sprintf("%02d", ($year + 543) % 100);
+    $matches = array_values(array_filter(
+        array_map("strval", array_keys($workbookSheets)),
+        fn($name) => trim($name) === $expected
+    ));
+
+    if (count($matches) !== 1) {
+        $out["reasons"][] = "ไม่พบชีตของเดือน{$monthName} (\"{$expected}\") หรือพบมากกว่าหนึ่งชีต";
+        return $out;
+    }
+
+    $sheetName = $matches[0];
+    $summaryFormula = function (string $coordinate) use ($summary): ?string {
+        if (!$summary->cellExists($coordinate)) {
+            return null;
+        }
+        $cell = $summary->getCell($coordinate);
+        return $cell->getDataType() === DataType::TYPE_FORMULA ? (string) $cell->getValue() : null;
+    };
+
+    $budgetRef = kpiCompanySingleCellRef($summaryFormula("C{$row}"));
+
+    if ($budgetRef === null || $budgetRef["sheet"] !== $sheetName || $budgetRef["col"] !== "O" || $budgetRef["row"] < 7) {
+        $out["reasons"][] = "เดือน{$monthName}: Budget (C{$row}) ต้องเป็นสูตรอ้างอิงเซลล์คอลัมน์ O ของชีต \"{$expected}\" ตามที่ยืนยัน"
+            . " (ไม่รับค่าที่พิมพ์เอง สูตรอื่น หรือการอ้างชีตของเดือนอื่น)";
+    }
+
+    $renewRefs = [];
+    foreach (["D", "E", "F"] as $offset => $col) {
+        $ref = kpiCompanySingleCellRef($summaryFormula("{$col}{$row}"));
+        $renewRefs[] = $ref;
+        if ($ref === null || $ref["sheet"] !== $sheetName || $ref["col"] !== "D" || $ref["row"] !== ($renewRefs[0]["row"] ?? -1) + $offset) {
+            $out["reasons"][] = "เดือน{$monthName}: Renew ({$col}{$row}) ต้องอ้างเซลล์คอลัมน์ D ที่ต่อเนื่องกันในชีต \"{$expected}\" ตามที่ยืนยัน"
+                . " (ไม่รับค่าที่พิมพ์เองหรือการอ้างชีตของเดือนอื่น)";
+            break;
+        }
+    }
+
+    if ($out["reasons"]) {
+        return $out;
+    }
+
+    $n = $budgetRef["row"];
+    $k = $renewRefs[0]["row"];
+    $required = ["O{$n}", "D" . ($k - 1), "D{$k}", "D" . ($k + 1), "D" . ($k + 2)];
+    $missing = array_values(array_filter($required, fn($c) => !isset($loadedCells[$sheetName][$c])));
+
+    if ($missing) {
+        $out["need"][$sheetName] = array_fill_keys($missing, true);
+        return $out;
+    }
+
+    $monthSheet = $spreadsheet->getSheetByName($sheetName);
+    $key = function (string $coordinate) use ($monthSheet): ?string {
+        if ($monthSheet === null || !$monthSheet->cellExists($coordinate)) {
+            return null;
+        }
+        $cell = $monthSheet->getCell($coordinate);
+        return $cell->getDataType() === DataType::TYPE_FORMULA ? kpiCompanyFormulaKey((string) $cell->getValue()) : null;
+    };
+
+    if ($key("O{$n}") !== "=SUM(O5:O" . ($n - 2) . ")") {
+        $out["reasons"][] = "เดือน{$monthName}: เซลล์ Budget ต้นทาง ({$expected}!O{$n}) ต้องเป็นสูตร =SUM(O5:O" . ($n - 2) . ") ตามที่ยืนยัน";
+    }
+
+    if (
+        $key("D" . ($k - 1)) !== "=O{$n}"
+        || $key("D{$k}") !== "=AB{$n}"
+        || $key("D" . ($k + 1)) !== "=AC{$n}"
+        || $key("D" . ($k + 2)) !== "=AD{$n}"
+    ) {
+        $out["reasons"][] = "เดือน{$monthName}: บล็อก Renew ในชีต \"{$expected}\" (D" . ($k - 1) . ":D" . ($k + 2) . ") ไม่ตรงกับโครงสร้างที่ยืนยัน"
+            . " (Budget Renew = O{$n} · Renew 1Y / 2Y / Bait 3Y = AB / AC / AD{$n})";
+    }
+
+    return $out;
+}
+
 /*
 |--------------------------------------------------------------------------
 | KPI "บรรลุเป้าหมายการต่อสัญญา": อ่านจากชีตสรุปรายเดือน (กฎ KPI_COMPANY_RENEWAL_RULE)
@@ -1267,6 +1387,30 @@ function kpiCompanyEvaluateRenewal(
         if (!$isNumber($g) || (float) $g < 0) {
             $reasons[] = "Total R (G{$row}) ต้องเป็นตัวเลขไม่ติดลบ";
         }
+
+        /* B3: ค่าจริงภายในเซลล์ (ไม่ใช่รูปแบบแสดงผล) ต้องมีทศนิยมไม่เกิน 2 ตำแหน่ง · ไม่ปัดเศษให้ผ่าน */
+        foreach (["C" => "Budget", "D" => "Renew 1Y", "E" => "Renew 2Y", "F" => "Renew Bait 3Y", "G" => "Total R"] as $col => $field) {
+            [, $value] = $read("{$col}{$row}");
+            if ($isNumber($value) && !kpiCompanyHasAtMostTwoDecimals((float) $value)) {
+                $reasons[] = "เดือน{$monthName}: {$field} ({$col}{$row}) มีทศนิยมเกิน 2 ตำแหน่งในค่าจริงของเซลล์"
+                    . " ระบบไม่ปัดเศษ กรุณาแก้ไขไฟล์";
+            }
+        }
+
+        /* B1 + B2: Budget และ Renew ต้องมาจากชีตของเดือนที่เลือกตามโครงสร้างที่ยืนยัน (ห้ามใช้ข้อมูลเดือนอื่น) */
+        $sourceCheck = kpiCompanyRenewalSourceReasons($spreadsheet, $workbookSheets, $loadedCells, $summary, $row, $month, $monthName, $year);
+        $reasons = array_merge($reasons, $sourceCheck["reasons"]);
+
+        if ($sourceCheck["need"]) {
+            if ($final) {
+                $reasons[] = "ตรวจสอบแหล่งข้อมูลของเดือน{$monthName}ไม่ครบ (โหลดเซลล์ต้นทางไม่ได้)";
+            } else {
+                foreach ($sourceCheck["need"] as $needSheet => $needCells) {
+                    $out["need"][$needSheet] = ($out["need"][$needSheet] ?? []) + $needCells;
+                }
+            }
+        }
+
         if ($qFormula !== null && $q === null) {
             $reasons[] = "ไม่มีค่าที่ Excel คำนวณเก็บไว้ในไฟล์ (เปิดและบันทึกไฟล์ใน Excel ก่อน)";
         } elseif (!$isNumber($q)) {
