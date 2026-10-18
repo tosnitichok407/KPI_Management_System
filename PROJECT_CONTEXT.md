@@ -51,8 +51,8 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 2. **Admin** สร้าง KPI + เกณฑ์ระดับ 5..1 (`admin/kpi-management/`)
 3. **Admin** มอบหมาย KPI ให้พนักงานรายปี กำหนด Target + Weight · น้ำหนักรวมต่อคนต่อปี ≤ 100% (`admin/kpi-assignment/`)
 4. **Employee** นำเข้าผลงานจาก **ไฟล์ Excel จริงของบริษัท** (`employee/kpi-import.php`) เดือนที่รอบยัง `Open` → Preview → ยืนยัน → บันทึกเป็น `Draft`
-   - รับเฉพาะ KPI ที่ยืนยัน Mapping แล้ว: ปัจจุบันมี **KPI 14 "บรรลุเป้าหมายการต่อสัญญา"** ตัวเดียว (Actual = Total R ÷ Budget × 100 ตัด 2 ตำแหน่ง · Target 100 · คะแนนจาก `kpiCalculateScore()`)
-   - **KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"**: มีกฎและชุดทดสอบแล้ว แต่ **ยังไม่เปิดใช้งาน** (Mapping `confirmed = false` จนกว่าเจ้าของระบบอนุมัติ) · รายละเอียดกฎในหัวข้อ 6
+   - รับเฉพาะ KPI ที่ยืนยัน Mapping แล้ว: ปัจจุบันมี **KPI 14 "บรรลุเป้าหมายการต่อสัญญา"** (Actual = Total R ÷ Budget × 100 ตัด 2 ตำแหน่ง · Target 100 · คะแนนจาก `kpiCalculateScore()`) และ KPI 8
+   - **KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"**: **เปิดใช้งานแล้ว** (เจ้าของระบบอนุมัติ 2026-10-18) · ข้อมูล KPI 8 ของเดือนใดไม่ผ่าน → ไฟล์เดือนนั้นนำเข้าไม่ได้ทั้งไฟล์ (รวม KPI 14) · รายละเอียดกฎในหัวข้อ 6
    - ปิดแล้ว: หน้ากรอกเอง (`employee/kpi/kpi.php`, ฟอร์มใน `employee/kpi-detail.php`) และ System-generated Template (`employee/kpi-import-template.php` + Template upload/Preview/Commit ถูกปฏิเสธฝั่ง Server)
    - Budget > 0 แต่ Total R = 0: เดือนยังไม่สิ้นสุด → ไม่บันทึก · สิ้นสุดแล้ว → เตือน + ติ๊กยืนยันรายแถว (ไม่ติ๊ก = ไม่บันทึก)
 5. **Manager** ดู Dashboard / แผนก / รายคน และให้ Feedback (`manager/feedback.php`)
@@ -70,8 +70,8 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 | `includes/kpi-score-helper.php` | **แหล่งหลัก** ตัดเกรด + โหลด/บันทึกเกณฑ์ |
 | `includes/monthly-period-helper.php` | หารอบตามเดือน, ตรวจการใช้งานรอบก่อนลบ |
 | `employee/kpi-import.php` | **ช่องทางเดียวที่บันทึกผล KPI**: นำเข้าไฟล์ Excel ของบริษัท → Preview → Commit (`Draft`) |
-| `includes/kpi-import-company-reader.php` | อ่าน/ตรวจแบบฟอร์ม KPI AM (allowlist ชีต, ตรวจสูตรทุกชั้น, กฎ KPI 14 และกฎ KPI 8 ที่ยังไม่เปิด) |
-| `includes/kpi-import-company-map.php` | Mapping หัวข้อแบบฟอร์ม → KPI ในระบบ (ยืนยันแล้วเฉพาะ KPI 14 · KPI 8 ยัง `confirmed = false`) + Checklist 12 ข้อ |
+| `includes/kpi-import-company-reader.php` | อ่าน/ตรวจแบบฟอร์ม KPI AM (allowlist ชีต, ตรวจสูตรทุกชั้น, กฎ KPI 14 และ KPI 8) |
+| `includes/kpi-import-company-map.php` | Mapping หัวข้อแบบฟอร์ม → KPI ในระบบ (ยืนยันแล้ว KPI 14 และ KPI 8) + Checklist 12 ข้อ |
 | `includes/kpi-import-helper.php` | Validate / Commit กลาง (Transaction + ล็อก, Draft เท่านั้น, ปิด origin Template) |
 | `employee/kpi/kpi.php` | (ปิดแล้ว) ส่งต่อไปหน้านำเข้า |
 | `employee/kpi-detail.php` | รายละเอียด + ประวัติ (ดูอย่างเดียว · ไม่มีฟอร์มบันทึกแล้ว) |
@@ -95,7 +95,7 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 
 **ฟังก์ชันกลาง**: `kpiCalculateScore($kpi, $levels, $actual, $target)` คืน grade / achievement / error · ทุกหน้าที่ตัดเกรดต้องเรียกตัวนี้
 
-**กฎนำเข้า KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"** (`value_rule` = `contract_uplift_s_over_o_floor_percent` · **ยังไม่เปิดใช้งาน** · ตุลาคม 2026)
+**กฎนำเข้า KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"** (`value_rule` = `contract_uplift_s_over_o_floor_percent` · เปิดใช้งาน 2026-10-18)
 - ความหมายที่เจ้าของระบบยืนยัน: ร้อยละที่มูลค่าสัญญารวมเพิ่มขึ้นจากมูลค่าเดิม · Target ใน Assignment ต้องเป็น 20
 - แหล่งข้อมูล: ชีตของเดือนที่เลือก (ไม่ใช่ช่อง "ที่ทำได้" ใน KPI AM) · แถวรวม n หาจากสูตร `O<n> = SUM(O5:O<n-2>)`
 - **S (ผลต่าง) เป็นแหล่งข้อมูลหลัก** — พิมพ์เองได้ ไม่ต้องเป็นสูตร `=R-O` · O (ราคาเดิม) ว่างได้ · R (ราคาสรุป) เป็นข้อมูลประกอบ
@@ -146,7 +146,7 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 - **แก้สูตรรวม/เปอร์เซ็นต์**: ต้องแก้ทั้ง 5 จุดในตารางหัวข้อ 6 พร้อมกัน
 - **เปิดนำเข้า KPI ใหม่**: ห้ามคาดเดา Mapping · ต้องผ่าน Checklist 12 ข้อในหัว `includes/kpi-import-company-map.php` และได้รับการยืนยันจากเจ้าของระบบก่อนตั้ง `confirmed = true`
 - **การทดสอบ**: ผลทดสอบการนำเข้าทั้งหมดมาจากฐานทดสอบแยก (MariaDB socket-only + ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน/ตรวจโครงสร้าง · **ยังไม่ได้ทดสอบการบันทึกกับ Production**
-- **เปิด KPI 8**: ต้องได้รับอนุมัติจากเจ้าของระบบก่อนแก้ Mapping (kpi_id 8, value_rule, ผู้ยืนยัน, วันที่, `confirmed = true`) · ต้องมี BCMath บน PHP ของเว็บไซต์
+- **KPI 8 เปิดแล้ว (2026-10-18)**: ต้องมี BCMath บน PHP ของเว็บไซต์ (ตรวจแล้วบน Apache ของ XAMPP เครื่องนี้) · ข้อมูล KPI 8 ของเดือนใดไม่ผ่าน ไฟล์เดือนนั้นนำเข้าไม่ได้ทั้งไฟล์ (รวม KPI 14) · ปิด KPI 8 ได้โดยตั้ง `confirmed = false` ใน Mapping
 - **Timezone**: ไม่มีการตั้ง timezone ในโค้ด (ใช้ `date.timezone` ของ php.ini · XAMPP = Europe/Berlin) · กฎเดือนสิ้นสุดของ KPI 8 ใช้ Asia/Bangkok แยกต่างหาก · กฎของ KPI 14 และ `kpiImportCommit` ยังใช้เวลาของ PHP · ช่วงต้นวันที่ 1 ตามเวลาไทยที่ระบบยังถือว่าเดือนก่อนยังไม่สิ้นสุดขึ้นกับความต่างระหว่างเวลาเบอร์ลินกับเวลาไทย: เวลามาตรฐานของเบอร์ลิน (UTC+1) ต่างกัน 6 ชั่วโมง → ช่วง 00:00–05:59 น. เวลาไทย · ช่วง Daylight Saving Time ของเบอร์ลิน (UTC+2 ประมาณปลายมีนาคมถึงปลายตุลาคม) ต่างกัน 5 ชั่วโมง → ช่วง 00:00–04:59 น. เวลาไทย
 - **ห้ามเปลี่ยนลำดับแหล่งเกณฑ์** โดยไม่ตรวจ KPI ที่ยังใช้เกณฑ์แบบเก่า — เกรดจะเปลี่ยน
 - **KPI 9 ผูกกับ ID 9 + ชื่อ "มูลค่าไม่ต่อสัญญา"** — ถ้าเปลี่ยนชื่อหรือ ID กฎพิเศษจะไม่ทำงาน (มี error_log เตือนเมื่อ ID ตรงแต่ชื่อไม่ตรง)

@@ -31,6 +31,10 @@
 |     แหล่งข้อมูล = ชีต "สรุปทั้งปี.." แถวของแต่ละเดือน: Q = G/C (Total R / Budget, ไม่รวม New)
 |     Actual = (Total R / Budget) × 100 ตัดทศนิยมลงเหลือ 2 ตำแหน่ง · Target ใน Assignment ต้องเป็น 100 (%)
 |     คะแนนใช้เกณฑ์ของ KPI ในระบบ (kpiCalculateScore) ไม่ใช้เกรดจาก Excel
+|   และ "จำนวนรายการปรับเพิ่มมูลค่าสัญญา" (kpi_id 8 · ยืนยัน 2026-10-18): value_rule "contract_uplift_s_over_o_floor_percent"
+|     แหล่งข้อมูล = ชีตของเดือนที่เลือก: S (ผลต่าง) เป็นแหล่งข้อมูลหลัก · S<n+1> = S<n>/O<n>
+|     Actual = FLOOR(S<n+1> × 100) จำนวนเต็ม · Target ใน Assignment ต้องเป็น 20 (%) · เกณฑ์คะแนน 1-5 ต้องครบ
+|     หมายเหตุ: ข้อมูล KPI 8 ของเดือนใดไม่ผ่าน → ไฟล์ของเดือนนั้นนำเข้าไม่ได้ทั้งไฟล์ (รวม KPI 14) ตามกฎไม่บันทึกบางส่วน
 | KPI 9 (มูลค่าไม่ต่อสัญญา) ถูกแยกออกจากการนำเข้าเสมอในตัวอ่าน
 | ห้ามกรอกค่าโดยการเดา และห้ามใช้ kpi_id จาก Seed / ฐานข้อมูลทดสอบ
 |
@@ -58,15 +62,16 @@ return [
         "confirmed" => true
     ],
     [
+        /* ยืนยันแล้ว: Actual = FLOOR(S<n+1> × 100) จากชีตของเดือน · S เป็นแหล่งข้อมูลหลัก (ดู KPI_COMPANY_UPLIFT_RULE ในตัวอ่าน) */
         "section" => "performance",
         "label" => "จำนวนรายการปรับเพิ่มมูลค่าสัญญา",
         "expected_weight" => 5,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 8,
+        "value_rule" => "contract_uplift_s_over_o_floor_percent",
+        "confirmed_kpi_name" => "จำนวนรายการปรับเพิ่มมูลค่าสัญญา",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-18",
+        "confirmed" => true
     ],
     [
         "section" => "performance",
