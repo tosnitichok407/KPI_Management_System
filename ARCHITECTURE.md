@@ -499,6 +499,15 @@ POST /employee/kpi-import.php  action=upload  format=company  company_year  comp
   │          C = Budget ('เดือน'!O41 = SUM(O5:O39) ← Port26) · G = Total R = SUM(D:F) (ไม่รวม New) · Q = G/C
   │          Actual = Total R ÷ Budget × 100 ตัดลง 2 ตำแหน่ง · Target ต้องเป็น 100
   │          Budget > 0 แต่ Total R = 0: เดือนยังไม่สิ้นสุด → REJECTED · สิ้นสุดแล้ว → READY + ต้องยืนยันรายแถว
+  │        KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา" (value_rule contract_uplift_s_over_o_floor_percent)
+  │          มีกฎและชุดทดสอบแล้ว แต่ Mapping ยัง confirmed = false → ยังไม่เปิด (NEEDS_CONFIRMATION)
+  │          ชีตของเดือนที่เลือก · แถวรวม n จาก O (O<n> = SUM(O5:O<n-2>)) · S = แหล่งข้อมูลหลัก
+  │          S รายแถวพิมพ์เองได้ · O ว่างได้ · R เป็นข้อมูลประกอบ · S<n> = SUM(S5:S<n-2>) และตรงกับผลรวมรายแถว
+  │          S<n+1> = S<n>/$O$<n> และตรงกับ S<n>/O<n> · O<n> > 0
+  │          Actual = FLOOR(S<n+1> × 100) จำนวนเต็ม (BCMath ไม่ใช้ round) · Target ต้องเป็น 20 · เกณฑ์ 1-5 ต้องครบ
+  │          ปฏิเสธ: มี O/R แต่ S ว่าง · S = R-O แต่ R ว่างขณะที่ O มีค่า · S = R-O แต่ค่าที่เก็บไว้ ≠ R - O
+  │                  (O และ R ว่างทั้งคู่ + S จากสูตร = 0 → แถวว่าง ไม่ปฏิเสธ) · ติดลบ · R ว่างทั้งเดือน · Error / External Link
+  │                  · อ้างชีตเดือนอื่น · เดือนยังไม่สิ้นสุดตามเวลา Asia/Bangkok (kpiCompanyUpliftMonthEnded)
   │      - หัวข้ออื่น → NEEDS_CONFIRMATION (ไม่บันทึก) · ข้อมูล/สูตรผิด → REJECTED (ไม่บันทึกทั้งไฟล์)
   ├─ 4. kpiImportValidate(..., origin = company) — Assignment ของผู้ใช้, รอบ Open, Draft เท่านั้น, ซ้ำในไฟล์
   │      คะแนนจาก kpiCalculateScore() (เกณฑ์ของ KPI ในระบบ) → เก็บ Preview ใน Session (token ใช้ครั้งเดียว)
@@ -514,6 +523,9 @@ POST action=confirm  import_token  confirm_update[]  confirm_flag[]
 
 ผลทดสอบของเส้นทางนี้มาจาก **ฐานข้อมูลทดสอบแยก** (MariaDB socket-only + ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน/ตรวจโครงสร้าง
 **ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI อื่นยังไม่มี Mapping ที่ยืนยัน จึงนำเข้าไม่ได้
+KPI 8 ทดสอบ Preview / ยืนยันอัปเดต Draft รายแถว / Rollback เฉพาะบนฐานข้อมูลทดสอบแยกด้วย Mapping ทดสอบ · ค่า S ที่พิมพ์เองไม่มีต้นทางให้ตรวจ
+เวลาที่ใช้ตัดสินเดือนสิ้นสุด: KPI 8 = Asia/Bangkok · KPI 14 และการตรวจตอนบันทึก (`kpiImportCommit`) = `date.timezone` ของ PHP (XAMPP: Europe/Berlin)
+`kpiCompanyPrepare` / `kpiCompanyRead` รับพารามิเตอร์ `$now` (ไม่บังคับ) สำหรับทดสอบรอยต่อเดือนของ KPI 8 · หน้าเว็บไม่ส่งค่านี้ จึงใช้เวลาจริง
 
 ### เส้นทาง B (เดิม — ก่อนตุลาคม 2026 · ปิดแล้ว ไว้อ้างอิง)
 

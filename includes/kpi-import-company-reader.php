@@ -7,6 +7,7 @@
 |
 | อ่านเฉพาะช่อง "ที่ทำได้" รายเดือนของส่วนที่ 1 (Performance) และส่วนที่ 2 (Competency)
 | ยกเว้น "บรรลุเป้าหมายการต่อสัญญา" ที่อ่านจากชีตสรุปรายเดือน (ดู KPI_COMPANY_RENEWAL_RULE)
+| และ "จำนวนรายการปรับเพิ่มมูลค่าสัญญา" ที่อ่านจากชีตของเดือน (ดู KPI_COMPANY_UPLIFT_RULE)
 | ไม่อ่านคอลัมน์ "เกรด" / "คะแนนจริง" · เดือนที่ว่างถูกข้าม (ไม่ถือว่าเป็น 0 หรือเกรด 1)
 | ผลลัพธ์ที่พร้อม (READY) อยู่ในรูปแบบภายในเดียวกับ Template กลาง (ใช้ kpiImportValidate / Preview / Commit เดิม)
 |
@@ -70,6 +71,38 @@ const KPI_COMPANY_RENEWAL_MONTH_SHEETS = [
     7 => "ก.ค", 8 => "ส.ค", 9 => "ก.ย", 10 => "ต.ค", 11 => "พ.ย", 12 => "ธ.ค"
 ];
 const KPI_COMPANY_CONFIRM_ZERO_TOTAL_R = "zero_total_r";
+
+/*
+| KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา" (value_rule KPI_COMPANY_UPLIFT_RULE · แยกจากกฎของ KPI 14)
+|   ความหมายที่เจ้าของระบบยืนยัน: ร้อยละที่มูลค่าสัญญารวมเพิ่มขึ้นจากมูลค่าเดิม · Target 20 (%)
+|   แหล่งข้อมูล = ชีตของเดือนที่เลือก (ชื่อตาม KPI_COMPANY_RENEWAL_MONTH_SHEETS) ไม่ใช้ช่อง "ที่ทำได้" ใน KPI AM
+|   แถวรวม n หาจากคอลัมน์ O (O<n> = SUM(O5:O<n-2>) ต้องมีแถวเดียว · ไม่ยึดเลขแถว เช่น มิ.ย. ในไฟล์จริงคือแถว 40)
+|     O<n> = SUM(O5:O<n-2>) ราคาเดิม · R<n> = SUM(R5:R<n-2>) ราคาสรุป · S<n> = SUM(S5:S<n-2>) ผลต่าง
+|     S<n+1> = S<n>/O<n> (สัดส่วน เช่น 0.2075 = 20.75%)
+|   รายแถว (เจ้าของระบบยืนยัน): S = ผลต่างที่ใช้คำนวณโดยตรง พิมพ์เองได้ ไม่ต้องเป็นสูตร =R-O · O ว่างได้ · R เป็นข้อมูลประกอบ
+|   Actual = FLOOR(S<n+1> × 100) เป็นจำนวนเต็ม (หน่วย %) ปัดลงครั้งเดียวด้วยเลขทศนิยมแม่นยำ (bcmath)
+|     และต้องได้ค่าเดียวกับ FLOOR(S<n> × 100 / O<n>) · ไม่ใช้ nonRenewalAchievementBasisPoints()
+|   ปฏิเสธ: เดือนที่ยังไม่สิ้นสุดตามเวลาไทย (KPI_COMPANY_UPLIFT_TIMEZONE) · R ว่างทั้งเดือน · แถวที่มี O/R แต่ S ว่าง · S เป็นสูตร =R-O แต่ R ว่าง · ผลติดลบ · O<n> ≤ 0 · สูตรหาย/พิมพ์ทับ/ผิดรูปแบบ
+|           · อ้างชีตของเดือนอื่น · External Link · ค่าที่ Excel เก็บไว้ไม่สอดคล้องกับสูตร
+|   ตอนเตรียมนำเข้าต้องผ่านเพิ่ม: kpi_id 8 · Target ใน Assignment = 20 · เกณฑ์คะแนนระดับ 1-5 ครบและครอบคลุมทุก Actual
+*/
+const KPI_COMPANY_UPLIFT_RULE = "contract_uplift_s_over_o_floor_percent";
+const KPI_COMPANY_UPLIFT_LABEL = "จำนวนรายการปรับเพิ่มมูลค่าสัญญา";
+const KPI_COMPANY_UPLIFT_KPI_ID = 8;
+const KPI_COMPANY_UPLIFT_TARGET = "20.00";
+const KPI_COMPANY_UPLIFT_FIRST_ROW = 5;
+const KPI_COMPANY_UPLIFT_SCAN_ROWS = 100;
+const KPI_COMPANY_UPLIFT_HEADER_ROWS = 4;
+const KPI_COMPANY_UPLIFT_HEADERS = ["O" => "ราคาเดิม", "R" => "ราคาสรุป", "S" => "ผลต่าง"];
+/*
+| ค่าที่ Excel คำนวณเก็บไว้เทียบกับการคำนวณซ้ำใน PHP (double เหมือนกัน ต่างกันได้เฉพาะลำดับการบวก ระดับ 1e-15)
+| เผื่อไว้ 1e-9 ของขนาดค่า · ต่างเกินนี้ถือว่าไม่ใช่ผลของสูตรเดียวกัน → ปฏิเสธ
+*/
+const KPI_COMPANY_UPLIFT_REL_TOLERANCE = 1e-9;
+/* เกณฑ์คะแนนต้องให้ทุก Actual จำนวนเต็ม 0..ค่านี้ (และ Actual ของรายการ) เข้าระดับใดระดับหนึ่ง */
+const KPI_COMPANY_UPLIFT_CRITERIA_CHECK_MAX = 1000;
+/* วัน/เดือนที่ใช้ตัดสินว่าเดือนสิ้นสุดแล้วหรือยัง (เฉพาะ KPI 8) ตามเวลาไทย ไม่ขึ้นกับ date.timezone ของ php.ini */
+const KPI_COMPANY_UPLIFT_TIMEZONE = "Asia/Bangkok";
 
 /* ฟังก์ชันที่ผลขึ้นกับค่าที่อ้างอิงเท่านั้น (นอกจากนี้ → ตรวจสอบไม่ได้ → ปฏิเสธ) */
 const KPI_COMPANY_ALLOWED_FUNCTIONS = [
@@ -654,7 +687,7 @@ function kpiCompanyYearHints(array $sheetNames): array
 | $map = null → ใช้ includes/kpi-import-company-map.php (สคริปต์ทดสอบส่ง mapping สังเคราะห์ได้)
 |
 */
-function kpiCompanyRead(string $path, int $year, string $sessionEmployeeCode, ?array $map = null, ?int $onlyMonth = null): array
+function kpiCompanyRead(string $path, int $year, string $sessionEmployeeCode, ?array $map = null, ?int $onlyMonth = null, ?DateTimeInterface $now = null): array
 {
     $result = ["errors" => [], "notes" => [], "sheets_loaded" => [], "items" => [], "skipped_empty" => 0, "rows" => []];
     $map = $map ?? require __DIR__ . "/kpi-import-company-map.php";
@@ -754,7 +787,7 @@ function kpiCompanyRead(string $path, int $year, string $sessionEmployeeCode, ?a
             }
         }
 
-        $evaluation = kpiCompanyEvaluate($spreadsheet, $package, $formSheet, $layout, $map, $year, $sessionEmployeeCode, $cellSet, false, $onlyMonth);
+        $evaluation = kpiCompanyEvaluate($spreadsheet, $package, $formSheet, $layout, $map, $year, $sessionEmployeeCode, $cellSet, false, $onlyMonth, $now);
         $result["sheets_loaded"] = $sheetsToLoad;
 
         $missing = [];
@@ -774,7 +807,7 @@ function kpiCompanyRead(string $path, int $year, string $sessionEmployeeCode, ?a
         $totalCells = array_sum(array_map("count", $merged));
 
         if (count($merged) + 1 > KPI_COMPANY_MAX_SHEETS || $totalCells > KPI_COMPANY_MAX_DEPENDENCY_CELLS || $pass === KPI_COMPANY_MAX_LOAD_PASSES) {
-            $evaluation = kpiCompanyEvaluate($spreadsheet, $package, $formSheet, $layout, $map, $year, $sessionEmployeeCode, $cellSet, true, $onlyMonth);
+            $evaluation = kpiCompanyEvaluate($spreadsheet, $package, $formSheet, $layout, $map, $year, $sessionEmployeeCode, $cellSet, true, $onlyMonth, $now);
             break;
         }
 
@@ -806,7 +839,7 @@ function kpiCompanyRead(string $path, int $year, string $sessionEmployeeCode, ?a
 }
 
 /* ประเมินทุกช่อง "ที่ทำได้" ในชีตที่โหลด · $final = true → ชีตที่ยังขาดถือว่าตรวจไม่ได้ */
-function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $formSheet, array $layout, array $map, int $year, string $employeeCode, array $loadedCells, bool $final = false, ?int $onlyMonth = null): array
+function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $formSheet, array $layout, array $map, int $year, string $employeeCode, array $loadedCells, bool $final = false, ?int $onlyMonth = null, ?DateTimeInterface $now = null): array
 {
     $workbookSheets = $package["sheets"];
     $calcUnreliable = $package["calc"]["mode"] === "manual" || $package["calc"]["full_calc_on_load"];
@@ -856,6 +889,18 @@ function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $fo
                 kpiCompanyEvaluateRenewal(
                     $spreadsheet, $workbookSheets, $formSheet, $loadedCells, $calcUnreliable, $final,
                     $section, $rawLabel, $weight, $entries[0], $mappingReasons, $year, $employeeCode, $out, $sequence, $onlyMonth
+                );
+                continue;
+            }
+
+            /* หัวข้อที่กำหนดกฎ "ปรับเพิ่มมูลค่าสัญญา" (KPI 8): อ่านจากชีตของเดือนแทนช่อง "ที่ทำได้" ในแบบฟอร์ม */
+            if (count($entries) === 1 && ($entries[0]["value_rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE) {
+                $mappingReasons = kpiCompanyMappingReasons(
+                    $section, $label, $weight, $entries[0], ($labelCount[$section . "|" . $label] ?? 0) > 1, $confirmedIds
+                );
+                kpiCompanyEvaluateUplift(
+                    $spreadsheet, $workbookSheets, $formSheet, $loadedCells, $calcUnreliable, $final,
+                    $section, $rawLabel, $weight, $entries[0], $mappingReasons, $year, $employeeCode, $out, $sequence, $onlyMonth, $now
                 );
                 continue;
             }
@@ -1034,14 +1079,30 @@ function kpiCompanyMappingReasons(string $section, string $label, ?float $weight
             $reasons[] = "ข้อมูลการยืนยันไม่ครบ (ชื่อ KPI ในระบบ / ผู้ยืนยัน / วันที่ยืนยัน)";
         } elseif ($section === "competency" && ($mapping["value_rule"] ?? null) !== "competency_integer") {
             $reasons[] = "ยังไม่ได้ยืนยันกฎแปลงค่าของหัวข้อนี้";
-        } elseif ($section === "performance" && ($mapping["value_rule"] ?? null) !== KPI_COMPANY_RENEWAL_RULE) {
+        } elseif (
+            $section === "performance"
+            && !in_array($mapping["value_rule"] ?? null, [KPI_COMPANY_RENEWAL_RULE, KPI_COMPANY_UPLIFT_RULE], true)
+        ) {
             $reasons[] = "ยังไม่ได้ยืนยันกฎแปลงค่า (หน่วย / Target) ของ KPI Performance";
         } elseif (
             $section === "performance"
+            && $mapping["value_rule"] === KPI_COMPANY_RENEWAL_RULE
             && ($label !== kpiCompanyNormalizeLabel(KPI_COMPANY_RENEWAL_LABEL) || (string) $mapping["confirmed_kpi_name"] !== KPI_COMPANY_RENEWAL_LABEL)
         ) {
             /* สูตรของ KPI การต่อสัญญาใช้กับ KPI อื่นไม่ได้ (ทั้งหัวข้อในแบบฟอร์มและชื่อ KPI ในระบบต้องเป็นตัวนี้) */
             $reasons[] = "กฎแปลงค่าการต่อสัญญาใช้ได้เฉพาะหัวข้อและ KPI \"" . KPI_COMPANY_RENEWAL_LABEL . "\"";
+        } elseif (
+            $section === "performance"
+            && $mapping["value_rule"] === KPI_COMPANY_UPLIFT_RULE
+            && (
+                $label !== kpiCompanyNormalizeLabel(KPI_COMPANY_UPLIFT_LABEL)
+                || (string) $mapping["confirmed_kpi_name"] !== KPI_COMPANY_UPLIFT_LABEL
+                || $mapping["kpi_id"] !== KPI_COMPANY_UPLIFT_KPI_ID
+            )
+        ) {
+            /* สูตรของ KPI ปรับเพิ่มมูลค่าสัญญาใช้ได้เฉพาะหัวข้อนี้ ชื่อ KPI นี้ และ kpi_id 8 */
+            $reasons[] = "กฎแปลงค่าการปรับเพิ่มมูลค่าสัญญาใช้ได้เฉพาะหัวข้อและ KPI \"" . KPI_COMPANY_UPLIFT_LABEL
+                . "\" (kpi_id " . KPI_COMPANY_UPLIFT_KPI_ID . ")";
         }
     }
 
@@ -1489,6 +1550,506 @@ function kpiCompanyEvaluateRenewal(
 
 
 /*
+| ค่า float → ทศนิยมแบบข้อความ 15 หลักนัยสำคัญ (ความละเอียดที่ Excel ใช้) ไม่มีเลขยกกำลัง สำหรับคำนวณด้วย bcmath
+| เช่น 0.57 → "0.570000000000000" (float 0.57 จริง ๆ คือ 0.56999999999999995 ซึ่ง × 100 แล้วปัดลงจะได้ 56 ผิด)
+*/
+function kpiCompanyPlainDecimal(float $value): ?string
+{
+    if (!is_finite($value)) {
+        return null;
+    }
+
+    if ($value == 0.0) {
+        return "0";
+    }
+
+    [$mantissa, $exponent] = explode("e", sprintf("%.14e", abs($value)));
+    $digits = str_replace(".", "", $mantissa);
+    $point = (int) $exponent + 1;
+
+    if ($point <= 0) {
+        $text = "0." . str_repeat("0", -$point) . $digits;
+    } elseif ($point >= strlen($digits)) {
+        $text = $digits . str_repeat("0", $point - strlen($digits));
+    } else {
+        $text = substr($digits, 0, $point) . "." . substr($digits, $point);
+    }
+
+    return ($value < 0 ? "-" : "") . $text;
+}
+
+/* FLOOR(ตัวตั้ง × 100 ÷ ตัวหาร) เป็นจำนวนเต็ม ปัดลงครั้งเดียว · ต้องไม่ติดลบและตัวหาร > 0 · คำนวณไม่ได้ → null */
+function kpiCompanyFloorPercent(string $numerator, string $denominator): ?int
+{
+    if (!function_exists("bcdiv") || bccomp($denominator, "0", 40) <= 0 || bccomp($numerator, "0", 40) < 0) {
+        return null;
+    }
+
+    /* bcdiv ที่ scale 0 ตัดเศษทิ้ง = ปัดลงสำหรับค่าที่ไม่ติดลบ */
+    return (int) bcdiv(bcmul($numerator, "100", 40), $denominator, 0);
+}
+
+/*
+| เดือนนั้นสิ้นสุดแล้วหรือยัง ตามวันที่ใน KPI_COMPANY_UPLIFT_TIMEZONE (สิ้นสุด = วันนี้เลยวันสุดท้ายของเดือนไปแล้ว)
+| ไม่เปลี่ยน timezone ของ runtime · $now ใช้ทดสอบรอยต่อเดือน (null = เวลาปัจจุบัน)
+*/
+function kpiCompanyUpliftMonthEnded(int $year, int $month, ?DateTimeInterface $now = null): bool
+{
+    $zone = new DateTimeZone(KPI_COMPANY_UPLIFT_TIMEZONE);
+    $today = DateTimeImmutable::createFromInterface($now ?? new DateTimeImmutable("now"))->setTimezone($zone)->format("Y-m-d");
+    $monthEnd = (new DateTimeImmutable(sprintf("%04d-%02d-01", $year, $month), $zone))->format("Y-m-t");
+
+    return $today > $monthEnd;
+}
+
+/*
+| เกณฑ์คะแนนของ KPI 8 ในระบบต้องครบระดับ 1-5 และทุก Actual จำนวนเต็ม (0..KPI_COMPANY_UPLIFT_CRITERIA_CHECK_MAX
+| และ Actual ของรายการ) ต้องเข้าเกณฑ์ระดับใดระดับหนึ่ง · ใช้ฟังก์ชันเดิมของ kpi-score-helper.php (ไม่เปลี่ยนกฎคะแนน)
+| คืนข้อความเหตุผล หรือ null ถ้าผ่าน
+*/
+function kpiCompanyUpliftCriteriaReason(PDO $pdo, int $kpiId, int $actual): ?string
+{
+    $levels = loadKpiScoreCriteria($pdo, [["kpi_id" => $kpiId]])[$kpiId] ?? [];
+    $rules = parseKpiCriteria($levels);
+    $missing = array_values(array_diff(range(KPI_MIN_LEVEL, KPI_MAX_LEVEL), array_keys($rules)));
+
+    if ($missing) {
+        return "เกณฑ์คะแนนของ KPI นี้ในระบบยังไม่ครบระดับ 1-5 (ไม่มีเกณฑ์เชิงตัวเลขของระดับ " . implode(", ", $missing) . ")"
+            . " ระบบจึงยังไม่เปิดนำเข้า KPI นี้ กรุณาให้ผู้ดูแลระบบกำหนดเกณฑ์ให้ครบ";
+    }
+
+    $target = (float) KPI_COMPANY_UPLIFT_TARGET;
+
+    foreach (array_unique(array_merge(range(0, KPI_COMPANY_UPLIFT_CRITERIA_CHECK_MAX), [$actual])) as $value) {
+        $compare = kpiCriteriaCompareValue($rules, (float) $value, $target);
+        $matched = false;
+        foreach ($rules as $rule) {
+            if (kpiCriterionMatches($rule, $compare)) {
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
+            return "เกณฑ์คะแนนของ KPI นี้ในระบบไม่ครอบคลุม Actual {$value}% (ไม่เข้าระดับใดเลย)"
+                . " ระบบจึงยังไม่เปิดนำเข้า KPI นี้ กรุณาให้ผู้ดูแลระบบตรวจเกณฑ์";
+        }
+    }
+
+    return null;
+}
+
+/*
+|--------------------------------------------------------------------------
+| KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา": อ่านจากชีตของเดือน (กฎ KPI_COMPANY_UPLIFT_RULE · ดูหัวไฟล์)
+|--------------------------------------------------------------------------
+|
+| ต่อเดือน: ชีตของเดือนนั้นต้องมีชีตเดียว · หาแถวรวม n จาก O · ตรวจหัวคอลัมน์ / สูตร / ค่าทุกแถว
+| ไล่ตรวจสูตรต้นทางของ S<n+1> และ R<n> ทุกชั้น (External Link / Error / ฟังก์ชัน) และห้ามอ้างชีตของเดือนอื่น
+| เดือนที่ไม่มีข้อมูลไม่ถูกข้าม แต่ปฏิเสธพร้อมเหตุผล (ตามข้อกำหนดของ KPI นี้)
+|
+*/
+function kpiCompanyEvaluateUplift(
+    Spreadsheet $spreadsheet, array $workbookSheets, string $formSheet, array $loadedCells, bool $calcUnreliable, bool $final,
+    string $section, string $rawLabel, ?float $weight, array $mapping, array $mappingReasons, int $year, string $employeeCode,
+    array &$out, int &$sequence, ?int $onlyMonth = null, ?DateTimeInterface $now = null
+): void {
+    $thaiMonths = monthlyPeriodMonths();
+    $first = KPI_COMPANY_UPLIFT_FIRST_ROW;
+    $suffix = sprintf("%02d", ($year + 543) % 100);
+    $monthSheetPattern = '/^(?:' . implode("|", array_map(fn($a) => preg_quote($a, "/"), KPI_COMPANY_RENEWAL_MONTH_SHEETS)) . ')\.[0-9]{2}$/u';
+
+    $push = function (int $month, string $source, ?string $formula, array $reasons, array $warnings, ?string $actual, array $details = [])
+        use (&$out, &$sequence, $section, $rawLabel, $weight, $mapping, $mappingReasons, $calcUnreliable, $thaiMonths, $year, $employeeCode): void {
+
+        $itemMappingReasons = $mappingReasons;
+        if ($calcUnreliable && $formula !== null) {
+            array_unshift($itemMappingReasons, "ไฟล์ตั้งค่าการคำนวณที่ทำให้ค่าจากสูตรอาจไม่ใช่ค่าล่าสุด");
+        }
+
+        $status = $reasons
+            ? KPI_COMPANY_STATUS_REJECTED
+            : ($itemMappingReasons ? KPI_COMPANY_STATUS_NEEDS_CONFIRMATION : KPI_COMPANY_STATUS_READY);
+
+        $item = [
+            "mapping_ready" => !$itemMappingReasons,
+            "confirmed_kpi_name" => $mapping["confirmed_kpi_name"] ?? null,
+            "value_rule" => KPI_COMPANY_UPLIFT_RULE,
+            "action" => null,
+            "section" => $section,
+            "label" => $rawLabel,
+            "weight" => $weight,
+            "month" => $month,
+            "month_label" => $thaiMonths[$month] . " " . $year,
+            "source" => $source,
+            "kind" => $formula !== null ? "ค่าจากสูตร (คำนวณโดย Excel)" : "ค่าที่พิมพ์",
+            "formula" => $formula,
+            "value" => $actual,
+            "kpi_id" => $mapping["kpi_id"] ?? null,
+            "status" => $status,
+            "reasons" => array_merge($reasons, $itemMappingReasons),
+            "warnings" => $warnings,
+            "requires_confirmation" => null,
+            "details" => $details
+        ];
+
+        if ($status === KPI_COMPANY_STATUS_READY) {
+            $item["row"] = ++$sequence;
+            $out["rows"][] = [
+                "row" => $sequence,
+                "source" => $source,
+                "requires_confirmation" => null,
+                "values" => [
+                    "employee_code" => $employeeCode,
+                    "kpi_id" => (int) $mapping["kpi_id"],
+                    "year" => $year,
+                    "month" => $month,
+                    "actual" => $actual,
+                    "competency_score" => null,
+                    "note" => null
+                ],
+                "errors" => []
+            ];
+        }
+
+        $out["items"][] = $item;
+    };
+
+    /* โหลดเซลล์ที่ยังไม่ได้โหลด → รอบถัดไป · รอบสุดท้าย (final) ถือว่าตรวจไม่ได้ */
+    $needCells = function (string $sheetName, array $coordinates) use ($loadedCells): array {
+        return array_values(array_filter($coordinates, fn($c) => !isset($loadedCells[$sheetName][$c])));
+    };
+    $requestOrFail = function (string $sheetName, array $missing) use (&$out, $final): bool {
+        if ($final) {
+            return false;
+        }
+        $out["need"][$sheetName] = ($out["need"][$sheetName] ?? []) + array_fill_keys($missing, true);
+        return true;
+    };
+    $limit = function (array $cells): string {
+        return implode(", ", array_slice($cells, 0, 5)) . (count($cells) > 5 ? " และอีก " . (count($cells) - 5) . " เซลล์" : "");
+    };
+    $isNumber = fn($v): bool => (is_int($v) || is_float($v)) && is_finite((float) $v);
+    $isBlank = fn($v): bool => $v === null || $v === "";
+    $close = fn(float $a, float $b, float $scale): bool => abs($a - $b) <= KPI_COMPANY_UPLIFT_REL_TOLERANCE * max(1.0, $scale);
+
+    $out["notes"][] = "หัวข้อ \"" . KPI_COMPANY_UPLIFT_LABEL . "\" อ่านจากชีตของเดือน (S = ผลต่าง ÷ ราคาเดิม ของเดือนนั้น)"
+        . " ไม่ใช้ช่อง \"ที่ทำได้\" ในแบบฟอร์ม " . KPI_COMPANY_FORM_SHEET;
+
+    foreach ($thaiMonths as $month => $monthName) {
+
+        if ($onlyMonth !== null && $month !== $onlyMonth) {
+            continue;
+        }
+
+        $expected = KPI_COMPANY_RENEWAL_MONTH_SHEETS[$month] . "." . $suffix;
+
+        /* เดือนที่ยังไม่สิ้นสุด (ตามเวลาไทย) → ไม่นำเข้า ข้อมูลราคาสรุปของเดือนอาจยังไม่ครบ */
+        if (!kpiCompanyUpliftMonthEnded($year, $month, $now)) {
+            $push($month, $expected, null, [
+                "เดือน{$monthName} {$year} ยังไม่สิ้นสุด (ตามเวลา " . KPI_COMPANY_UPLIFT_TIMEZONE . ")"
+                . " ข้อมูลในไฟล์อาจยังไม่ครบ ระบบจึงไม่นำเข้าเดือนนี้ของ KPI นี้ นำเข้าได้ตั้งแต่วันแรกของเดือนถัดไป"
+            ], [], null);
+            continue;
+        }
+
+        $matches = array_values(array_filter(
+            array_map("strval", array_keys($workbookSheets)),
+            fn($name) => trim($name) === $expected
+        ));
+
+        if (count($matches) !== 1) {
+            $push($month, $expected, null, ["ไม่พบชีตของเดือน{$monthName} (\"{$expected}\") หรือพบมากกว่าหนึ่งชีต"], [], null);
+            continue;
+        }
+
+        $sheetName = $matches[0];
+
+        /* รอบแรก: คอลัมน์ O สำหรับหาแถวรวม + หัวคอลัมน์ O / R / S */
+        $scan = [];
+        for ($row = 1; $row <= KPI_COMPANY_UPLIFT_SCAN_ROWS; $row++) {
+            $scan[] = "O{$row}";
+        }
+        for ($row = 1; $row <= KPI_COMPANY_UPLIFT_HEADER_ROWS; $row++) {
+            $scan[] = "R{$row}";
+            $scan[] = "S{$row}";
+        }
+        $missing = $needCells($sheetName, $scan);
+        $sheet = $spreadsheet->getSheetByName($sheetName);
+
+        if ($missing || $sheet === null) {
+            if (!$requestOrFail($sheetName, $missing)) {
+                $push($month, $sheetName, null, ["อ่านชีต \"{$expected}\" ไม่ครบ"], [], null);
+            }
+            continue;
+        }
+
+        $read = function (string $coordinate) use ($sheet): array {
+            if (!$sheet->cellExists($coordinate)) {
+                return [null, null];
+            }
+            $cell = $sheet->getCell($coordinate);
+            $value = $cell->getValue();
+            if ($value instanceof RichText) {
+                $value = $value->getPlainText();
+            }
+            if ($cell->getDataType() === DataType::TYPE_FORMULA) {
+                return [(string) $value, $cell->getOldCalculatedValue()];
+            }
+            if ($cell->getDataType() === DataType::TYPE_ERROR) {
+                return [null, "#ERROR"];
+            }
+            return [null, $value];
+        };
+        $key = fn(string $coordinate): ?string => ($f = $read($coordinate)[0]) === null ? null : kpiCompanyFormulaKey($f);
+
+        $sumRows = [];
+        for ($row = $first + 2; $row <= KPI_COMPANY_UPLIFT_SCAN_ROWS; $row++) {
+            if ($key("O{$row}") === "=SUM(O{$first}:O" . ($row - 2) . ")") {
+                $sumRows[] = $row;
+            }
+        }
+
+        if (count($sumRows) !== 1) {
+            $push($month, $sheetName, null, [
+                "เดือน{$monthName}: ไม่พบแถวรวมราคาเดิม (O<n> = SUM(O{$first}:O<n-2>)) ในชีต \"{$expected}\" หรือพบมากกว่าหนึ่งแถว"
+            ], [], null);
+            continue;
+        }
+
+        $n = $sumRows[0];
+        $last = $n - 2;
+        $ratioCell = "S" . ($n + 1);
+
+        $headerOk = false;
+        for ($row = 1; $row <= KPI_COMPANY_UPLIFT_HEADER_ROWS && !$headerOk; $row++) {
+            $headerOk = true;
+            foreach (KPI_COMPANY_UPLIFT_HEADERS as $col => $text) {
+                if (kpiCompanyCellText($sheet, Coordinate::columnIndexFromString($col), $row) !== $text) {
+                    $headerOk = false;
+                }
+            }
+        }
+
+        if (!$headerOk) {
+            $push($month, $sheetName, null, [
+                "เดือน{$monthName}: หัวคอลัมน์ในชีต \"{$expected}\" ไม่ตรงกับที่ยืนยัน (O = ราคาเดิม, R = ราคาสรุป, S = ผลต่าง)"
+            ], [], null);
+            continue;
+        }
+
+        /* รอบถัดไป: ข้อมูลรายแถวและแถวรวม */
+        $block = ["R{$n}", "S{$n}", $ratioCell];
+        for ($row = $first; $row <= $last; $row++) {
+            array_push($block, "O{$row}", "R{$row}", "S{$row}");
+        }
+        $missing = $needCells($sheetName, $block);
+
+        if ($missing) {
+            if (!$requestOrFail($sheetName, $missing)) {
+                $push($month, $sheetName, null, ["อ่านข้อมูลในชีต \"{$expected}\" ไม่ครบ"], [], null);
+            }
+            continue;
+        }
+
+        $source = "{$sheetName}!{$ratioCell}";
+        [$ratioFormula, $ratio] = $read($ratioCell);
+        [, $oTotal] = $read("O{$n}");
+        [, $rTotal] = $read("R{$n}");
+        [, $sTotal] = $read("S{$n}");
+
+        /*
+        | ข้อมูลรายแถว (เจ้าของระบบยืนยัน: S = ผลต่างที่ใช้คำนวณโดยตรง · O ว่างได้ · R เป็นข้อมูลประกอบ)
+        |   S เป็นตัวเลข (พิมพ์เองหรือสูตร) → นับทุกแถว · S ต้องไม่ใช่ค่าที่อ่านไม่ได้ / Error
+        |   S ว่างแต่แถวมี O หรือ R → ข้อมูลไม่พอ (ไม่เติมค่าแทน) · S เป็นสูตร =R-O แต่ R ว่าง → S มาจากค่าที่ไม่มี
+        |   S เป็นสูตร =R-O → ค่าที่ Excel เก็บไว้ต้องเท่ากับ R - O (O ว่าง = 0)
+        */
+        $invalid = [];
+        $noCache = [];
+        $noDiff = [];
+        $fromBlankR = [];
+        $badS = [];
+        $rAny = false;
+        $sumO = 0.0;
+        $sumR = 0.0;
+        $sumS = 0.0;
+        $scaleO = 0.0;
+        $scaleR = 0.0;
+        $scaleS = 0.0;
+
+        for ($row = $first; $row <= $last; $row++) {
+            $cells = [];
+            foreach (["O", "R", "S"] as $col) {
+                [$formula, $value] = $read("{$col}{$row}");
+                if ($formula !== null && $value === null) {
+                    $noCache[] = "{$col}{$row}";
+                } elseif (!$isBlank($value) && !$isNumber($value)) {
+                    $invalid[] = "{$col}{$row}";
+                }
+                $cells[$col] = $isNumber($value) ? (float) $value : null;
+            }
+
+            $sumO += $cells["O"] ?? 0.0;
+            $sumR += $cells["R"] ?? 0.0;
+            $sumS += $cells["S"] ?? 0.0;
+            $scaleO += abs($cells["O"] ?? 0.0);
+            $scaleR += abs($cells["R"] ?? 0.0);
+            $scaleS += abs($cells["S"] ?? 0.0);
+            $rAny = $rAny || $cells["R"] !== null;
+            $sIsFormula = $key("S{$row}") === "=R{$row}-O{$row}";
+
+            if ($cells["S"] === null) {
+                if (($cells["O"] !== null || $cells["R"] !== null) && $isBlank($read("S{$row}")[1])) {
+                    $noDiff[] = $row;
+                }
+            } elseif ($sIsFormula && $cells["R"] === null && $cells["O"] !== null) {
+                $fromBlankR[] = "S{$row}";
+            } elseif ($sIsFormula && !$close($cells["S"], ($cells["R"] ?? 0.0) - ($cells["O"] ?? 0.0), abs($cells["R"] ?? 0.0) + abs($cells["O"] ?? 0.0))) {
+                $badS[] = "S{$row}";
+            }
+        }
+
+        if (!$rAny && !$invalid && !$noCache) {
+            $push($month, $source, $ratioFormula, [
+                "เดือน{$monthName}: คอลัมน์ R (ราคาสรุป) R{$first}:R{$last} ในชีต \"{$expected}\" ว่างทั้งเดือน"
+                . " ถือว่ายังไม่มีข้อมูล ระบบไม่นำค่า {$ratioCell} มาใช้และไม่บันทึกเดือนนี้"
+            ], [], null);
+            continue;
+        }
+
+        $reasons = [];
+
+        if ($invalid) {
+            $reasons[] = "เดือน{$monthName}: เซลล์ข้อมูลไม่ใช่ตัวเลขหรือมีค่า Error ({$limit($invalid)})";
+        }
+        if ($noCache) {
+            $reasons[] = "เดือน{$monthName}: ไม่มีค่าที่ Excel คำนวณเก็บไว้ในเซลล์ {$limit($noCache)} (เปิดและบันทึกไฟล์ใน Excel ก่อน)";
+        }
+        if ($noDiff) {
+            $reasons[] = "เดือน{$monthName}: แถว " . $limit(array_map("strval", $noDiff)) . " มีราคาเดิม (O) หรือราคาสรุป (R) แต่ไม่มีผลต่าง (S)"
+                . " ข้อมูลไม่พอสำหรับคำนวณ ระบบไม่เติมค่าแทน จึงไม่นำเข้าเดือนนี้";
+        }
+        if ($fromBlankR) {
+            $reasons[] = "เดือน{$monthName}: ผลต่าง {$limit($fromBlankR)} เป็นสูตร =R-O แต่ราคาสรุป (R) ของแถวนั้นว่าง"
+                . " ผลต่างจึงคำนวณจากข้อมูลที่ยังไม่มี ระบบไม่นำเข้าเดือนนี้";
+        }
+        if ($badS) {
+            $reasons[] = "เดือน{$monthName}: ผลต่าง {$limit($badS)} เป็นสูตร =R-O แต่ค่าที่ Excel เก็บไว้ไม่เท่ากับ R - O"
+                . " (เปิดและบันทึกไฟล์ใน Excel ใหม่ หรือตรวจสูตร)";
+        }
+
+        /* สูตรของแถวรวม */
+        if ($key("R{$n}") !== "=SUM(R{$first}:R{$last})") {
+            $reasons[] = "เดือน{$monthName}: R{$n} ต้องเป็นสูตร =SUM(R{$first}:R{$last}) ตามที่ยืนยัน (ไม่รับค่าที่พิมพ์ทับหรือสูตรอื่น)";
+        }
+        if ($key("S{$n}") !== "=SUM(S{$first}:S{$last})") {
+            $reasons[] = "เดือน{$monthName}: S{$n} ต้องเป็นสูตร =SUM(S{$first}:S{$last}) ตามที่ยืนยัน (ไม่รับค่าที่พิมพ์ทับหรือสูตรอื่น)";
+        }
+        if ($ratioFormula === null || kpiCompanyFormulaKey($ratioFormula) !== "=S{$n}/O{$n}") {
+            $reasons[] = "เดือน{$monthName}: {$ratioCell} ต้องเป็นสูตร =S{$n}/\$O\${$n} ตามที่ยืนยัน (ไม่รับค่าที่พิมพ์ทับ สูตรอื่น หรือการอ้างชีตอื่น)";
+        }
+
+        /* ค่าของแถวรวม */
+        if (!$isNumber($oTotal) || (float) $oTotal <= 0) {
+            $reasons[] = "เดือน{$monthName}: ราคาเดิมรวม (O{$n}) ต้องเป็นตัวเลขมากกว่า 0";
+        } elseif (!$close((float) $oTotal, $sumO, $scaleO)) {
+            $reasons[] = "เดือน{$monthName}: ค่าใน O{$n} ไม่ตรงกับผลรวมของ O{$first}:O{$last}";
+        }
+        if (!$isNumber($rTotal)) {
+            $reasons[] = "เดือน{$monthName}: ราคาสรุปรวม (R{$n}) ต้องเป็นตัวเลข";
+        } elseif (!$close((float) $rTotal, $sumR, $scaleR)) {
+            $reasons[] = "เดือน{$monthName}: ค่าใน R{$n} ไม่ตรงกับผลรวมของ R{$first}:R{$last}";
+        }
+        if (!$isNumber($sTotal)) {
+            $reasons[] = "เดือน{$monthName}: ผลต่างรวม (S{$n}) ต้องเป็นตัวเลข";
+        } elseif (!$close((float) $sTotal, $sumS, $scaleS)) {
+            $reasons[] = "เดือน{$monthName}: ค่าใน S{$n} ไม่ตรงกับผลรวมของ S{$first}:S{$last}";
+        }
+        if ($ratioFormula !== null && $ratio === null) {
+            $reasons[] = "เดือน{$monthName}: ไม่มีค่าที่ Excel คำนวณเก็บไว้ใน {$ratioCell} (เปิดและบันทึกไฟล์ใน Excel ก่อน)";
+        } elseif (!$isNumber($ratio)) {
+            $reasons[] = "เดือน{$monthName}: ค่าใน {$ratioCell} ไม่ใช่ตัวเลข";
+        }
+
+        /* S เป็นแหล่งข้อมูลหลัก (พิมพ์เองได้) จึงไม่บังคับ S<n> = R<n> - O<n> · ตรวจ S<n> กับผลรวมรายแถวด้านบนแล้ว */
+        if (!$reasons) {
+            if (!$close((float) $ratio, (float) $sTotal / (float) $oTotal, abs((float) $ratio))) {
+                $reasons[] = "เดือน{$monthName}: ค่าใน {$ratioCell} ไม่เท่ากับ S{$n}/O{$n}";
+            }
+            if ((float) $ratio < 0 || (float) $sTotal < 0) {
+                $reasons[] = "เดือน{$monthName}: ผลการปรับเพิ่มมูลค่าสัญญาติดลบ (มูลค่ารวมลดลง) ระบบไม่บันทึกค่าติดลบและไม่ปรับเป็น 0";
+            }
+        }
+
+        /* ไล่ตรวจสูตรต้นทางทุกชั้น · ห้ามอ้างชีตของเดือนอื่น */
+        $ctx = [
+            "visited" => [], "budget" => KPI_COMPANY_MAX_DEPENDENCY_CELLS, "need" => [],
+            "form" => $formSheet, "loaded" => $loadedCells
+        ];
+        $error = kpiCompanyCheckCell($spreadsheet, $workbookSheets, $sheetName, $ratioCell, $ctx)
+            ?? kpiCompanyCheckCell($spreadsheet, $workbookSheets, $sheetName, "R{$n}", $ctx);
+
+        if ($error !== null) {
+            $reasons[] = "เดือน{$monthName}: " . $error;
+        } elseif ($ctx["need"]) {
+            if ($final) {
+                $reasons[] = "เดือน{$monthName}: ตรวจสอบข้อมูลต้นทางของสูตรไม่ครบ (อ้างอิงข้อมูลมากเกินกว่าที่ระบบตรวจได้)";
+            } else {
+                foreach ($ctx["need"] as $needSheet => $cells) {
+                    $out["need"][$needSheet] = ($out["need"][$needSheet] ?? []) + $cells;
+                }
+            }
+        }
+
+        $otherMonth = [];
+        foreach (array_keys($ctx["visited"]) as $visited) {
+            $visitedSheet = substr($visited, 0, (int) strrpos($visited, "!"));
+            if ($visitedSheet !== $sheetName && preg_match($monthSheetPattern, trim($visitedSheet))) {
+                $otherMonth[] = $visited;
+            }
+        }
+        if ($otherMonth) {
+            $reasons[] = "เดือน{$monthName}: สูตรอ้างข้อมูลจากชีตของเดือนอื่น (" . $limit($otherMonth) . ") ระบบไม่ใช้ข้อมูลข้ามเดือน";
+        }
+
+        $actual = null;
+        $details = [];
+        $warnings = [];
+
+        if (!$reasons) {
+            $ratioText = kpiCompanyPlainDecimal((float) $ratio);
+            $fromRatio = $ratioText === null ? null : kpiCompanyFloorPercent($ratioText, "1");
+            $sText = kpiCompanyPlainDecimal((float) $sTotal);
+            $oText = kpiCompanyPlainDecimal((float) $oTotal);
+            $fromTotals = $sText === null || $oText === null ? null : kpiCompanyFloorPercent($sText, $oText);
+
+            if (!function_exists("bcdiv")) {
+                $reasons[] = "เซิร์ฟเวอร์ไม่มีส่วนขยาย bcmath ระบบจึงคำนวณค่าแบบแม่นยำไม่ได้ กรุณาติดต่อผู้ดูแลระบบ";
+            } elseif ($fromRatio === null || $fromTotals === null) {
+                $reasons[] = "เดือน{$monthName}: คำนวณสัดส่วนการปรับเพิ่มมูลค่าสัญญาไม่ได้";
+            } elseif ($fromRatio !== $fromTotals) {
+                $reasons[] = "เดือน{$monthName}: ค่าใน {$ratioCell} อยู่ชิดขอบจำนวนเต็มจนยืนยันผลปัดลงไม่ได้"
+                    . " (FLOOR ของ {$ratioCell} × 100 ไม่ตรงกับ S{$n} × 100 ÷ O{$n})";
+            } else {
+                $actual = (string) $fromRatio;
+                $details = [
+                    "rule" => KPI_COMPANY_UPLIFT_RULE,
+                    "base" => number_format((float) $oTotal, 2), "base_cell" => "O{$n}",
+                    "diff" => number_format((float) $sTotal, 2), "diff_cell" => "S{$n}",
+                    "ratio" => rtrim(rtrim(number_format((float) $ratio, 6, ".", ""), "0"), "."), "ratio_cell" => $ratioCell,
+                    "actual" => $actual, "target" => KPI_COMPANY_UPLIFT_TARGET
+                ];
+                $warnings[] = "ค่าจากสูตรเป็นค่าที่ Excel คำนวณไว้เมื่อบันทึกไฟล์ครั้งล่าสุด ระบบไม่คำนวณใหม่และยืนยันไม่ได้ว่าเป็นค่าปัจจุบัน";
+                $warnings[] = "ผลต่าง (S{$n}) " . $details["diff"] . " ÷ ราคาเดิม (O{$n}) " . $details["base"]
+                    . " = " . $details["ratio"] . " ({$ratioCell}) → Actual {$actual}% (ปัดลงเป็นจำนวนเต็ม) เทียบกับ Target 20%";
+            }
+        }
+
+        $push($month, $source, $ratioFormula, $reasons, $warnings, $reasons ? null : $actual, $reasons ? [] : $details);
+    }
+}
+
+
+/*
 |--------------------------------------------------------------------------
 | 5) เตรียมนำเข้า: ตรวจ KPI ที่ยืนยันกับฐานข้อมูล + Validation เดิม (อ่านอย่างเดียว ไม่เขียนข้อมูล)
 |--------------------------------------------------------------------------
@@ -1500,7 +2061,7 @@ function kpiCompanyEvaluateRenewal(
 | รายการที่ Mapping ยังไม่ยืนยัน (NEEDS_CONFIRMATION) ไม่อยู่ในขอบเขตการนำเข้าและไม่ถูกบันทึก
 |
 */
-function kpiCompanyPrepare(PDO $pdo, int $employeeId, string $path, int $year, ?array $map = null, ?int $onlyMonth = null): array
+function kpiCompanyPrepare(PDO $pdo, int $employeeId, string $path, int $year, ?array $map = null, ?int $onlyMonth = null, ?DateTimeInterface $now = null): array
 {
     $codeStmt = $pdo->prepare("SELECT employee_code FROM employees WHERE employee_id = :employee_id LIMIT 1");
     $codeStmt->execute([":employee_id" => $employeeId]);
@@ -1510,7 +2071,7 @@ function kpiCompanyPrepare(PDO $pdo, int $employeeId, string $path, int $year, ?
         return ["errors" => ["ไม่พบข้อมูลพนักงานของผู้ใช้"], "notes" => [], "items" => [], "rows" => [], "preview" => [], "commit_ok" => false, "skipped_empty" => 0];
     }
 
-    $result = kpiCompanyRead($path, $year, (string) $employeeCode, $map, $onlyMonth);
+    $result = kpiCompanyRead($path, $year, (string) $employeeCode, $map, $onlyMonth, $now);
     $result["preview"] = [];
     $result["commit_ok"] = false;
 
@@ -1585,6 +2146,16 @@ function kpiCompanyPrepare(PDO $pdo, int $employeeId, string $path, int $year, ?
             /* Actual เป็นร้อยละของ Budget จึงใช้ได้เฉพาะเมื่อ Target ใน Assignment = 100 (%) */
             $item["status"] = KPI_COMPANY_STATUS_REJECTED;
             $item["reasons"][] = "Target ของ KPI นี้ในระบบ (" . ($checked["target"] ?? "-") . ") ไม่ใช่ 100 (%) ตามที่ยืนยัน กรุณาติดต่อผู้ดูแลระบบ";
+        } elseif (($item["value_rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE && ($checked["target"] ?? null) !== KPI_COMPANY_UPLIFT_TARGET) {
+            /* Actual เป็นร้อยละการเพิ่มของมูลค่าสัญญา จึงใช้ได้เฉพาะเมื่อ Target ใน Assignment = 20 (%) */
+            $item["status"] = KPI_COMPANY_STATUS_REJECTED;
+            $item["reasons"][] = "Target ของ KPI นี้ในระบบ (" . ($checked["target"] ?? "-") . ") ไม่ใช่ 20 (%) ตามที่ยืนยัน กรุณาติดต่อผู้ดูแลระบบ";
+        } elseif (
+            ($item["value_rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE
+            && ($criteriaReason = kpiCompanyUpliftCriteriaReason($pdo, (int) $item["kpi_id"], (int) $item["value"])) !== null
+        ) {
+            $item["status"] = KPI_COMPANY_STATUS_REJECTED;
+            $item["reasons"][] = $criteriaReason;
         } else {
             $item["action"] = $checked["action"];
         }
