@@ -251,6 +251,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/employees/employee-edit: " . $e->getMessage());
+
             $error = "Unable to update employee.";
 
         }
@@ -325,6 +327,8 @@ if (!$employee) {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="stylesheet"
@@ -715,7 +719,7 @@ if (!$employee) {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    Save Changes
+                    <?= icon("save") ?>Save Changes
                 </button>
 
 
@@ -723,7 +727,7 @@ if (!$employee) {
                     href="../index.php?page=employees"
                     class="btn btn-secondary"
                 >
-                    Cancel
+                    <?= icon("x") ?>Cancel
                 </a>
 
             </div>

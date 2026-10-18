@@ -6,6 +6,8 @@ require_once __DIR__ . "/../config/database.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/quarter-helper.php";
+require_once __DIR__ . "/../includes/monthly-period-helper.php";
+require_once __DIR__ . "/../includes/kpi-score-helper.php";
 require_once __DIR__ . "/includes/layout.php";
 require_once __DIR__ . "/includes/feedback.php";
 
@@ -134,6 +136,8 @@ $stmt = $pdo->query("
     SELECT
         period_id,
         period_name,
+        period_year,
+        period_month,
         start_date,
         end_date,
         status
@@ -148,44 +152,30 @@ $periods = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
 |--------------------------------------------------------------------------
-| Selected Period
+| Selected Period (ค่าเริ่มต้น = เดือนปัจจุบัน หรือรอบล่าสุดที่เริ่มแล้ว)
 |--------------------------------------------------------------------------
 */
 
 $selectedPeriod = (int) ($_GET["period_id"] ?? 0);
 
-
-/*
-|--------------------------------------------------------------------------
-| Default = Latest Period
-|--------------------------------------------------------------------------
-*/
-
-if ($selectedPeriod <= 0 && !empty($periods)) {
-
-    $selectedPeriod =
-        (int) $periods[0]["period_id"];
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| Selected Period Data
-|--------------------------------------------------------------------------
-*/
-
 $selectedPeriodData = null;
 
 foreach ($periods as $period) {
-
-    if (
-        (int) $period["period_id"]
-        === $selectedPeriod
-    ) {
-
+    if ((int) $period["period_id"] === $selectedPeriod) {
         $selectedPeriodData = $period;
-
         break;
+    }
+}
+
+if ($selectedPeriodData === null) {
+
+    $selectedPeriod = defaultEvaluationPeriodId($periods);
+
+    foreach ($periods as $period) {
+        if ((int) $period["period_id"] === $selectedPeriod) {
+            $selectedPeriodData = $period;
+            break;
+        }
     }
 }
 
@@ -204,10 +194,6 @@ $pendingKpi = 0;
 
 $averageScore = 0;
 
-$totalPercentage = 0;
-
-$performanceLevel = "-";
-
 $kpiData = [];
 
 $typeData = [];
@@ -217,256 +203,128 @@ $typeData = [];
 |--------------------------------------------------------------------------
 | KPI Data
 |--------------------------------------------------------------------------
+|
+| แหล่งข้อมูล: kpi_assignments (มอบหมายรายปี) + kpi_performances (ผลงานรายเดือน)
+| Query เดียวกับหน้า "KPI ของฉัน" แล้วสรุปตัวเลขใน PHP
+|
+| เดิมหน้านี้อ่านจาก employee_kpi / performance_summary ซึ่งไม่มีโค้ดเขียนข้อมูลแล้ว
+|
 */
 
-if ($selectedPeriod > 0) {
+if ($selectedPeriodData !== null) {
 
+    try {
 
-    /*
-    |--------------------------------------------------------------------------
-    | KPI Summary
-    |--------------------------------------------------------------------------
-    */
+        $stmt = $pdo->prepare("
+            SELECT
 
-    $stmt = $pdo->prepare("
-        SELECT
+                ka.assignment_id,
+                ka.status AS assignment_status,
+                ka.target_value AS assignment_target,
+                ka.weight AS assignment_weight,
 
-            COUNT(*) AS total_kpi,
+                ki.kpi_id,
+                ki.kpi_name,
+                ki.kpi_type,
+                ki.unit,
+                ki.max_score,
 
-            COUNT(
-                CASE
-                    WHEN ek.score IS NOT NULL
-                    THEN 1
-                END
-            ) AS evaluated_kpi,
+                kp.actual AS actual_value,
+                kp.score,
+                kp.comment AS remark
 
-            COALESCE(
-                AVG(ek.score),
-                0
-            ) AS average_score
+            FROM kpi_assignments ka
 
-        FROM kpi_assignments ka
+            INNER JOIN kpi_indicators ki
+                ON ka.kpi_id = ki.kpi_id
 
-        INNER JOIN kpi_indicators ki
-            ON ka.kpi_id = ki.kpi_id
+            LEFT JOIN kpi_performances kp
+                ON kp.performance_id = (
 
-        LEFT JOIN employee_kpi ek
-            ON ek.employee_id = ka.employee_id
-            AND ek.kpi_id = ka.kpi_id
-            AND ek.period_id = ka.period_id
+                    SELECT kp2.performance_id
+                    FROM kpi_performances kp2
+                    WHERE kp2.assignment_id = ka.assignment_id
+                      AND kp2.employee_id = ka.employee_id
+                      AND kp2.period_id = :period_id
+                    ORDER BY kp2.performance_id DESC
+                    LIMIT 1
+                )
 
-        WHERE
-            ka.employee_id = :employee_id
+            WHERE ka.employee_id = :employee_id
+              /* Inactive แสดงเป็นประวัติเฉพาะเมื่อมีผลงานในรอบที่เลือก (นับรวมในสรุปของรอบนั้นด้วย) */
+              AND (ka.status = 'Active' OR kp.performance_id IS NOT NULL)
+              AND COALESCE(ka.start_date, CONCAT(ka.assignment_year, '-01-01')) <= :month_end
+              AND COALESCE(ka.end_date, CONCAT(ka.assignment_year, '-12-31')) >= :month_start
 
-            AND ka.period_id = :period_id
+            ORDER BY
+                FIELD(ki.kpi_type, 'Performance', 'Competency'),
+                ka.assignment_id
+        ");
 
-            AND ka.status = 'Active'
-    ");
+        $stmt->execute([
+            ":period_id" => $selectedPeriod,
+            ":employee_id" => $employeeId,
+            ":month_start" => $selectedPeriodData["start_date"],
+            ":month_end" => $selectedPeriodData["end_date"]
+        ]);
 
-    $stmt->execute([
+        $kpiData = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        ":employee_id" => $employeeId,
+    } catch (PDOException $e) {
 
-        ":period_id" => $selectedPeriod
+        error_log("Employee dashboard query failed: " . $e->getMessage());
 
-    ]);
-
-    $summary = $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-    if ($summary) {
-
-        $totalKpi =
-            (int) $summary["total_kpi"];
-
-        $evaluatedKpi =
-            (int) $summary["evaluated_kpi"];
-
-        $averageScore =
-            (float) $summary["average_score"];
-
-        $pendingKpi =
-            $totalKpi - $evaluatedKpi;
+        $kpiData = [];
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | Performance Summary
-    |--------------------------------------------------------------------------
-    */
+    /* สรุปตัวเลข */
 
-    $stmt = $pdo->prepare("
-        SELECT
+    $scoreSum = 0.0;
+    $typeTotals = [];
 
-            percentage,
+    foreach ($kpiData as &$kpiRow) {
 
-            performance_level,
+        $type = $kpiRow["kpi_type"];
 
-            total_score,
+        if (!isset($typeTotals[$type])) {
+            $typeTotals[$type] = ["total" => 0, "sum" => 0.0, "count" => 0];
+        }
 
-            max_score,
+        $typeTotals[$type]["total"]++;
+        $totalKpi++;
 
-            evaluation_status
+        if ($kpiRow["score"] !== null) {
 
-        FROM performance_summary
+            $evaluatedKpi++;
+            $scoreSum += (float) $kpiRow["score"];
 
-        WHERE
-            employee_id = :employee_id
-
-            AND period_id = :period_id
-
-        LIMIT 1
-    ");
-
-    $stmt->execute([
-
-        ":employee_id" => $employeeId,
-
-        ":period_id" => $selectedPeriod
-
-    ]);
-
-    $performanceSummary =
-        $stmt->fetch(PDO::FETCH_ASSOC);
-
-
-    if ($performanceSummary) {
-
-        $totalPercentage =
-            (float) (
-                $performanceSummary["percentage"]
-                ?? 0
-            );
-
-        $performanceLevel =
-            $performanceSummary["performance_level"] ?? "-";
+            $typeTotals[$type]["sum"] += (float) $kpiRow["score"];
+            $typeTotals[$type]["count"]++;
+        }
     }
 
+    unset($kpiRow);
 
-    /*
-    |--------------------------------------------------------------------------
-    | KPI List
-    |--------------------------------------------------------------------------
-    */
+    $pendingKpi = $totalKpi - $evaluatedKpi;
 
-    $stmt = $pdo->prepare("
-        SELECT
+    $averageScore = $evaluatedKpi > 0
+        ? $scoreSum / $evaluatedKpi
+        : 0;
 
-            ka.assignment_id,
+    foreach ($typeTotals as $type => $totals) {
 
-            ka.target_value AS assignment_target,
+        // กราฟแสดงเฉพาะประเภทที่มีคะแนนแล้ว
+        if ($totals["count"] === 0) {
+            continue;
+        }
 
-            ka.weight AS assignment_weight,
-
-            ki.kpi_id,
-
-            ki.kpi_name,
-
-            ki.kpi_type,
-
-            ki.unit,
-
-            ki.max_score,
-
-            ek.actual_value,
-
-            ek.score,
-
-            ek.remark
-
-        FROM kpi_assignments ka
-
-        INNER JOIN kpi_indicators ki
-            ON ka.kpi_id = ki.kpi_id
-
-        LEFT JOIN employee_kpi ek
-            ON ek.employee_id = ka.employee_id
-
-            AND ek.kpi_id = ka.kpi_id
-
-            AND ek.period_id = ka.period_id
-
-        WHERE
-
-            ka.employee_id = :employee_id
-
-            AND ka.period_id = :period_id
-
-            AND ka.status = 'Active'
-
-        ORDER BY
-            ki.kpi_type,
-            ka.assignment_id
-    ");
-
-    $stmt->execute([
-
-        ":employee_id" => $employeeId,
-
-        ":period_id" => $selectedPeriod
-
-    ]);
-
-    $kpiData =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | KPI Type
-    |--------------------------------------------------------------------------
-    */
-
-    $stmt = $pdo->prepare("
-        SELECT
-
-            ki.kpi_type,
-
-            COUNT(*) AS total,
-
-            COALESCE(
-                AVG(ek.score),
-                0
-            ) AS average_score
-
-        FROM kpi_assignments ka
-
-        INNER JOIN kpi_indicators ki
-            ON ka.kpi_id = ki.kpi_id
-
-        LEFT JOIN employee_kpi ek
-            ON ek.employee_id = ka.employee_id
-
-            AND ek.kpi_id = ka.kpi_id
-
-            AND ek.period_id = ka.period_id
-
-        WHERE
-
-            ka.employee_id = :employee_id
-
-            AND ka.period_id = :period_id
-
-            AND ka.status = 'Active'
-
-        GROUP BY
-            ki.kpi_type
-
-        ORDER BY
-            ki.kpi_type
-    ");
-
-    $stmt->execute([
-
-        ":employee_id" => $employeeId,
-
-        ":period_id" => $selectedPeriod
-
-    ]);
-
-    $typeData =
-        $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $typeData[] = [
+            "kpi_type" => $type,
+            "total" => $totals["total"],
+            "average_score" => $totals["sum"] / $totals["count"]
+        ];
+    }
 }
 
 
@@ -477,25 +335,24 @@ if ($selectedPeriod > 0) {
 */
 
 $quarterScoreStmt = $pdo->prepare("
-        SELECT kp.performance_date, kp.score
-        FROM kpi_performances kp
-        INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
-        WHERE ka.employee_id = :employee_id
-            AND ka.status = 'Active'
-            AND kp.score IS NOT NULL
-    ORDER BY kp.performance_date
+    SELECT ep.period_year, ep.quarter, kp.score
+    FROM kpi_performances kp
+    INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
+    INNER JOIN kpi_assignments ka ON ka.assignment_id = kp.assignment_id
+    WHERE ka.employee_id = :employee_id
+      /* ประวัติรายไตรมาส: ทุกผลงานที่มีจริง รวม Assignment ที่ปิดใช้งาน */
+      AND kp.score IS NOT NULL
 ");
 $quarterScoreStmt->execute([":employee_id" => $employeeId]);
 $quarterScores = [];
 
 foreach ($quarterScoreStmt->fetchAll(PDO::FETCH_ASSOC) as $quarterRow) {
-    $year = (int) date("Y", strtotime($quarterRow["performance_date"]));
-    $quarter = getQuarterFromDate($quarterRow["performance_date"]);
-    $quarterScores[$year . "-" . $quarter][] = (float) $quarterRow["score"];
+    $quarterScores[(int) $quarterRow["period_year"] . "-" . $quarterRow["quarter"]][] =
+        (float) $quarterRow["score"];
 }
 
 $employeeQuarterYear = $selectedPeriodData
-    ? (int) date("Y", strtotime($selectedPeriodData["start_date"]))
+    ? (int) $selectedPeriodData["period_year"]
     : (int) date("Y");
 
 $chartLabels = [];
@@ -570,6 +427,8 @@ $avatar =
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
 
     <link
         rel="stylesheet"
@@ -631,11 +490,7 @@ $avatar =
                                 : ""
                             ?>>
 
-                            <?= htmlspecialchars(
-                                $period["period_name"],
-                                ENT_QUOTES,
-                                "UTF-8"
-                            ) ?>
+                            <?= htmlspecialchars($period["period_name"] . " " . $period["period_year"], ENT_QUOTES, "UTF-8") ?>
 
                         </option>
 
@@ -843,9 +698,9 @@ $avatar =
         <?php
         renderFeedbackCard($latestFeedback, [
             "root" => "../",
-            "title" => "💬 Feedback จากหัวหน้า",
+            "title" => "Feedback จากหัวหน้า",
             "subtitle" => "ข้อความล่าสุดจากหัวหน้างานของคุณ",
-            "link" => ["href" => "feedback.php", "label" => "ดูทั้งหมด →"]
+            "link" => ["href" => "feedback.php", "label" => "ดูทั้งหมด"]
         ]);
         ?>
 
@@ -1032,6 +887,10 @@ $avatar =
 
                                         </strong>
 
+                                        <?php if (($kpi["assignment_status"] ?? "Active") !== "Active"): ?>
+                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="การมอบหมายนี้ปิดใช้งานแล้ว แสดงเป็นประวัติเพราะมีผลงานในเดือนนี้">ปิดใช้งาน</span>
+                                            <?php endif; ?>
+
                                     </td>
 
 
@@ -1097,6 +956,12 @@ $avatar =
 
                                     <td>
 
+                                        <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                            Budget <?= kpiFormatMoney($kpi["assignment_target"]) ?>
+
+                                        <?php else: ?>
+
                                         <?= $kpi["assignment_target"] !== null
 
                                             ? htmlspecialchars(
@@ -1107,9 +972,11 @@ $avatar =
                                             : "-"
                                         ?>
 
+                                        <?php endif; ?>
+
 
                                         <?php if (
-                                            !empty($kpi["unit"])
+                                            !empty($kpi["unit"]) && !isNonRenewalKpi($kpi)
                                         ): ?>
 
                                             <?= htmlspecialchars(
@@ -1128,6 +995,14 @@ $avatar =
 
                                     <td>
 
+                                        <?php if (isNonRenewalKpi($kpi) && $kpi["actual_value"] !== null): ?>
+
+                                            Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
+                                            <br>
+                                            <small><?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["assignment_target"])) ?></small>
+
+                                        <?php else: ?>
+
                                         <?= $kpi["actual_value"] !== null
 
                                             ? htmlspecialchars(
@@ -1137,6 +1012,8 @@ $avatar =
                                             )
                                             : "-"
                                         ?>
+
+                                        <?php endif; ?>
 
 
                                     </td>
@@ -1155,10 +1032,9 @@ $avatar =
                                             <span
                                                 class="score">
 
-                                                <?= number_format(
+                                                <?= kpiScoreLevel(
                                                     (float)
-                                                    $kpi["score"],
-                                                    2
+                                                    $kpi["score"]
                                                 ) ?>
 
                                                 / 5

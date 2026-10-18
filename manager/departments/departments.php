@@ -228,8 +228,8 @@ if ($selectedDepartmentName !== null) {
 
                             <td>
                                 <div class="action-buttons">
-                                    <a href="<?= managerUrl("departments", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $row["department_id"]]) ?>#department-detail" class="btn-small edit">รายเดือน</a>
-                                    <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $row["department_id"]]) ?>" class="btn-small">รายคน</a>
+                                    <a href="<?= managerUrl("departments", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $row["department_id"]]) ?>#department-detail" class="btn-small edit"><?= icon("calendar") ?>รายเดือน</a>
+                                    <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $row["department_id"]]) ?>" class="btn-small"><?= icon("users") ?>รายคน</a>
                                 </div>
                             </td>
 
@@ -420,7 +420,7 @@ if ($selectedDepartmentName !== null) {
                             <td><span class="level level-<?= $levelClass ?>"><?= $levelText ?></span></td>
 
                             <td>
-                                <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit">ดูรายละเอียด</a>
+                                <a href="<?= managerUrl("employees", ["year" => $filterYear, "month" => $filterMonth, "department_id" => $filterDepartment, "employee_id" => $employee["employee_id"]]) ?>" class="btn-small edit"><?= icon("eye") ?>ดูรายละเอียด</a>
                             </td>
 
                         </tr>

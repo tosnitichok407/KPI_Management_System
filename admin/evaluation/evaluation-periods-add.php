@@ -156,6 +156,8 @@ $submitLabel = "Save Evaluation Period";
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/evaluation.css?v=period-form-2">

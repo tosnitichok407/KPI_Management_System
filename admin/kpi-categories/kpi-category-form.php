@@ -154,14 +154,14 @@ $usedKpis = $usedKpis ?? null;
             href="../index.php?page=kpi-categories"
             class="btn btn-secondary"
         >
-            ยกเลิก
+            <?= icon("x") ?>ยกเลิก
         </a>
 
         <button
             type="submit"
             class="btn btn-primary"
         >
-            <?= htmlspecialchars($submitLabel, ENT_QUOTES, "UTF-8") ?>
+            <?= icon("save") ?><?= htmlspecialchars($submitLabel, ENT_QUOTES, "UTF-8") ?>
         </button>
 
     </div>

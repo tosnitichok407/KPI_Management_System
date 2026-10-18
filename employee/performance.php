@@ -8,6 +8,7 @@ require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/period-picker.php";
+require_once __DIR__ . "/../includes/kpi-score-helper.php";
 require_once __DIR__ . "/includes/layout.php";
 require_once __DIR__ . "/includes/feedback.php";
 
@@ -88,7 +89,7 @@ $quarterScoreStmt = $pdo->prepare("
     INNER JOIN kpi_assignments a ON a.assignment_id = p.assignment_id
     INNER JOIN kpi_indicators k ON k.kpi_id = a.kpi_id
     WHERE a.employee_id = :employee_id
-      AND a.status = 'Active'
+    /* ประวัติรายไตรมาส: ทุกผลงานที่มีจริง รวม Assignment ที่ปิดใช้งาน (แถวผลงาน = เดือนที่มีผลงาน) */
     AND p.score IS NOT NULL
     ORDER BY p.performance_date
 ");
@@ -124,7 +125,10 @@ $yearStmt = $pdo->prepare("
         a.assignment_year
     FROM kpi_assignments a
     WHERE a.employee_id = :employee_id
-      AND a.status = 'Active'
+      AND (
+          a.status = 'Active'
+          OR EXISTS (SELECT 1 FROM kpi_performances kx WHERE kx.assignment_id = a.assignment_id)
+      )
     ORDER BY a.assignment_year DESC
 ");
 $yearStmt->execute([":employee_id" => $employeeId]);
@@ -192,7 +196,8 @@ $sql = "
 
     WHERE a.employee_id = :employee_id
 
-    AND a.status = 'Active'
+    /* Inactive แสดงเป็นประวัติเฉพาะเมื่อมีผลงานในเดือนที่เลือก (นับรวมในสรุปของเดือนนั้นด้วย) */
+    AND (a.status = 'Active' OR p.performance_id IS NOT NULL)
 
     -- KPI ที่มีผลในเดือนที่เลือก (Assignment เดียวใช้ได้ทุกเดือนในช่วงเวลา)
     AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
@@ -217,6 +222,8 @@ try {
 
     $assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
+
+        error_log("employee/performance: " . $e->getMessage());
 
     $assignments = [];
 
@@ -353,8 +360,10 @@ foreach ($assignments as $assignment) {
             $actual !== null
         ) {
 
-            $progress =
-                ($actual / $target) * 100;
+            /* KPI 9 ใช้ Achievement จากฟังก์ชันกลาง (Total R / Budget × 100) */
+            $progress = isNonRenewalKpi($assignment)
+                ? (float) nonRenewalAchievement($actual, $target)
+                : ($actual / $target) * 100;
 
 
             /*
@@ -504,6 +513,8 @@ if ($totalPerformanceRecords === 0) {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
         <link
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
@@ -587,13 +598,13 @@ if ($totalPerformanceRecords === 0) {
                             class="performance-export-button pdf"
                             target="_blank"
                             rel="noopener">
-                            📄 Export PDF
+                            <?= icon("file-text") ?> Export PDF
                         </a>
 
                         <a
                             href="performance-export-excel.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
                             class="performance-export-button excel">
-                            📊 Export Excel
+                            <?= icon("file-spreadsheet") ?> Export Excel
                         </a>
 
                     </div>
@@ -609,9 +620,9 @@ if ($totalPerformanceRecords === 0) {
         <?php
         renderFeedbackCard($monthFeedback, [
             "root" => "../",
-            "title" => "💬 Feedback จากหัวหน้า",
+            "title" => "Feedback จากหัวหน้า",
             "subtitle" => "ประจำเดือน" . $thaiMonths[$selectedMonth] . " " . $selectedYear,
-            "link" => ["href" => "feedback.php?year=" . $selectedYear, "label" => "ดูทั้งหมด →"],
+            "link" => ["href" => "feedback.php?year=" . $selectedYear, "label" => "ดูทั้งหมด"],
             "empty" => $selectedPeriod
                 ? "หัวหน้ายังไม่ได้ให้ Feedback ของเดือนนี้"
                 : "ยังไม่มีรอบประเมินของเดือนนี้"
@@ -678,7 +689,7 @@ if ($totalPerformanceRecords === 0) {
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    🎯
+                    <?= icon("target") ?>
                 </div>
 
                 <div>
@@ -740,7 +751,7 @@ if ($totalPerformanceRecords === 0) {
             <div class="summary-card">
 
                 <div class="summary-icon">
-                    📈
+                    <?= icon("trending-up") ?>
                 </div>
 
                 <div>
@@ -766,7 +777,7 @@ if ($totalPerformanceRecords === 0) {
             <section class="empty-card">
 
                 <div class="empty-icon">
-                    📋
+                    <?= icon("clipboard-list") ?>
                 </div>
 
                 <h2>
@@ -853,6 +864,10 @@ if ($totalPerformanceRecords === 0) {
                                                 "UTF-8"
                                             ) ?>
 
+                                            <?php if (($kpi["assignment_status"] ?? "Active") !== "Active"): ?>
+                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="การมอบหมายนี้ปิดใช้งานแล้ว แสดงเป็นประวัติเพราะมีผลงานในเดือนนี้">ปิดใช้งาน</span>
+                                            <?php endif; ?>
+
                                         </h3>
 
                                         <div
@@ -917,6 +932,12 @@ if ($totalPerformanceRecords === 0) {
 
                                             <strong>
 
+                                                <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                                    Budget <?= kpiFormatMoney($kpi["target_value"]) ?>
+
+                                                <?php else: ?>
+
                                                 <?= number_format(
                                                     (int) $kpi["target_value"]
                                                 ) ?>
@@ -926,6 +947,8 @@ if ($totalPerformanceRecords === 0) {
                                                     ENT_QUOTES,
                                                     "UTF-8"
                                                 ) ?>
+
+                                                <?php endif; ?>
 
                                             </strong>
 
@@ -939,6 +962,13 @@ if ($totalPerformanceRecords === 0) {
 
                                             <strong>
 
+                                                <?php if (isNonRenewalKpi($kpi)): ?>
+
+                                                    Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
+                                                    <small>(<?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["target_value"])) ?>)</small>
+
+                                                <?php else: ?>
+
                                                 <?= number_format(
                                                     (int) $kpi["actual_value"]
                                                 ) ?>
@@ -948,6 +978,8 @@ if ($totalPerformanceRecords === 0) {
                                                     ENT_QUOTES,
                                                     "UTF-8"
                                                 ) ?>
+
+                                                <?php endif; ?>
 
                                             </strong>
 
@@ -1070,10 +1102,7 @@ if ($totalPerformanceRecords === 0) {
                                         href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>&amp;year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>&amp;period_id=<?= $selectedPeriodId ?>"
                                         class="performance-button">
 
-                                        <?= !empty($kpi["performance_id"])
-                                            ? "เพิ่ม/ดูผลงาน"
-                                            : "บันทึกผลงาน"
-                                        ?>
+                                        <?= icon("eye") ?>ดูรายละเอียด
 
                                     </a>
 

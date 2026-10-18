@@ -175,6 +175,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/kpi-categories/kpi-category-add: " . $e->getMessage());
+
             $error =
                 "ไม่สามารถเพิ่ม KPI Category ได้ กรุณาลองใหม่อีกครั้ง";
         }
@@ -214,6 +216,8 @@ $submitLabel = "+ เพิ่มหมวดหมู่ KPI";
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="stylesheet"

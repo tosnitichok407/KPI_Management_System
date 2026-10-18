@@ -45,6 +45,40 @@ $filter_has_month = $filter_month > 0;
 $report = loadKpiSummaryReport($pdo, $filters);
 
 $employee_summaries = $report["employees"];
+
+/* ประวัติ (พนักงานที่ปิดใช้งานและมีผลงาน) และแถวอ้างอิงที่ไม่นับ (ไม่มีผลงาน) */
+$history_summaries = $report["history_employees"] ?? [];
+$other_rows = $report["other_rows"] ?? [];
+
+$other_summaries = [];
+foreach ($other_rows as $other_row) {
+    $other_id = (int) $other_row["employee_id"];
+    if (!isset($other_summaries[$other_id])) {
+        $other_summaries[$other_id] = [
+            "employee_id" => $other_id,
+            "employee_code" => $other_row["employee_code"],
+            "first_name" => $other_row["first_name"],
+            "last_name" => $other_row["last_name"],
+            "department_name" => $other_row["department_name"],
+            "kpis" => [],
+            "kpi_total" => 0,
+            "evaluated" => 0,
+            "total_weight" => 0.0,
+            "history_weight" => 0.0,
+            "employee_inactive" => true,
+            "not_counted" => true
+        ];
+    }
+    $other_summaries[$other_id]["kpis"][] = $other_row;
+}
+
+$detail_groups = [["title" => "", "summaries" => $employee_summaries]];
+if (!empty($history_summaries)) {
+    $detail_groups[] = ["title" => "ประวัติพนักงานที่ปิดใช้งาน (ไม่นับรวมตัวเลขปัจจุบัน)", "summaries" => $history_summaries];
+}
+if (!empty($other_summaries)) {
+    $detail_groups[] = ["title" => "รายการของพนักงานที่ปิดใช้งานซึ่งไม่มีผลงานในช่วงนี้ (แสดงเพื่ออ้างอิง ไม่นับ)", "summaries" => $other_summaries];
+}
 $totals = $report["totals"];
 $filter_period = $report["period"];
 $filter_label = $report["label"];
@@ -74,19 +108,27 @@ function summaryPageUrl(array $filters, array $overrides = []): string
    GET EMPLOYEES (สำหรับ dropdown)
 ========================================================= */
 
-$employees = $pdo->query("
+/* Active ทั้งหมด + พนักงานที่ปิดใช้งานซึ่งมีผลงานในปีที่เลือก (ติดป้าย) */
+$employees_stmt = $pdo->prepare("
     SELECT
-        employee_id,
-        employee_code,
-        first_name,
-        last_name
-
-    FROM employees
-
-    WHERE status = 'Active'
-
-    ORDER BY first_name ASC, last_name ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+        e.employee_id,
+        e.employee_code,
+        e.first_name,
+        e.last_name,
+        e.status
+    FROM employees e
+    WHERE e.status = 'Active'
+       OR EXISTS (
+            SELECT 1
+            FROM kpi_performances kp
+            INNER JOIN evaluation_periods ep ON ep.period_id = kp.period_id
+            WHERE kp.employee_id = e.employee_id
+              AND ep.period_year = ?
+       )
+    ORDER BY e.first_name ASC, e.last_name ASC
+");
+$employees_stmt->execute([$filter_year]);
+$employees = $employees_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 ?>
 
@@ -121,13 +163,13 @@ $employees = $pdo->query("
                 target="_blank"
                 rel="noopener"
                 data-no-scroll-save>
-                📄 Export PDF
+                <?= icon("file-text") ?> Export PDF
             </a>
 
             <a
                 href="index.php?page=kpi-assignment"
                 class="btn btn-primary">
-                มอบหมาย KPI
+                <?= icon("clipboard-list") ?>มอบหมาย KPI
             </a>
 
         </div>
@@ -268,7 +310,7 @@ $employees = $pdo->query("
                             -
                             <?= htmlspecialchars($employee["first_name"]) ?>
                             <?= htmlspecialchars($employee["last_name"]) ?>
-
+                            <?= ($employee["status"] ?? "Active") !== "Active" ? "(ปิดใช้งาน)" : "" ?>
                         </option>
 
                     <?php endforeach; ?>
@@ -307,7 +349,7 @@ $employees = $pdo->query("
             <div class="filter-actions">
 
                 <noscript>
-                    <button type="submit" class="btn btn-primary">ค้นหา</button>
+                    <button type="submit" class="btn btn-primary"><?= icon("search") ?>ค้นหา</button>
                 </noscript>
 
                 <?php if ($has_filter): ?>
@@ -315,7 +357,7 @@ $employees = $pdo->query("
                     <a
                         href="index.php?page=summary"
                         class="btn btn-secondary">
-                        ล้างตัวกรอง
+                        <?= icon("rotate-ccw") ?>ล้างตัวกรอง
                     </a>
 
                 <?php endif; ?>
@@ -474,6 +516,10 @@ $employees = $pdo->query("
                                     <small>/ 100%</small>
                                 </span>
 
+                                <?php if (($summary["history_weight"] ?? 0) > 0): ?>
+                                    <div><small>+ <?= number_format($summary["history_weight"]) ?>% <span class="badge badge-inactive" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span></small></div>
+                                <?php endif; ?>
+
                             </td>
 
 
@@ -516,7 +562,7 @@ $employees = $pdo->query("
                                 <a
                                     href="#employee-<?= (int) $summary["employee_id"] ?>"
                                     class="btn-small">
-                                    ดูรายละเอียด
+                                    <?= icon("eye") ?>ดูรายละเอียด
                                 </a>
 
                             </td>
@@ -534,6 +580,71 @@ $employees = $pdo->query("
         </div>
 
     </div>
+
+
+    <?php if (!empty($history_summaries)): ?>
+
+    <!-- =================================================
+         ประวัติพนักงานที่ปิดใช้งาน (แยกจากตัวเลขปัจจุบัน)
+    ================================================= -->
+
+    <div class="card">
+
+        <h2 class="card-title">
+            ประวัติพนักงานที่ปิดใช้งาน
+            <span class="count"><?= count($history_summaries) ?> คน</span>
+        </h2>
+
+        <p>ผลงานในช่วงที่เลือกของพนักงานที่ปิดใช้งานแล้ว · ไม่นับรวมจำนวนพนักงาน ตัวเลข KPI และค่าเฉลี่ยด้านบน</p>
+
+        <div class="table-wrapper">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th class="col-index">#</th>
+                        <th>พนักงาน</th>
+                        <th>Performance</th>
+                        <th>Competency</th>
+                        <th>Weight</th>
+                        <th>ประเมินแล้ว</th>
+                        <th>คะแนนเฉลี่ย</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php $history_no = 1; ?>
+                    <?php foreach ($history_summaries as $history_summary): ?>
+                        <tr>
+                            <td class="col-index"><?= $history_no++ ?></td>
+                            <td>
+                                <?= htmlspecialchars($history_summary["employee_code"] . " - " . $history_summary["first_name"] . " " . $history_summary["last_name"]) ?>
+                                <span class="badge badge-inactive" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                <br><small><?= htmlspecialchars($history_summary["department_name"] ?? "ไม่ระบุแผนก") ?></small>
+                            </td>
+                            <td><?= $history_summary["count"]["Performance"] ?> KPI</td>
+                            <td><?= $history_summary["count"]["Competency"] ?> KPI</td>
+                            <td>
+                                <?= number_format($history_summary["total_weight"] + $history_summary["history_weight"]) ?>%
+                            </td>
+                            <td><?= $history_summary["evaluated"] ?> / <?= $history_summary["kpi_total"] ?> KPI</td>
+                            <td>
+                                <?php if ($history_summary["avg_score"] === null): ?>
+                                    -
+                                <?php else: ?>
+                                    <?= number_format($history_summary["avg_score"], 2) ?> / 5
+                                    <?php if ($history_summary["weighted_percent"] !== null): ?>
+                                        <br><small>ถ่วงน้ำหนัก <?= number_format($history_summary["weighted_percent"], 1) ?>%</small>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <?php endif; ?>
 
 
     <!-- =================================================
@@ -575,7 +686,7 @@ $employees = $pdo->query("
 
                 <tbody>
 
-                <?php if (empty($employee_summaries)): ?>
+                <?php if (empty($employee_summaries) && empty($history_summaries) && empty($other_summaries)): ?>
 
                     <tr>
 
@@ -587,7 +698,15 @@ $employees = $pdo->query("
 
                 <?php else: ?>
 
-                    <?php foreach ($employee_summaries as $summary): ?>
+                    <?php foreach ($detail_groups as $detail_group): ?>
+
+                    <?php if ($detail_group["title"] !== ""): ?>
+                        <tr class="group-row">
+                            <td colspan="8"><strong><?= htmlspecialchars($detail_group["title"]) ?></strong> <span class="badge badge-inactive" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span></td>
+                        </tr>
+                    <?php endif; ?>
+
+                    <?php foreach ($detail_group["summaries"] as $summary): ?>
 
 
                         <!-- =========================================
@@ -660,7 +779,13 @@ $employees = $pdo->query("
                                 <td>
 
                                     <div class="kpi-name">
-                                        <?= htmlspecialchars($kpi["kpi_name"]) ?>
+<?= htmlspecialchars($kpi["kpi_name"]) ?>
+                                        <?php if (!empty($kpi["is_inactive_assignment"]) || !empty($kpi["employee_inactive"])): ?>
+                                            <span class="badge badge-inactive" title="ปิดใช้งาน · แสดงเป็นประวัติ">ปิดใช้งาน</span>
+                                        <?php endif; ?>
+                                        <?php if (array_key_exists("counted", $kpi) && !$kpi["counted"]): ?>
+                                            <small>(ไม่มีผลงานในช่วงนี้ · ไม่นับในสรุป)</small>
+                                        <?php endif; ?>
                                     </div>
 
                                     <div class="kpi-unit">
@@ -680,7 +805,9 @@ $employees = $pdo->query("
 
 
                                 <td class="col-number">
-                                    <?= number_format($kpi["target_value"]) ?>%
+                                    <?= isNonRenewalKpi($kpi)
+                                        ? "Budget " . kpiFormatMoney($kpi["target_value"])
+                                        : number_format($kpi["target_value"]) . "%" ?>
                                 </td>
 
 
@@ -722,14 +849,14 @@ $employees = $pdo->query("
                                         <!-- เดือนเดียว: ผลของเดือนนั้น -->
 
                                         <div class="result-score">
-                                            <?= number_format((float) $kpi["avg_score"], 2) ?>
+                                            <?= kpiScoreLevel((float) $kpi["avg_score"]) ?>
                                             <small>/ <?= number_format((float) $kpi["max_score"]) ?></small>
                                         </div>
 
                                         <div class="result-meta">
 
                                             <?php if ($kpi["last_actual"] !== null): ?>
-                                                Actual <?= number_format((float) $kpi["last_actual"]) ?>
+                                                <?= isNonRenewalKpi($kpi) ? "Total R สูงสุด " . kpiFormatMoney($kpi["last_actual"]) : "Actual " . number_format((float) $kpi["last_actual"]) ?>
                                                 ·
                                             <?php endif; ?>
 
@@ -770,6 +897,8 @@ $employees = $pdo->query("
                             </tr>
 
                         <?php endforeach; ?>
+
+                    <?php endforeach; ?>
 
                     <?php endforeach; ?>
 

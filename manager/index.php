@@ -163,6 +163,8 @@ $flash = $_GET["saved"] ?? "";
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
 
     <!-- Shared CSS (โครงสร้างเดียวกับ Admin) -->
 
@@ -226,7 +228,7 @@ $flash = $_GET["saved"] ?? "";
                 aria-label="Open navigation menu"
                 aria-expanded="false">
 
-                ☰
+                <?= icon("menu", "icon-only") ?><?= icon("x", "icon-only") ?>
 
             </button>
 
@@ -295,14 +297,12 @@ $flash = $_GET["saved"] ?? "";
             sidebar.classList.add("mobile-open");
             mobileMenuOverlay.classList.add("active");
             mobileMenuButton.setAttribute("aria-expanded", "true");
-            mobileMenuButton.textContent = "✕";
         }
 
         function closeMobileMenu() {
             sidebar.classList.remove("mobile-open");
             mobileMenuOverlay.classList.remove("active");
             mobileMenuButton.setAttribute("aria-expanded", "false");
-            mobileMenuButton.textContent = "☰";
         }
 
         if (mobileMenuButton) {

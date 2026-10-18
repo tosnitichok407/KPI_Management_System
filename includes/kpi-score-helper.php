@@ -4,32 +4,6 @@
 |--------------------------------------------------------------------------
 | KPI Score Helper — ตัดเกรดจาก "เกณฑ์ระดับผลงาน" (Criteria) ที่ Admin กำหนด
 |--------------------------------------------------------------------------
-|
-| เดิมหน้ากรอกผลงานคิดคะแนนแบบสัดส่วน (Actual / Target × 5) ซึ่งไม่ตรงกับเกณฑ์
-| ที่แสดงอยู่บนหน้าจอ เช่น KPI ที่ตั้งเกณฑ์ไว้ว่า "5 : >100%" และ "4 : 100%"
-| แต่สูตรสัดส่วนให้ Actual เท่ากับ Target (= 100%) ได้ 5 เต็ม ทั้งที่ต้องได้ 4
-|
-| ไฟล์นี้จึงตัดเกรดจากข้อความเกณฑ์จริง ตามลำดับ:
-|
-|   1. แปลงข้อความเกณฑ์ของแต่ละระดับ (5..1) เป็นกฎเชิงตัวเลข
-|      รองรับรูปแบบที่ใช้จริงในระบบ:
-|        ">100%"            มากกว่า 100
-|        "100%"             เท่ากับ 100 พอดี
-|        "99-90%"           ช่วง 90 ถึง 99 (สลับหัวท้ายได้)
-|        "ตรงเวลา 95% - 97%" ช่วง 95 ถึง 97 (มีข้อความไทยนำหน้าได้)
-|        "<5%"              น้อยกว่า 5
-|        "ความพึงพอใจ 90% ขึ้นไป"  ตั้งแต่ 90 ขึ้นไป
-|        "ตรงเวลาต่ำกว่า 85%"      น้อยกว่า 85
-|        "-" / ว่าง / ข้อความล้วน  ข้ามไป (ตัดเกรดอัตโนมัติไม่ได้)
-|
-|   2. เลือกฐานเปรียบเทียบ (ดู kpiCriteriaCompareValue)
-|      — ค่าที่ทำได้จริง หรือ % ของเป้าหมาย
-|
-|   3. ไล่จากระดับ 5 ลงมา 1 · ระดับแรกที่เข้าเกณฑ์คือเกรดที่ได้
-|
-|   4. ถ้าไม่เข้าช่วงใดเลย (เกณฑ์มีช่องว่าง หรือผลงานอยู่นอกทุกช่วง)
-|      จัดตำแหน่งตามทิศทางของเกณฑ์ · ต่ำกว่าเกณฑ์ต่ำสุด = 1
-|
 | ใช้ร่วมกันระหว่างหน้ากรอกผลงาน (employee/kpi/kpi.php, employee/kpi-detail.php)
 | และสคริปต์คำนวณคะแนนย้อนหลัง เพื่อให้ทุกที่ใช้กติกาเดียวกัน
 |
@@ -42,10 +16,269 @@ const KPI_MIN_LEVEL = 1;
 const KPI_MAX_LEVEL = 5;
 
 /*
+| ระดับคะแนนของ KPI หนึ่งตัวต้องเป็นจำนวนเต็มเสมอ (ค่าเฉลี่ยมีทศนิยมได้)
+| คะแนนเก่าที่บันทึกเป็นทศนิยม เช่น 4.75 ปัดเศษลงเป็น 4
+*/
+function kpiScoreLevel(float $score): int
+{
+    return (int) floor($score + KPI_SCORE_EPSILON);
+}
+
+/*
 | เพดานที่ยังถือว่า Target กับเกณฑ์เป็นหน่วยเดียวกัน (ดู kpiCriteriaCompareValue)
 | เช่น เกณฑ์สูงสุด "98% ขึ้นไป" แต่ตั้งเป้าไว้ 100% ยังนับเป็นหน่วยเดียวกัน
 */
 const KPI_CRITERIA_TARGET_TOLERANCE = 1.5;
+
+
+/*
+|--------------------------------------------------------------------------
+| กฎเฉพาะ KPI ID 9 "มูลค่าไม่ต่อสัญญา"
+|--------------------------------------------------------------------------
+|
+| Target = Budget (จำนวนเงิน) · Actual = Total R (ไม่รวม Total N และห้ามใช้ Total R+N)
+| Achievement = Total R / Budget × 100
+|
+|   Achievement >= 100%          → 5
+|   96% <= Achievement < 100%    → 4
+|   90% <= Achievement < 96%     → 3
+|   85% <= Achievement < 90%     → 2
+|   Achievement < 85%            → 1
+|
+| ช่วงคะแนนต่อเนื่องนี้เป็นข้อกำหนดของระบบ เพื่อให้ทุกเปอร์เซ็นต์ทศนิยมมีคะแนน
+| (เช่น 99.5% → 4) ไม่ใช่การคัดลอกสูตร Excel เดิมทุกประการ
+|
+| Budget เป็น 0 / NULL / ไม่ใช่ตัวเลข → ไม่คำนวณคะแนน (kpiCalculateScore คืน error)
+|
+| ระบุ KPI ด้วย kpi_id = 9 เท่านั้น (ชื่อไม่ใช่เงื่อนไขเลือกกฎ)
+| ถ้าชื่อไม่ตรง "มูลค่าไม่ต่อสัญญา" → บันทึกคำเตือนลง error_log แต่ยังใช้กฎ KPI 9 ต่อ
+| (ไม่กลับไปใช้เกณฑ์ทั่วไป ซึ่งของ KPI 9 ในฐานข้อมูลเป็นเกณฑ์เก่ากลับทิศ)
+| KPI 9 ต้องเป็นประเภท Performance · ถ้าไม่ใช่ หรือไม่ได้ส่ง kpi_type มา
+| → kpiCalculateScore() คืน error ไม่คำนวณ ไม่บันทึก และไม่แก้ฐานข้อมูลเอง
+|
+| ทุกหน้าต้องคำนวณผ่าน kpiCalculateScore() / nonRenewalAchievement() เท่านั้น:
+| หน้า KPI ของฉัน · หน้ารายละเอียด KPI · หน้าผลงาน · แบบฟอร์ม Excel/PDF · สคริปต์คำนวณย้อนหลัง
+| loadKpiScoreCriteria() คืนข้อความเกณฑ์ชุดนี้ (ใช้แสดงผลเท่านั้น ไม่ผ่านตัวอ่านเกณฑ์ทั่วไป)
+|
+*/
+
+const NON_RENEWAL_KPI_ID = 9;
+const NON_RENEWAL_KPI_NAME = "มูลค่าไม่ต่อสัญญา";
+
+/* เพดานของ kpi_assignments.target_value = decimal(10,2) */
+const KPI_BUDGET_MAX = 99999999.99;
+
+/* เกณฑ์ขั้นต่ำ (%) ของแต่ละระดับ · ต่ำกว่า 85% = ระดับ 1 */
+const NON_RENEWAL_KPI_THRESHOLDS = [
+    5 => 100,
+    4 => 96,
+    3 => 90,
+    2 => 85,
+];
+
+const NON_RENEWAL_KPI_CRITERIA = [
+    5 => "Achievement ≥ 100%",
+    4 => "96% ≤ Achievement < 100%",
+    3 => "90% ≤ Achievement < 96%",
+    2 => "85% ≤ Achievement < 90%",
+    1 => "Achievement < 85%",
+];
+
+function isNonRenewalKpi(array $kpi): bool
+{
+    if ((int) ($kpi["kpi_id"] ?? 0) !== NON_RENEWAL_KPI_ID) {
+        return false;
+    }
+
+    /* ชื่อใช้ตรวจความถูกต้องของข้อมูลเท่านั้น (เตือนครั้งเดียวต่อ request) */
+    if (array_key_exists("kpi_name", $kpi) && !nonRenewalKpiNameMatches($kpi)) {
+        static $warned = false;
+        if (!$warned) {
+            $warned = true;
+            error_log(
+                "kpi-score-helper: kpi_id " . NON_RENEWAL_KPI_ID . " name mismatch ("
+                . (string) $kpi["kpi_name"]
+                . ") · non-renewal rule still applied by kpi_id"
+            );
+        }
+    }
+
+    return true;
+}
+
+/* ชื่อ KPI ตรงกับชื่อที่กฎ KPI 9 คาดไว้หรือไม่ (ใช้แสดงคำเตือน ไม่ใช่เงื่อนไขเลือกกฎ) */
+function nonRenewalKpiNameMatches(array $kpi): bool
+{
+    return mb_strpos((string) ($kpi["kpi_name"] ?? ""), NON_RENEWAL_KPI_NAME) !== false;
+}
+
+const NON_RENEWAL_TYPE_ERROR =
+    "ข้อมูล KPI มูลค่าไม่ต่อสัญญา (ID 9) ต้องเป็นประเภท Performance จึงจะคำนวณคะแนนได้"
+    . " ระบบไม่บันทึกคะแนน กรุณาติดต่อผู้ดูแลระบบ";
+
+/*
+| ตรวจประเภทของ KPI 9 · null = ถูกต้อง
+| ไม่ได้ส่ง kpi_type มา ถือว่าข้อมูลไม่ครบ (fail closed) เพื่อไม่ให้คำนวณจากข้อมูลที่ตรวจไม่ได้
+*/
+function nonRenewalKpiTypeError(array $kpi): ?string
+{
+    if (!isNonRenewalKpi($kpi)) {
+        return null;
+    }
+
+    return strtolower(trim((string) ($kpi["kpi_type"] ?? ""))) === "performance"
+        ? null
+        : NON_RENEWAL_TYPE_ERROR;
+}
+
+/* แปลงจำนวนเงิน / ตัวเลข → หน่วยสตางค์ (จำนวนเต็ม) · null = ไม่ใช่ตัวเลข */
+function kpiToCents($value): ?int
+{
+    if ($value === null || $value === "" || !is_numeric($value)) {
+        return null;
+    }
+
+    return (int) round((float) $value * 100);
+}
+
+/*
+| Achievement (%) แบบตัดทศนิยมลง 2 ตำแหน่ง (basis point) เพื่อไม่ให้ค่าที่แสดง
+| ข้ามเกณฑ์ที่ยังไม่ถึงจริง เช่น 95.999% แสดง 95.99% (ไม่ใช่ 96.00%)
+| คำนวณจากจำนวนเต็มเพื่อเลี่ยงความคลาดเคลื่อนของ float ที่ขอบเกณฑ์
+| null = Budget เป็น 0 / NULL / ไม่ใช่ตัวเลข หรือไม่มี Total R
+*/
+function nonRenewalAchievementBasisPoints($totalR, $budget): ?int
+{
+    $budgetCents = kpiToCents($budget);
+    $actualCents = kpiToCents($totalR);
+
+    if ($budgetCents === null || $budgetCents <= 0 || $actualCents === null || $actualCents < 0) {
+        return null;
+    }
+
+    if ($actualCents > intdiv(PHP_INT_MAX, 10000)) {
+        return (int) floor($actualCents / $budgetCents * 10000);
+    }
+
+    return intdiv($actualCents * 10000, $budgetCents);
+}
+
+function nonRenewalAchievement($totalR, $budget): ?float
+{
+    $basisPoints = nonRenewalAchievementBasisPoints($totalR, $budget);
+
+    return $basisPoints === null ? null : $basisPoints / 100;
+}
+
+/* ระดับ 1..5 จาก Total R และ Budget · null = คำนวณไม่ได้ */
+function nonRenewalKpiGrade($totalR, $budget): ?int
+{
+    $basisPoints = nonRenewalAchievementBasisPoints($totalR, $budget);
+
+    if ($basisPoints === null) {
+        return null;
+    }
+
+    foreach (NON_RENEWAL_KPI_THRESHOLDS as $level => $minimumPercent) {
+        if ($basisPoints >= $minimumPercent * 100) {
+            return $level;
+        }
+    }
+
+    return KPI_MIN_LEVEL;
+}
+
+/* Budget ใช้ได้หรือไม่ (มากกว่า 0) */
+function kpiBudgetIsValid($budget): bool
+{
+    $cents = kpiToCents($budget);
+
+    return $cents !== null && $cents > 0;
+}
+
+const NON_RENEWAL_BUDGET_ERROR =
+    "KPI มูลค่าไม่ต่อสัญญายังไม่ได้กำหนด Budget (เป้าหมายจำนวนเงิน) หรือ Budget เป็น 0"
+    . " จึงคำนวณคะแนนไม่ได้ กรุณาติดต่อผู้ดูแลระบบ";
+
+/*
+|--------------------------------------------------------------------------
+| ฟังก์ชันกลาง: คำนวณคะแนน Performance KPI หนึ่งรายการ
+|--------------------------------------------------------------------------
+|
+| $kpi ต้องมี kpi_id, kpi_name และ kpi_type · $levels = เกณฑ์จาก loadKpiScoreCriteria()
+| คืน ["grade" => ?int, "achievement" => ?float, "error" => ?string]
+|   - KPI 9: ใช้ Budget / Total R ตามกฎด้านบน
+|   - KPI อื่น: ใช้ kpiPerformanceGrade() ตามเดิม (achievement = null)
+|
+*/
+function kpiCalculateScore(array $kpi, array $levels, $actual, $target): array
+{
+    $actualMissing = $actual === null || $actual === "";
+
+    if (isNonRenewalKpi($kpi)) {
+
+        $typeError = nonRenewalKpiTypeError($kpi);
+        if ($typeError !== null) {
+            return ["grade" => null, "achievement" => null, "error" => $typeError];
+        }
+
+        if (!kpiBudgetIsValid($target)) {
+            return ["grade" => null, "achievement" => null, "error" => NON_RENEWAL_BUDGET_ERROR];
+        }
+
+        if ($actualMissing) {
+            return ["grade" => null, "achievement" => null, "error" => null];
+        }
+
+        return [
+            "grade" => nonRenewalKpiGrade($actual, $target),
+            "achievement" => nonRenewalAchievement($actual, $target),
+            "error" => null
+        ];
+    }
+
+    if ($actualMissing) {
+        return ["grade" => null, "achievement" => null, "error" => null];
+    }
+
+    $targetValue = $target !== null && $target !== "" && (float) $target > 0 ? (float) $target : null;
+    $grade = kpiPerformanceGrade($levels, (float) $actual, $targetValue);
+
+    return [
+        "grade" => $grade,
+        "achievement" => null,
+        "error" => $grade === null
+            ? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ"
+            : null
+    ];
+}
+
+/* ตรวจค่า Budget ที่ Admin กรอก (เฉพาะ KPI 9) · คืนข้อความ error หรือ null ถ้าผ่าน */
+function kpiValidateBudgetInput(array $kpi, string $raw): ?string
+{
+    if (!isNonRenewalKpi($kpi)) {
+        return null;
+    }
+
+    if (!preg_match('/^\d{1,8}(\.\d{1,2})?$/', $raw) || !kpiBudgetIsValid($raw) || (float) $raw > KPI_BUDGET_MAX) {
+        return "Budget ของ KPI มูลค่าไม่ต่อสัญญาต้องเป็นจำนวนเงินมากกว่า 0 และไม่เกิน "
+            . number_format(KPI_BUDGET_MAX, 2) . " (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
+    }
+
+    return null;
+}
+
+/* แสดงจำนวนเงิน (Budget / Total R) */
+function kpiFormatMoney($value): string
+{
+    return $value === null || $value === "" ? "-" : number_format((float) $value, 2);
+}
+
+/* แสดง Achievement (%) ที่ตัดลง 2 ตำแหน่งแล้ว */
+function kpiFormatAchievement(?float $achievement): string
+{
+    return $achievement === null ? "-" : number_format($achievement, 2) . "%";
+}
 
 
 /*
@@ -406,7 +639,7 @@ function kpiPerformanceGrade(array $levels, float $actual, ?float $target): ?int
 | ใช้แหล่งเดียวต่อ KPI ตามลำดับ: kpi_score_criteria → kpi_score_levels → score_5..score_1 (ข้อมูลเก่า)
 |
 */
-function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
+function loadKpiScoreCriteria(PDO $pdo, array $kpis, bool $applySpecialRules = true): array
 {
     $ids = array_values(array_unique(array_map(fn($kpi) => (int) $kpi["kpi_id"], $kpis)));
 
@@ -420,6 +653,11 @@ function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
     $stmt = $pdo->prepare("SELECT kpi_id, score_level, criteria FROM kpi_score_criteria WHERE kpi_id IN ({$in})");
     $stmt->execute($ids);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        /* แถวเกณฑ์ว่าง (ข้อมูลเก่าจากหน้าเพิ่ม KPI) ไม่นับเป็นเกณฑ์ เพื่อไม่ให้บังแหล่งอื่น */
+        if (trim((string) $row["criteria"]) === "") {
+            continue;
+        }
+
         $fromCriteria[(int) $row["kpi_id"]][(int) $row["score_level"]] = trim($row["criteria"]);
     }
 
@@ -491,5 +729,57 @@ function loadKpiScoreCriteria(PDO $pdo, array $kpis): array
         }
     }
 
+    /* กฎเฉพาะ KPI (ดูหัวไฟล์) · อ่านชื่อ KPI จากฐานข้อมูลเอง ไม่พึ่งคอลัมน์ที่ผู้เรียก SELECT มา */
+    if ($applySpecialRules) {
+
+        $in = implode(",", array_fill(0, count($ids), "?"));
+
+        $stmt = $pdo->prepare("SELECT kpi_id, kpi_name FROM kpi_indicators WHERE kpi_id IN ({$in})");
+        $stmt->execute($ids);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (isNonRenewalKpi($row)) {
+                $result[(int) $row["kpi_id"]] = NON_RENEWAL_KPI_CRITERIA;
+            }
+        }
+    }
+
     return $result;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| บันทึกเกณฑ์ระดับผลงาน 5..1 ของ KPI
+|--------------------------------------------------------------------------
+|
+| หน้าเพิ่ม KPI และหน้าแก้ไข KPI ของ Admin ใช้ฟังก์ชันนี้ร่วมกัน
+| เขียนลง kpi_score_criteria (แหล่งที่ loadKpiScoreCriteria() อ่านก่อนเสมอ)
+| ระดับที่เว้นว่างจะถูกลบแถวออก · ผู้เรียกเป็นผู้เปิด/ปิด transaction
+|
+*/
+function saveKpiScoreCriteria(PDO $pdo, int $kpiId, array $levels): void
+{
+    $upsert = $pdo->prepare("
+        INSERT INTO kpi_score_criteria (kpi_id, score_level, criteria)
+        VALUES (:kpi_id, :score_level, :criteria)
+        ON DUPLICATE KEY UPDATE criteria = VALUES(criteria)
+    ");
+
+    $delete = $pdo->prepare("
+        DELETE FROM kpi_score_criteria
+        WHERE kpi_id = :kpi_id AND score_level = :score_level
+    ");
+
+    for ($level = KPI_MAX_LEVEL; $level >= KPI_MIN_LEVEL; $level--) {
+
+        $text = trim((string) ($levels[$level] ?? ""));
+
+        if ($text === "") {
+            $delete->execute([":kpi_id" => $kpiId, ":score_level" => $level]);
+            continue;
+        }
+
+        $upsert->execute([":kpi_id" => $kpiId, ":score_level" => $level, ":criteria" => $text]);
+    }
 }

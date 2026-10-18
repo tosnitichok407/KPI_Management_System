@@ -233,6 +233,19 @@ textarea {
 
 }
 
+/* ลิงก์ไปหน้าบันทึกผล KPI (Excel) แทนปุ่มบันทึกเดิม */
+a.submit-button {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    text-decoration: none;
+
+}
+
 .alert {
 
     padding: 12px 15px;

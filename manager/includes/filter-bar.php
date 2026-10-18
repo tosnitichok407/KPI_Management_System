@@ -109,13 +109,13 @@ $hasFilter =
     <div class="filter-actions">
 
         <button type="submit" class="btn btn-primary">
-            แสดงผล
+            <?= icon("filter") ?>แสดงผล
         </button>
 
         <?php if ($hasFilter): ?>
 
             <a href="index.php?page=<?= htmlspecialchars($page, ENT_QUOTES, "UTF-8") ?>" class="btn btn-secondary">
-                ล้างตัวกรอง
+                <?= icon("rotate-ccw") ?>ล้างตัวกรอง
             </a>
             
         <?php endif; ?>

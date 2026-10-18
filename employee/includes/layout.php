@@ -29,11 +29,12 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
     $e = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES, "UTF-8");
 
     $navItems = [
-        "home" => ["employee/index.php", "🏠", "หน้าแรก"],
-        "kpi" => ["employee/kpi/kpi.php", "🎯", "KPI ของฉัน"],
-        "performance" => ["employee/performance.php", "📊", "ผลการปฏิบัติงาน"],
-        "feedback" => ["employee/feedback.php", "💬", "Feedback จากหัวหน้า"],
-        "profile" => ["employee/profile.php", "👤", "ข้อมูลส่วนตัว"]
+        "home" => ["employee/index.php", "house", "หน้าแรก"],
+        /* บันทึกผล KPI ผ่าน Excel เท่านั้น · หน้ากรอกเอง (employee/kpi/kpi.php) redirect มาที่นี่ */
+        "import" => ["employee/kpi-import.php", "file-spreadsheet", "บันทึกผล KPI (Excel)"],
+        "performance" => ["employee/performance.php", "chart-column", "ผลการปฏิบัติงาน"],
+        "feedback" => ["employee/feedback.php", "message-square", "Feedback จากหัวหน้า"],
+        "profile" => ["employee/profile.php", "circle-user", "ข้อมูลส่วนตัว"]
     ];
 
     ?>
@@ -80,7 +81,7 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
                     class="nav-item <?= $key === $activeNav ? "active" : "" ?>">
 
                     <span class="nav-icon">
-                        <?= $icon ?>
+                        <?= icon($icon) ?>
                     </span>
 
                     <span>
@@ -96,10 +97,10 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
         <div class="sidebar-bottom">
 
             <a
-                href="<?= $e($rootPath) ?>logout.php"
+                href="<?= $e(logoutUrl($rootPath)) ?>"
                 class="logout-button">
 
-                ออกจากระบบ
+                <?= icon("log-out") ?>ออกจากระบบ
 
             </a>
 
@@ -123,7 +124,7 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
                 aria-label="Open navigation menu"
                 aria-expanded="false">
 
-                ☰
+                <?= icon("menu", "icon-only") ?><?= icon("x", "icon-only") ?>
 
             </button>
 
@@ -187,14 +188,12 @@ function employeeLayoutEnd(string $rootPath = "../"): void
                 sidebar.classList.add("mobile-open");
                 mobileMenuOverlay.classList.add("active");
                 mobileMenuButton.setAttribute("aria-expanded", "true");
-                mobileMenuButton.textContent = "✕";
             }
 
             function closeMobileMenu() {
                 sidebar.classList.remove("mobile-open");
                 mobileMenuOverlay.classList.remove("active");
                 mobileMenuButton.setAttribute("aria-expanded", "false");
-                mobileMenuButton.textContent = "☰";
             }
 
             mobileMenuButton.addEventListener("click", function () {

@@ -227,7 +227,7 @@ $previewPeriod =
             href="../index.php?page=evaluation"
             class="btn btn-secondary"
         >
-            ยกเลิก
+            <?= icon("x") ?>ยกเลิก
         </a>
 
         <button
@@ -235,7 +235,7 @@ $previewPeriod =
             class="btn btn-primary"
             id="periodSubmit"
         >
-            <?= htmlspecialchars($submitLabel, ENT_QUOTES, "UTF-8") ?>
+            <?= icon("save") ?><?= htmlspecialchars($submitLabel, ENT_QUOTES, "UTF-8") ?>
         </button>
 
     </div>

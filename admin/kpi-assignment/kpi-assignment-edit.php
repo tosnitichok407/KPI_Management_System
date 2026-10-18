@@ -3,6 +3,7 @@
 require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 
@@ -47,6 +48,7 @@ $assignment_sql = "
         assignment_id,
         kpi_id,
         employee_id,
+        assignment_year,
         period_id,
         target_value,
         weight,
@@ -172,7 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         ================================================= */
 
         $kpi_type_sql = "
-            SELECT kpi_type
+            SELECT kpi_id, kpi_name, kpi_type
             FROM kpi_indicators
             WHERE kpi_id = ?
             LIMIT 1
@@ -185,13 +187,91 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $kpi_id
         ]);
 
+        $kpi_row =
+            $kpi_type_stmt->fetch(PDO::FETCH_ASSOC);
+
         $kpi_type =
-            $kpi_type_stmt->fetchColumn();
+            $kpi_row["kpi_type"] ?? false;
+
+        /* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget จำนวนเงิน (> 0 และไม่เกินเพดานคอลัมน์) */
+        $budget_error = $kpi_row
+            ? kpiValidateBudgetInput($kpi_row, $target_value)
+            : null;
+
+        /*
+        | Assignment ที่มีผลงานแล้ว (ตรวจจากฐานข้อมูล ไม่เชื่อค่าจากฟอร์ม):
+        |   - ห้ามเปลี่ยน kpi_id      (คะแนนเดิมตัดตามเกณฑ์ของ KPI เดิม · ครอบคลุมทั้งเข้าและออกจาก KPI 9)
+        |   - ห้ามเปลี่ยน employee_id (ผลงานเก็บ employee_id ของคนเดิม · กันไปนับเป็นของคนใหม่)
+        |   - ห้ามเปลี่ยน assignment_year
+        |   - ห้ามย่นช่วงวันที่จนรอบประเมินของผลงานเดิมไม่ทับกับช่วงของ Assignment
+        |     (นิยามเดียวกับหน้าบันทึกผลงาน: start_date <= วันสิ้นสุดรอบ และ end_date >= วันเริ่มรอบ)
+        |     ขยายช่วงได้ตามเดิม
+        | ใช้ฟังก์ชันเดียวกันทั้งตรวจก่อน UPDATE และตรวจซ้ำเมื่อ UPDATE ไม่กระทบแถวใด
+        */
+        $assignmentGuardError = function () use (
+            $pdo, $assignment, $assignment_id, $kpi_id, $employee_id, $assignment_year, $start_date, $end_date
+        ): ?string {
+            $stats_stmt = $pdo->prepare("
+                SELECT
+                    COUNT(*) AS performance_count,
+                    MIN(ep.end_date) AS earliest_period_end,
+                    MAX(ep.start_date) AS latest_period_start
+                FROM kpi_performances p
+                INNER JOIN evaluation_periods ep ON ep.period_id = p.period_id
+                WHERE p.assignment_id = ?
+            ");
+            $stats_stmt->execute([$assignment_id]);
+            $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ((int) ($stats["performance_count"] ?? 0) === 0) {
+                return null;
+            }
+
+            $suffix = " เนื่องจากการมอบหมายนี้มีผลงานบันทึกไว้แล้ว "
+                . (int) $stats["performance_count"] . " รายการ";
+
+            if ($kpi_id !== (int) $assignment["kpi_id"]) {
+                return "ไม่สามารถเปลี่ยน KPI ได้" . $suffix
+                    . " (คะแนนเดิมตัดตามเกณฑ์ของ KPI เดิม) · แก้ไขฟิลด์อื่นได้ตามปกติ"
+                    . " หรือสร้างการมอบหมายใหม่สำหรับ KPI ที่ต้องการ";
+            }
+
+            if ($employee_id !== (int) $assignment["employee_id"]) {
+                return "ไม่สามารถเปลี่ยนพนักงานได้" . $suffix
+                    . " (ผลงานเดิมเป็นของพนักงานคนเดิม)";
+            }
+
+            if ($assignment_year !== (int) $assignment["assignment_year"]) {
+                return "ไม่สามารถเปลี่ยนปีของการมอบหมายได้" . $suffix;
+            }
+
+            if (
+                $start_date > $stats["earliest_period_end"]
+                || $end_date < $stats["latest_period_start"]
+            ) {
+                return "ไม่สามารถย่นช่วงวันที่ได้" . $suffix
+                    . " · ช่วงวันที่ต้องครอบคลุมรอบประเมินตั้งแต่ "
+                    . date("d/m/Y", strtotime($stats["earliest_period_end"])) . " ถึง "
+                    . date("d/m/Y", strtotime($stats["latest_period_start"])) . " (ขยายช่วงได้ตามปกติ)";
+            }
+
+            return null;
+        };
+
+        $guard_error = $assignmentGuardError();
 
 
         if (!$kpi_type) {
 
             $error = "ไม่พบประเภทของ KPI";
+
+        } elseif ($budget_error !== null) {
+
+            $error = $budget_error;
+
+        } elseif ($guard_error !== null) {
+
+            $error = $guard_error;
 
         } else {
 
@@ -237,13 +317,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 
                 /* =============================================
-                   CHECK TOTAL WEIGHT BY KPI TYPE
+                   CHECK TOTAL WEIGHT
 
-                   แยก:
-                   - Competency
-                   - Performance
-
-                   และไม่รวม Assignment ที่กำลังแก้ไข
+                   Performance + Competency ของพนักงานในปีเดียวกัน
+                   รวมกันไม่เกิน 100% (ไม่รวม Assignment ที่กำลังแก้ไข)
                 ============================================= */
 
                 $weight_sql = "
@@ -252,12 +329,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     FROM kpi_assignments a
 
-                    INNER JOIN kpi_indicators k
-                        ON a.kpi_id = k.kpi_id
-
                     WHERE a.employee_id = ?
                     AND a.assignment_year = ?
-                    AND k.kpi_type = ?
                     AND a.status = 'Active'
                     AND a.assignment_id != ?
                 ";
@@ -268,7 +341,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $weight_stmt->execute([
                     $employee_id,
                     $assignment_year,
-                    $kpi_type,
                     $assignment_id
                 ]);
 
@@ -307,9 +379,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if ($new_total_weight > 100) {
 
                     $error =
-                        "ไม่สามารถบันทึกได้ เพราะ Weight รวมของ "
-                        . $kpi_type
-                        . " จะเป็น "
+                        "ไม่สามารถบันทึกได้ เพราะ Weight รวม (Performance + Competency) จะเป็น "
                         . number_format(
                             $new_total_weight,
                             2
@@ -338,24 +408,79 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             status = ?
 
                         WHERE assignment_id = ?
+
+                          /*
+                          | ตรวจซ้ำในคำสั่งเดียวกัน (กันผลงานที่ถูกบันทึกระหว่างตรวจด้านบนกับ UPDATE)
+                          | ยังไม่มีผลงาน หรือ KPI / พนักงาน / ปี ไม่เปลี่ยน และช่วงวันที่ยังทับทุกรอบของผลงาน
+                          | (WHERE เทียบกับค่าเดิมของแถว ก่อน SET)
+                          */
+                          AND (
+                              NOT EXISTS (
+                                  SELECT 1
+                                  FROM kpi_performances p
+                                  WHERE p.assignment_id = ?
+                              )
+                              OR (
+                                  kpi_id = ?
+                                  AND employee_id = ?
+                                  AND assignment_year = ?
+                                  AND NOT EXISTS (
+                                      SELECT 1
+                                      FROM kpi_performances p
+                                      INNER JOIN evaluation_periods ep ON ep.period_id = p.period_id
+                                      WHERE p.assignment_id = ?
+                                        AND (ep.end_date < ? OR ep.start_date > ?)
+                                  )
+                              )
+                          )
                     ";
 
-                    $update_stmt =
-                        $pdo->prepare($update_sql);
+                    try {
 
-                    $update_stmt->execute([
-                        $kpi_id,
-                        $employee_id,
-                        $assignment_year,
-                        $period_id,
-                        $target_value,
-                        $weight,
-                        $start_date,
-                        $end_date,
-                        $status,
-                        $assignment_id
-                    ]);
+                        $update_stmt =
+                            $pdo->prepare($update_sql);
 
+                        $update_stmt->execute([
+                            $kpi_id,
+                            $employee_id,
+                            $assignment_year,
+                            $period_id,
+                            $target_value,
+                            $weight,
+                            $start_date,
+                            $end_date,
+                            $status,
+                            $assignment_id,
+                            $assignment_id,
+                            $kpi_id,
+                            $employee_id,
+                            $assignment_year,
+                            $assignment_id,
+                            $start_date,
+                            $end_date
+                        ]);
+
+                        /*
+                         * 0 แถว = ค่าเหมือนเดิม หรือถูกเงื่อนไขด้านบนกันไว้
+                         * (มีผลงานเกิดขึ้นระหว่างตรวจกับ UPDATE) → ตรวจซ้ำด้วยฟังก์ชันเดิม
+                         */
+                        $update_error = $update_stmt->rowCount() === 0
+                            ? $assignmentGuardError()
+                            : null;
+                    } catch (PDOException $e) {
+
+                        error_log("Update KPI assignment failed: " . $e->getMessage());
+
+                        /* 1205 = lock wait timeout · 1213 = deadlock · ไม่แสดงรายละเอียดฐานข้อมูล */
+                        $update_error = in_array((int) ($e->errorInfo[1] ?? 0), [1205, 1213], true)
+                            ? "มีการบันทึกผลงานของการมอบหมายนี้อยู่ในขณะนี้ ระบบยังไม่ได้บันทึกการแก้ไข กรุณาลองใหม่อีกครั้ง"
+                            : "ไม่สามารถบันทึกการแก้ไขได้ กรุณาลองใหม่อีกครั้ง";
+                    }
+
+                    if ($update_error !== null) {
+
+                        $error = $update_error;
+                    } else {
 
                     /*
                      * Redirect กลับหน้าหลัก
@@ -366,6 +491,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     );
 
                     exit;
+                    }
                 }
             }
         }
@@ -473,6 +599,8 @@ $kpis_result =
         rel="preconnect"
         href="https://fonts.googleapis.com"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="preconnect"
@@ -610,6 +738,7 @@ $kpis_result =
 
                     <select
                         name="kpi_id"
+                        id="assignment_kpi_select"
                         required
                     >
 
@@ -625,6 +754,7 @@ $kpis_result =
 
                             <option
                                 value="<?= (int) $kpi["kpi_id"] ?>"
+                                <?= isNonRenewalKpi($kpi) ? 'data-budget="1"' : "" ?>
 
                                 <?= $assignment["kpi_id"] ==
                                     $kpi["kpi_id"]
@@ -660,13 +790,14 @@ $kpis_result =
                 <div class="form-group">
 
                     <label>
-                        Target Value <span>*</span>
+                        <span id="target_label_text">Target Value</span> <span>*</span>
                     </label>
 
 
                     <input
                         type="number"
                         name="target_value"
+                        id="target_value_input"
                         step="0.01"
                         min="0"
 
@@ -676,6 +807,11 @@ $kpis_result =
 
                         required
                     >
+
+                    <small id="target_budget_hint" hidden>
+                        KPI มูลค่าไม่ต่อสัญญา: กรอก Budget เป็นจำนวนเงิน (มากกว่า 0 ไม่เกิน <?= number_format(KPI_BUDGET_MAX, 2) ?>)
+                        · คะแนนคำนวณจาก Total R / Budget × 100
+                    </small>
 
                 </div>
 
@@ -807,7 +943,7 @@ $kpis_result =
                     href="../index.php?page=kpi-assignment"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
 
@@ -815,7 +951,7 @@ $kpis_result =
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกการแก้ไข
+                    <?= icon("save") ?>บันทึกการแก้ไข
                 </button>
 
 
@@ -831,6 +967,39 @@ $kpis_result =
 
 
 <script src="../../assets/js/admin.js"></script>
+
+<script>
+/* KPI 9 มูลค่าไม่ต่อสัญญา: ช่อง Target เป็น Budget จำนวนเงิน */
+(function () {
+    const kpiSelect = document.getElementById("assignment_kpi_select");
+    const targetInput = document.getElementById("target_value_input");
+    const targetLabel = document.getElementById("target_label_text");
+    const budgetHint = document.getElementById("target_budget_hint");
+
+    if (!kpiSelect || !targetInput) {
+        return;
+    }
+
+    function syncTargetField() {
+        const option = kpiSelect.options[kpiSelect.selectedIndex];
+        const isBudget = !!(option && option.dataset.budget === "1");
+
+        targetLabel.textContent = isBudget ? "Budget (เป้าหมายจำนวนเงิน)" : "Target Value";
+        targetInput.min = isBudget ? "0.01" : "0";
+
+        if (isBudget) {
+            targetInput.max = "<?= number_format(KPI_BUDGET_MAX, 2, ".", "") ?>";
+        } else {
+            targetInput.removeAttribute("max");
+        }
+
+        budgetHint.hidden = !isBudget;
+    }
+
+    kpiSelect.addEventListener("change", syncTargetField);
+    syncTargetField();
+})();
+</script>
 
 </body>
 
