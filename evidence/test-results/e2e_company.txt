@@ -1,0 +1,14 @@
+PASS F1 upload form offers both formats + year
+PASS F2 company file (23.8 MB uncompressed) is read: results table shown
+PASS F3 month Jan, real map (KPI 14 + KPI 8 confirmed): ready 0 / needs confirmation 8 / rejected 3 (K14 external link + KPI 14 and KPI 8: old fixture has no value table / month block) / skipped 0
+PASS F4 table shows source cells and reasons (K14 external link)
+PASS F5 no confirm button / no import token; DB unchanged
+PASS F6 nothing stored for confirmation (next GET shows upload form, no preview)
+PASS F7 wrong year -> error, no table
+PASS F8 same file via Template format -> rejected: Template channel closed
+PASS F9 another employee uploads A's form -> code error, no data/table shown
+PASS F10 company upload without CSRF rejected
+PASS F11 manager POST to import page redirected
+PASS F12 DB unchanged after all company-format requests
+
+TOTAL 12 · PASS 12 · FAIL 0

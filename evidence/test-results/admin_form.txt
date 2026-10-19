@@ -1,0 +1,9 @@
+PASS A1 required fields marked with red * (category, type, name, weight, max score = 5 marks + legend)
+PASS A2 HTML required on the 5 required fields only (description / unit optional)
+PASS A3 empty required fields -> 200, summary + error under each empty field (category_id kpi_name weight max_score), nothing saved
+PASS A4 error texts shown next to the fields + has-error styling + aria-invalid
+PASS A5 invalid values -> errors per field (category not found, type, weight range, max score range), entered name kept, nothing saved
+PASS A6 missing/invalid CSRF -> Session error, nothing saved
+PASS A7 complete form -> 302 to KPI management, KPI saved (category 1, Performance, weight 10, unit %, max 5) with 5 criteria rows
+
+TOTAL 7 · PASS 7 · FAIL 0

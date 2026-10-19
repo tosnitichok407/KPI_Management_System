@@ -1,0 +1,2 @@
+after: kpi 8 id=16 Draft actual=30.00 score=5.00 target=20.00
+after: kpi 14 id=17 Draft actual=95.00 score=3.00 target=100.00

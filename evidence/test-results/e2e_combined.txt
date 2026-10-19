@@ -1,0 +1,13 @@
+PASS C0 real map in the app copy confirms KPI 14 and KPI 8
+PASS C1 incomplete file: KPI 8 rejected with the row reason (แถว 7 ... ไม่มีผลต่าง (S))
+PASS C2 incomplete file: whole file blocked (no confirm button) although KPI 14 (สรุปทั้งปี69!Q6) is valid
+PASS C2b forced confirm with the page token (cancel-only) is refused server side (ยังนำเข้าไม่ได้), nothing written
+PASS C3 incomplete file: nothing written (KPI 8 and KPI 14 February rows absent)
+PASS C4 complete file: preview shows KPI 14 (สรุปทั้งปี69!Q6, 99.99) and KPI 8 (ก.พ.69!S42, Actual 20%) both as รายการใหม่
+PASS C5 preview wrote nothing
+PASS C6 confirm: success message, 2 new rows
+PASS C7 KPI 14 February saved as Draft 99.99 / score 3 / target 100.00
+PASS C8 KPI 8 February saved as Draft 20.00 / score 4 / target 20.00
+PASS C9 no Submitted/Approved created; other employees/KPIs untouched
+
+TOTAL 11 · PASS 11 · FAIL 0

@@ -1,0 +1,21 @@
+PASS J0 throwaway DB: datadir/port 0/skip_networking/marker/db = /private/tmp/kpi-throwaway-imp-10428/data/|0|ON|1|kpi_import_test
+PASS J0b both app copies point at the throwaway socket
+PASS J1 starting state: KPI 8 January existing Draft (actual 12.00, score 3.00, target 20.00)
+PASS J2 REAL map (KPI 8 enabled 2026-10-18): January preview has the KPI 8 row (Actual 30, อัปเดต Draft), preview wrote nothing
+   preview row (KPI 8):  ม.ค.69!S42 8 จำนวนรายการปรับเพิ่มมูลค่าสัญญา Performance · หน่วย % มกราคม 2026 30 ราคาเดิม (O41) 500,000.00 ผลต่าง (S41) 153,750.00 · สัดส่วน (S42) 0.3075 → Actual 30% (ปัดลงเป็นจำนวนเต็ม) 20.00 5 Draft Actual 12.00 · คะแนน 3.00 อัปเดต Draft <input type="checkbox" name="confirm_update[]" value="8|2026|1"> ยืนยันอัปเดตรายการนี้ 
+PASS J3 Preview READY: KPI 8 January row, Actual 30, Target 20.00, Score 5, period มกราคม 2026
+PASS J4 existing Draft shown explicitly (status Draft, Actual 12.00, score 3.00) and action = อัปเดต Draft
+PASS J5 per-row confirmation checkbox for the Draft update (confirm_update[] = 8|2026|1)
+PASS J6 Preview wrote nothing
+PASS J7 confirm without ticking: KPI 8 January Draft NOT updated (still 12.00 / 3.00), summary counts it as not confirmed
+PASS J8 token is single use: re-posting the same token is refused, DB unchanged
+PASS J9 confirm with tick: same row updated (same performance_id) -> Draft, actual 30.00, score 5.00, target 20.00
+PASS J10 no Submit/Approve created: all KPI 8 / KPI 14 rows written by the import are Draft
+PASS J11 rows of other employees / other KPIs untouched
+PASS J12 rollback [actual changed after Preview] -> whole batch cancelled with message, nothing written
+PASS J12 rollback [target changed after Preview] -> whole batch cancelled with message, nothing written
+PASS J12 rollback [submitted changed after Preview] -> whole batch cancelled with message, nothing written
+PASS J12 rollback [period_closed changed after Preview] -> whole batch cancelled with message, nothing written
+PASS J13 existing Submitted row: preview shows the Submitted error, no confirm button, row unchanged
+
+TOTAL 18 · PASS 18 · FAIL 0

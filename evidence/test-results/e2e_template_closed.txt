@@ -1,0 +1,23 @@
+PASS C1 employee A login redirects to employee home
+PASS C2 import page: no Template download / no template format option; company upload form + KPI readiness table
+PASS C3 Template download URL -> 303 to import page with 'closed' message (no xlsx served)
+PASS C4 direct POST of a Template file (format='template') -> no preview / no token / no confirm, DB unchanged
+PASS C4 direct POST of a Template file (format='<missing>') -> no preview / no token / no confirm, DB unchanged
+PASS C4 direct POST of a Template file (format='bogus') -> no preview / no token / no confirm, DB unchanged
+PASS C5 format=template upload answered with the 'Template closed' message
+PASS C6 template file sent as company format -> rejected as not a company form (no KPI AM sheet), nothing stored
+PASS C7 forged confirm (no pending, forged token/flags) -> rejected, DB unchanged
+PASS C8 (E8) confirm without CSRF token rejected, DB unchanged
+PASS C9 (E12) Approved row (performance_id 3) unchanged
+PASS C10 (E15) non-xlsx content rejected with message
+PASS C11 (E16a) old manual page -> 303 to import page
+PASS C12 (E16) page employee/index.php renders 200 without PHP error text
+PASS C12 (E16) page employee/performance.php?year=2026&month=6 renders 200 without PHP error text
+PASS C13 whole run: nothing written to kpi_performances
+PASS C14 (E20) manager redirected away from import page
+PASS C15 (E21) manager redirected away from template
+PASS C16 (E22) admin redirected away from import page
+PASS C17 (E23) anonymous redirected to login
+PASS C18 (E24) anonymous template request redirected to login
+
+TOTAL 21 · PASS 21 · FAIL 0

@@ -1,0 +1,31 @@
+PASS R1 anonymous -> old KPI page redirects to login
+PASS R2 employee/index.php: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R2 employee/performance.php?year=2026&month=6: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R2 employee/kpi-import.php: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R2 employee/feedback.php: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R2 employee/profile.php: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R2 employee/kpi-detail.php?assignment_id=1&year=2026&month=6: 200, no link to kpi/kpi.php, menu item 'บันทึกผล KPI (Excel)' -> kpi-import.php, no PHP error
+PASS R3 GET old KPI page -> 303 to kpi-import.php
+PASS R4 POST to old KPI page with valid CSRF -> 303 to import, DB unchanged
+PASS R5 KPI detail: no POST form / no actual input, link to import, history still shown
+PASS R6 POST to KPI detail with valid CSRF -> 303 to import, DB unchanged
+PASS R7 performance page: KPI buttons read 'ดูรายละเอียด', no 'เพิ่ม/ดูผลงาน' entry button
+PASS R14 PUT to old KPI page -> 303 to import, DB unchanged
+PASS R14 PATCH to old KPI page -> 303 to import, DB unchanged
+PASS R14 DELETE to old KPI page -> 303 to import, DB unchanged
+PASS R15 anonymous POST old KPI page -> login, DB unchanged
+PASS R16 anonymous POST KPI detail -> login, DB unchanged
+PASS R17 POST KPI detail for another employee's assignment -> 303 to import, DB unchanged
+PASS R18 GET KPI detail of another employee's assignment -> redirected to performance page
+PASS R13 cancel after preview: preview cleared, DB unchanged, confirm with the cancelled token writes nothing
+PASS R8 manager -> old KPI page redirects to manager home (not import)
+PASS R9 manager -> import page redirects to manager home
+PASS R10 manager POST upload to import -> redirected, DB unchanged
+PASS R8 admin -> old KPI page redirects to admin home (not import)
+PASS R9 admin -> import page redirects to admin home
+PASS R10 admin POST upload to import -> redirected, DB unchanged
+PASS R11 company-file import of 1 row committed (success message points to performance page)
+   dashboard Feb before: 7 2 5 2.00 · after: 7 3 4 2.33  (KPI ที่ได้รับ · ประเมินแล้ว · รอประเมิน · คะแนนเฉลี่ย)
+PASS R12 dashboard Feb: evaluated +1, pending -1, total unchanged, evaluated = DB distinct scored assignments (3)
+
+TOTAL 28 · PASS 28 · FAIL 0

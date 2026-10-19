@@ -1,0 +1,13 @@
+PASS E1 real map (KPI 8 enabled 2026-10-18): readiness table lists KPI 8 as ready
+PASS E2 real map (KPI 8 enabled): June preview includes KPI 8 from มิ.ย.69!S41 with details, preview wrote nothing
+PASS E3 test copy: readiness table lists KPI 8 as ready
+PASS E4 June preview: KPI 8 from มิ.ย.69!S41, details ราคาเดิม (O40) / ผลต่าง (S40) / สัดส่วน (S41) 0.57 -> Actual 57%, Target 20.00, confirm button, nothing written
+PASS E5 confirm -> KPI 8 June saved as Draft, actual 57.00, score 5, target 20.00
+PASS E6 u_default month 7 -> rejected with reason 'ว่างทั้งเดือน', no confirm button, DB unchanged
+PASS E6 u_external month 3 -> rejected with reason 'External Link', no confirm button, DB unchanged
+PASS E6 u_neg month 2 -> rejected with reason 'ติดลบ', no confirm button, DB unchanged
+PASS E6 u_r_row_blank month 1 -> rejected with reason 'ราคาสรุป (R) ของแถวนั้นว่าง', no confirm button, DB unchanged
+PASS E7 Template format upload still closed (message, no token), DB unchanged
+PASS E8 no KPI 8 row other than Draft was created by the import
+
+TOTAL 11 · PASS 11 · FAIL 0

@@ -1,0 +1,5 @@
+login syn_admin -> /admin/index.php
+screenshot 06-admin-add-kpi-form.png (1327px)
+screenshot 07-admin-add-kpi-required-errors.png (1503px)
+text saved 07-admin-add-kpi-required-errors.txt
+DONE
