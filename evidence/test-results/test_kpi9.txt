@@ -1,0 +1,34 @@
+PASS A1 real map: KPI 9 confirmed with kpi_id 9, rule non_renewal_total_r_with_monthly_budget, exact system name, owner 2026-10-19
+PASS A2 Feb READY: Actual = Total R 199990.00, row Target = Budget of the month 200000.00, source = summary Q6 (not KPI AM)
+PASS A3 preview details: rule, Budget C6 / Total R G6, Achievement 99.99 (truncated, same as KPI 14)
+PASS A4 KPI 14 row unchanged by KPI 9 (no target key, Actual 99.99)
+PASS A5 parity over 26 KPI 14 fixtures/probes × 12 months (312 reads): KPI 9 status/flag = KPI 14 (incl. 56 KPI 9 rejections: decimals, typed / wrong-sheet Budget, Q mismatch, errors, no value table, future zero …)
+PASS A5b KPI 14 row weight changed in the form → only KPI 14 NEEDS_CONFIRMATION; KPI 9 (own weight 20 unchanged) READY
+PASS A6 empty month (Aug in default) → KPI 9 skipped like KPI 14
+PASS A7a KPI 9 with the KPI 14 rule → NEEDS_CONFIRMATION, never READY
+PASS A7c KPI 9 with another system name → NEEDS_CONFIRMATION, never READY
+PASS A7d KPI 9 label mapped to kpi_id 12 → NEEDS_CONFIRMATION, never READY
+PASS A7e KPI 9 rule put on the KPI 8 row → NEEDS_CONFIRMATION, never READY
+PASS A7b KPI 9 with the × 100 form rule → never READY in any month (items found carry the KPI 9 rule reason; empty cells skipped)
+PASS A7f KPI 9 unconfirmed → NEEDS_CONFIRMATION; KPI 14 still READY
+PASS B1 Feb prepare: KPI 9 insert, Target 200000.00 (monthly Budget), score 4, commit open, nothing written
+PASS B2 the Assignment Budget (500000) is NOT used: it would give score 1
+PASS B3 rows changed after preview (KPI 9 Target 200000 → 100000) → whole batch rolled back
+PASS B4 commit: KPI 14 + KPI 9 inserted; KPI 9 Feb = Draft / Actual 199990.00 / score 4 / Target 200000.00
+PASS B5 re-import → unchanged (no duplicate)
+PASS B6 Assignment Budget changed to 1.00 → KPI 9 still unchanged, Target 200000.00 (assignment value not used)
+PASS B7 existing KPI 9 Draft differs → update; not confirmed → skipped, nothing written
+PASS B8 confirmed → Draft updated back to Actual 199990.00 / Target 200000.00, still Draft
+PASS B9 KPI 9 row Submitted → REJECTED, commit closed
+PASS B10 July (ended) Total R 0 → READY with confirmation flag, Target = July Budget
+PASS B11 not confirmed → declined, nothing written
+PASS B12 KPI 9 confirmed only → KPI 9 July Draft 0.00 / score 1 / Target = July Budget; KPI 14 July still declined
+PASS B13 December (not ended) Budget > 0 / Total R 0 → KPI 9 REJECTED, commit closed
+PASS B14 January (Closed period) → KPI 9 REJECTED, commit closed
+PASS B15 KPI 9 name in system differs from the confirmed name → REJECTED, commit closed
+PASS B16 KPI 9 not assigned in March → REJECTED, commit closed
+PASS B17 same KPI 9 rows (with Target) replayed with TEMPLATE origin → refused, nothing written
+PASS B18 other employees' / other KPIs' rows untouched by the whole run
+PASS B19 no Submitted / Approved KPI 9 rows created
+
+TOTAL 32 · PASS 32 · FAIL 0

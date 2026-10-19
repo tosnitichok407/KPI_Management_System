@@ -35,7 +35,12 @@
 |     แหล่งข้อมูล = ชีตของเดือนที่เลือก: S (ผลต่าง) เป็นแหล่งข้อมูลหลัก · S<n+1> = S<n>/O<n>
 |     Actual = FLOOR(S<n+1> × 100) จำนวนเต็ม · Target ใน Assignment ต้องเป็น 20 (%) · เกณฑ์คะแนน 1-5 ต้องครบ
 |     หมายเหตุ: ข้อมูล KPI 8 ของเดือนใดไม่ผ่าน → ไฟล์ของเดือนนั้นนำเข้าไม่ได้ทั้งไฟล์ (รวม KPI 14) ตามกฎไม่บันทึกบางส่วน
-| KPI 9 (มูลค่าไม่ต่อสัญญา) ถูกแยกออกจากการนำเข้าเสมอในตัวอ่าน
+|   KPI 10 / 11 / 12 (ยืนยัน 2026-10-19): value_rule "kpi_am_cell_ratio_times_100" — Actual = ค่าในช่อง "ที่ทำได้" (K15-K17) × 100 ไม่ปัดเศษ
+|   Competency 15-19 (ยืนยัน 2026-10-19): value_rule "competency_integer" — คะแนน 1-5 จากช่อง "ที่ทำได้"
+|   KPI 9 มูลค่าไม่ต่อสัญญา (ยืนยัน 2026-10-19 · แบบ ก): value_rule "non_renewal_total_r_with_monthly_budget"
+|     แหล่งข้อมูล = แถวของเดือนในชีต "สรุปทั้งปี.." (ตาราง Portfolio(มูลค่า) แถวเดียวกับ KPI 14)
+|     Actual = Total R (G) · Target = Budget ของเดือนนั้น (C) จากไฟล์ — ไม่ใช้ Budget ใน Assignment
+|     คะแนนตามกฎ KPI 9 ของระบบ (Total R ÷ Budget ≥100 / 96 / 90 / 85%) · ไม่ใช้ช่อง K14 ในแบบฟอร์ม
 | ห้ามกรอกค่าโดยการเดา และห้ามใช้ kpi_id จาก Seed / ฐานข้อมูลทดสอบ
 |
 | เปิดนำเข้า KPI ทีละตัว: ก่อนตั้ง confirmed = true ต้องผ่านครบ
@@ -74,102 +79,103 @@ return [
         "confirmed" => true
     ],
     [
+        /* ยืนยันแล้ว (แบบ ก): Actual = Total R · Target = Budget ของเดือนจากชีต "สรุปทั้งปี" (ดู KPI_COMPANY_NON_RENEWAL_RULE ในตัวอ่าน) */
         "section" => "performance",
         "label" => "มูลค่าไม่ต่อสัญญา",
         "expected_weight" => 20,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 9,
+        "value_rule" => "non_renewal_total_r_with_monthly_budget",
+        "confirmed_kpi_name" => "มูลค่าไม่ต่อสัญญา",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "performance",
         "label" => "ขายเพิ่มผลิตภัณฑ์และบริการในลูกค้าเดิม",
         "expected_weight" => 10,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 10,
+        "value_rule" => "kpi_am_cell_ratio_times_100",
+        "confirmed_kpi_name" => "ขายเพิ่มผลิตภัณฑ์และบริการในลูกค้าเดิม",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "performance",
         "label" => "เข้าเยี่ยมลูกค้าตามKPIที่บริษัทกำหนด",
         "expected_weight" => 5,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 11,
+        "value_rule" => "kpi_am_cell_ratio_times_100",
+        "confirmed_kpi_name" => "เข้าเยี่ยมลูกค้าตาม KPI ที่บริษัทกำหนด",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "performance",
         "label" => "อัตราคงค้างสัญญาตัวจริงนำกลับ",
         "expected_weight" => 10,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 12,
+        "value_rule" => "kpi_am_cell_ratio_times_100",
+        "confirmed_kpi_name" => "อัตราค้างสัญญาตัวจริงนำกลับ",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "competency",
         "label" => "ความรู้เชิงชีวของแมลงและการใช้สารเคมีอย่างถูกต้อง",
         "expected_weight" => 4,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 15,
+        "value_rule" => "competency_integer",
+        "confirmed_kpi_name" => "ความรู้เชิงชีวะของแมลงและการใช้สารเคมีอย่างถูกต้อง",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "competency",
         "label" => "ความรู้ด้านสินค้าและผลิตภัณฑ์",
         "expected_weight" => 4,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 16,
+        "value_rule" => "competency_integer",
+        "confirmed_kpi_name" => "ความรู้ด้านสินค้าและผลิตภัณฑ์",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "competency",
         "label" => "ทักษะด้านการสื่อสาร",
         "expected_weight" => 4,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 17,
+        "value_rule" => "competency_integer",
+        "confirmed_kpi_name" => "ทักษะด้านการสื่อสาร",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "competency",
         "label" => "บริหารจัดการด้านข้อมูลและคอมพิวเตอร์",
         "expected_weight" => 4,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 18,
+        "value_rule" => "competency_integer",
+        "confirmed_kpi_name" => "บริหารจัดการด้านข้อมูลและคอมพิวเตอร์",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ],
     [
         "section" => "competency",
         "label" => "บุคลิกภาพที่ดี",
         "expected_weight" => 4,
-        "kpi_id" => null,
-        "value_rule" => null,
-        "confirmed_kpi_name" => null,
-        "confirmed_by" => null,
-        "confirmed_at" => null,
-        "confirmed" => false
+        "kpi_id" => 19,
+        "value_rule" => "competency_integer",
+        "confirmed_kpi_name" => "บุคลิกภาพที่ดี",
+        "confirmed_by" => "เจ้าของระบบ",
+        "confirmed_at" => "2026-10-19",
+        "confirmed" => true
     ]
 ];

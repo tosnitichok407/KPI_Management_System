@@ -1,0 +1,12 @@
+kpi 1: Draft actual=80.00 score=1.00
+kpi 3: Draft actual=- score=3.00
+kpi 8: Draft actual=20.00 score=4.00
+kpi 10: Draft actual=87.50 score=5.00
+kpi 11: Draft actual=100.00 score=5.00
+kpi 12: Draft actual=95.00 score=5.00
+kpi 14: Draft actual=99.99 score=3.00
+kpi 15: Draft actual=- score=4.00
+kpi 16: Draft actual=- score=5.00
+kpi 17: Draft actual=- score=3.00
+kpi 18: Draft actual=- score=4.00
+kpi 19: Draft actual=- score=5.00

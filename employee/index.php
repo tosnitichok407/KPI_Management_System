@@ -229,6 +229,7 @@ if ($selectedPeriodData !== null) {
                 ki.unit,
                 ki.max_score,
 
+                kp.target AS performance_target,
                 kp.actual AS actual_value,
                 kp.score,
                 kp.comment AS remark
@@ -958,7 +959,8 @@ $avatar =
 
                                         <?php if (isNonRenewalKpi($kpi)): ?>
 
-                                            Budget <?= kpiFormatMoney($kpi["assignment_target"]) ?>
+                                            <?php /* KPI 9: Budget ของเดือนที่บันทึกกับผลงาน (ถ้ามี) */ ?>
+                                            Budget <?= kpiFormatMoney($kpi["performance_target"] ?? $kpi["assignment_target"]) ?>
 
                                         <?php else: ?>
 
@@ -999,7 +1001,7 @@ $avatar =
 
                                             Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
                                             <br>
-                                            <small><?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["assignment_target"])) ?></small>
+                                            <small><?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["performance_target"] ?? $kpi["assignment_target"])) ?></small>
 
                                         <?php else: ?>
 

@@ -11,11 +11,12 @@ PASS J7 confirm without ticking: KPI 8 January Draft NOT updated (still 12.00 / 
 PASS J8 token is single use: re-posting the same token is refused, DB unchanged
 PASS J9 confirm with tick: same row updated (same performance_id) -> Draft, actual 30.00, score 5.00, target 20.00
 PASS J10 no Submit/Approve created: all KPI 8 / KPI 14 rows written by the import are Draft
-PASS J11 rows of other employees / other KPIs untouched
+PASS J11 rows of other employees / other KPIs untouched (KPI 9 checked in J11b)
+PASS J11b KPI 9 January saved once as Draft, Actual = Total R 475000.00, Target = January Budget 500000.00, score 3 (95%)
 PASS J12 rollback [actual changed after Preview] -> whole batch cancelled with message, nothing written
 PASS J12 rollback [target changed after Preview] -> whole batch cancelled with message, nothing written
 PASS J12 rollback [submitted changed after Preview] -> whole batch cancelled with message, nothing written
 PASS J12 rollback [period_closed changed after Preview] -> whole batch cancelled with message, nothing written
 PASS J13 existing Submitted row: preview shows the Submitted error, no confirm button, row unchanged
 
-TOTAL 18 · PASS 18 · FAIL 0
+TOTAL 19 · PASS 19 · FAIL 0

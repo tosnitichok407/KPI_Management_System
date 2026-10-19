@@ -104,6 +104,27 @@ const KPI_COMPANY_UPLIFT_CRITERIA_CHECK_MAX = 1000;
 /* วัน/เดือนที่ใช้ตัดสินว่าเดือนสิ้นสุดแล้วหรือยัง (เฉพาะ KPI 8) ตามเวลาไทย ไม่ขึ้นกับ date.timezone ของ php.ini */
 const KPI_COMPANY_UPLIFT_TIMEZONE = "Asia/Bangkok";
 
+/*
+| KPI 10 / 11 / 12 (เจ้าของระบบยืนยัน 2026-10-19: ใช้ช่อง "ที่ทำได้" ในแบบฟอร์ม KPI AM แถว 15-17 ได้เลย)
+|   ค่าในช่องเป็นสัดส่วนแบบ Excel (1 = 100% · สูตรเกรดในแบบฟอร์มเทียบกับ %) → Actual = ค่า × 100 (หน่วย %)
+|   คำนวณด้วยเลขทศนิยมแม่นยำ ไม่ปัดเศษ: ผลมีทศนิยมเกิน 2 ตำแหน่ง / ติดลบ / ไม่ใช่ตัวเลข → ปฏิเสธ
+|   ช่องที่เป็นสูตรยังต้องผ่านการไล่ตรวจสูตรต้นทางเหมือนช่องอื่น · ช่องว่าง = เดือนนั้นไม่มีข้อมูล (ข้าม)
+|   ใช้ได้เฉพาะ kpi_id ในรายการนี้ · คะแนนจาก kpiCalculateScore() ตามเกณฑ์ / Target ของ KPI ในระบบ (ไม่ใช้เกรดจาก Excel)
+*/
+const KPI_COMPANY_FORM_RATIO_RULE = "kpi_am_cell_ratio_times_100";
+const KPI_COMPANY_FORM_RATIO_KPI_IDS = [10, 11, 12];
+
+/*
+| KPI 9 "มูลค่าไม่ต่อสัญญา" (เจ้าของระบบยืนยัน 2026-10-19 · แบบ ก: ใช้ Budget รายเดือนจากไฟล์เป็น Target)
+|   แหล่งข้อมูล = แถวของเดือนในตาราง "Portfolio(มูลค่า)" ของชีตสรุป — แถวเดียวกับ KPI 14 และตรวจสูตรต้นทางชุดเดียวกัน
+|     (Q = G/C · G = SUM(D:F) · C = Budget จากชีตของเดือนนั้น · ทศนิยมไม่เกิน 2 ตำแหน่ง · ห้าม External Link / Error)
+|   Actual = Total R (G) จำนวนเงิน · Target = Budget ของเดือนนั้น (C) จำนวนเงิน — ไม่ใช้ Budget ใน Assignment
+|   คะแนน = kpiCalculateScore() กฎ KPI 9 (Total R ÷ Budget: ≥100 / 96 / 90 / 85%) ไม่ใช้เกรดจาก Excel
+|   ไม่ใช้ช่อง "ที่ทำได้" (K14) ในแบบฟอร์ม เพราะอ้างตารางจำนวนรายทั้งปี ไม่ใช่มูลค่ารายเดือน
+|   ใช้ได้เฉพาะหัวข้อ / ชื่อ KPI / kpi_id 9 นี้เท่านั้น
+*/
+const KPI_COMPANY_NON_RENEWAL_RULE = "non_renewal_total_r_with_monthly_budget";
+
 /* ฟังก์ชันที่ผลขึ้นกับค่าที่อ้างอิงเท่านั้น (นอกจากนี้ → ตรวจสอบไม่ได้ → ปฏิเสธ) */
 const KPI_COMPANY_ALLOWED_FUNCTIONS = [
     "SUM", "AVERAGE", "MIN", "MAX", "COUNT", "COUNTA", "COUNTIF", "COUNTIFS", "SUMIF", "SUMIFS",
@@ -881,8 +902,8 @@ function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $fo
 
             $entries = $mapIndex[$section . "|" . $label] ?? [];
 
-            /* หัวข้อที่ยืนยันกฎ "การต่อสัญญา": อ่านจากชีตสรุปรายเดือนแทนช่อง "ที่ทำได้" ในแบบฟอร์ม */
-            if (count($entries) === 1 && ($entries[0]["value_rule"] ?? null) === KPI_COMPANY_RENEWAL_RULE) {
+            /* หัวข้อที่ยืนยันกฎ "การต่อสัญญา" (KPI 14) / "มูลค่าไม่ต่อสัญญา" (KPI 9): อ่านจากชีตสรุปรายเดือนแทนช่อง "ที่ทำได้" ในแบบฟอร์ม */
+            if (count($entries) === 1 && in_array($entries[0]["value_rule"] ?? null, [KPI_COMPANY_RENEWAL_RULE, KPI_COMPANY_NON_RENEWAL_RULE], true)) {
                 $mappingReasons = kpiCompanyMappingReasons(
                     $section, $label, $weight, $entries[0], ($labelCount[$section . "|" . $label] ?? 0) > 1, $confirmedIds
                 );
@@ -1000,6 +1021,32 @@ function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $fo
                     kpiCompanyMappingReasons($section, $label, $weight, $mapping, ($labelCount[$section . "|" . $label] ?? 0) > 1, $confirmedIds)
                 );
 
+                /* KPI 10 / 11 / 12: Actual = ค่าในช่อง × 100 (ไม่ปัดเศษ · ดู KPI_COMPANY_FORM_RATIO_RULE) */
+                $formRatio = $section === "performance" && ($mapping["value_rule"] ?? null) === KPI_COMPANY_FORM_RATIO_RULE;
+                $actual = null;
+                $details = [];
+
+                if ($formRatio && $numeric !== null && !$reasons) {
+                    $ratioText = kpiCompanyPlainDecimal((float) $numeric);
+                    $percent = $ratioText === null || !function_exists("bcmul") ? null : bcmul($ratioText, "100", 40);
+                    $percent = $percent === null ? null : rtrim(rtrim($percent, "0"), ".");
+
+                    if ($percent === null) {
+                        $reasons[] = "คำนวณค่า × 100 ไม่ได้ (ต้องมีส่วนขยาย BCMath บนเซิร์ฟเวอร์)";
+                    } elseif (str_starts_with($percent, "-")) {
+                        $reasons[] = "ค่าในช่อง {$coordinate} ติดลบ ระบบไม่บันทึกค่าติดลบ";
+                    } elseif (str_contains($percent, ".") && strlen($percent) - strpos($percent, ".") - 1 > 2) {
+                        $reasons[] = "ค่าในช่อง {$coordinate} × 100 มีทศนิยมเกิน 2 ตำแหน่ง ระบบไม่ปัดเศษ กรุณาแก้ไขไฟล์";
+                    } else {
+                        $actual = $percent === "" ? "0" : $percent;
+                        $details = [
+                            "rule" => KPI_COMPANY_FORM_RATIO_RULE, "cell" => $coordinate,
+                            "ratio" => rtrim(rtrim(number_format((float) $numeric, 6, ".", ""), "0"), "."), "actual" => $actual
+                        ];
+                        $warnings[] = "ค่าในช่อง {$coordinate} = " . $details["ratio"] . " (สัดส่วนใน Excel) × 100 → Actual {$actual}%";
+                    }
+                }
+
                 $status = $reasons
                     ? KPI_COMPANY_STATUS_REJECTED
                     : ($mappingReasons ? KPI_COMPANY_STATUS_NEEDS_CONFIRMATION : KPI_COMPANY_STATUS_READY);
@@ -1016,12 +1063,16 @@ function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $fo
                     "source" => $formSheet . "!" . $coordinate,
                     "kind" => $kind,
                     "formula" => $formulaText,
-                    "value" => $numeric ?? (is_scalar($value) ? (string) $value : null),
+                    "value" => $formRatio && $actual !== null ? $actual : ($numeric ?? (is_scalar($value) ? (string) $value : null)),
                     "kpi_id" => $mapping["kpi_id"] ?? null,
                     "status" => $status,
                     "reasons" => array_merge($reasons, $mappingReasons),
-                    "warnings" => $warnings
+                    "warnings" => $warnings,
+                    "details" => $details
                 ];
+                if ($formRatio) {
+                    $item["value_rule"] = KPI_COMPANY_FORM_RATIO_RULE;
+                }
 
                 $out["items"][] = $item;
 
@@ -1035,8 +1086,8 @@ function kpiCompanyEvaluate(Spreadsheet $spreadsheet, array $package, string $fo
                             "kpi_id" => (int) $mapping["kpi_id"],
                             "year" => $year,
                             "month" => $month,
-                            "actual" => null,
-                            "competency_score" => (int) $numeric,
+                            "actual" => $formRatio ? $actual : null,
+                            "competency_score" => $formRatio ? null : (int) $numeric,
                             "note" => null
                         ],
                         "errors" => []
@@ -1054,9 +1105,23 @@ function kpiCompanyMappingReasons(string $section, string $label, ?float $weight
 {
     $reasons = [];
 
-    /* KPI 9 แยกออกจากการนำเข้าเสมอ จนกว่าจะยืนยันแหล่ง Actual (Total R) และ Target (Budget) ตามสูตรของระบบ */
-    if ($label === kpiCompanyNormalizeLabel(NON_RENEWAL_KPI_NAME) || (int) ($mapping["kpi_id"] ?? 0) === NON_RENEWAL_KPI_ID) {
-        $reasons[] = "KPI 9 (" . NON_RENEWAL_KPI_NAME . ") แยกออกจากการนำเข้า จนกว่าจะยืนยันแหล่ง Actual (Total R) และ Target (Budget) ที่ตรงกับสูตรของระบบ";
+    /*
+    | KPI 9 นำเข้าได้เฉพาะกฎ KPI_COMPANY_NON_RENEWAL_RULE (Total R + Budget รายเดือนจากชีตสรุป) ที่หัวข้อ ชื่อ และ kpi_id ตรงกันทั้งหมด
+    | และกฎนี้ใช้กับ KPI อื่นไม่ได้ · ไม่ตรง → ไม่นำเข้า
+    */
+    $isKpi9 = $label === kpiCompanyNormalizeLabel(NON_RENEWAL_KPI_NAME) || (int) ($mapping["kpi_id"] ?? 0) === NON_RENEWAL_KPI_ID;
+    if (
+        ($isKpi9 || ($mapping["value_rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE)
+        && (
+            $section !== "performance"
+            || $label !== kpiCompanyNormalizeLabel(NON_RENEWAL_KPI_NAME)
+            || ($mapping["kpi_id"] ?? null) !== NON_RENEWAL_KPI_ID
+            || ($mapping["value_rule"] ?? null) !== KPI_COMPANY_NON_RENEWAL_RULE
+            || (string) ($mapping["confirmed_kpi_name"] ?? "") !== NON_RENEWAL_KPI_NAME
+        )
+    ) {
+        $reasons[] = "KPI 9 (" . NON_RENEWAL_KPI_NAME . ") นำเข้าได้เฉพาะกฎ Total R + Budget รายเดือนจากชีตสรุป"
+            . " และกฎนี้ใช้ได้เฉพาะหัวข้อ / KPI \"" . NON_RENEWAL_KPI_NAME . "\" (kpi_id " . NON_RENEWAL_KPI_ID . ")";
     }
 
     if ($duplicateLabel) {
@@ -1081,7 +1146,7 @@ function kpiCompanyMappingReasons(string $section, string $label, ?float $weight
             $reasons[] = "ยังไม่ได้ยืนยันกฎแปลงค่าของหัวข้อนี้";
         } elseif (
             $section === "performance"
-            && !in_array($mapping["value_rule"] ?? null, [KPI_COMPANY_RENEWAL_RULE, KPI_COMPANY_UPLIFT_RULE], true)
+            && !in_array($mapping["value_rule"] ?? null, [KPI_COMPANY_RENEWAL_RULE, KPI_COMPANY_UPLIFT_RULE, KPI_COMPANY_FORM_RATIO_RULE, KPI_COMPANY_NON_RENEWAL_RULE], true)
         ) {
             $reasons[] = "ยังไม่ได้ยืนยันกฎแปลงค่า (หน่วย / Target) ของ KPI Performance";
         } elseif (
@@ -1103,6 +1168,13 @@ function kpiCompanyMappingReasons(string $section, string $label, ?float $weight
             /* สูตรของ KPI ปรับเพิ่มมูลค่าสัญญาใช้ได้เฉพาะหัวข้อนี้ ชื่อ KPI นี้ และ kpi_id 8 */
             $reasons[] = "กฎแปลงค่าการปรับเพิ่มมูลค่าสัญญาใช้ได้เฉพาะหัวข้อและ KPI \"" . KPI_COMPANY_UPLIFT_LABEL
                 . "\" (kpi_id " . KPI_COMPANY_UPLIFT_KPI_ID . ")";
+        } elseif (
+            $section === "performance"
+            && $mapping["value_rule"] === KPI_COMPANY_FORM_RATIO_RULE
+            && !in_array($mapping["kpi_id"], KPI_COMPANY_FORM_RATIO_KPI_IDS, true)
+        ) {
+            /* กฎ "ช่องที่ทำได้ × 100" ยืนยันไว้เฉพาะ KPI 10 / 11 / 12 */
+            $reasons[] = "กฎแปลงค่า \"ช่องที่ทำได้ × 100\" ใช้ได้เฉพาะ kpi_id " . implode(", ", KPI_COMPANY_FORM_RATIO_KPI_IDS);
         }
     }
 
@@ -1244,9 +1316,12 @@ function kpiCompanyEvaluateRenewal(
     array &$out, int &$sequence, ?int $onlyMonth = null
 ): void {
     $thaiMonths = monthlyPeriodMonths();
+    /* KPI 9: แถวเดียวกัน แต่บันทึก Total R (G) เป็น Actual และ Budget ของเดือน (C) เป็น Target */
+    $rule = ($mapping["value_rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE ? KPI_COMPANY_NON_RENEWAL_RULE : KPI_COMPANY_RENEWAL_RULE;
+    $nonRenewal = $rule === KPI_COMPANY_NON_RENEWAL_RULE;
 
-    $push = function (int $month, string $source, ?string $formula, $value, array $reasons, array $warnings, ?string $actual, ?string $requires = null, array $details = [])
-        use (&$out, &$sequence, $section, $rawLabel, $weight, $mapping, $mappingReasons, $calcUnreliable, $thaiMonths, $year, $employeeCode): void {
+    $push = function (int $month, string $source, ?string $formula, $value, array $reasons, array $warnings, ?string $actual, ?string $requires = null, array $details = [], ?string $target = null)
+        use (&$out, &$sequence, $section, $rawLabel, $weight, $mapping, $mappingReasons, $calcUnreliable, $thaiMonths, $year, $employeeCode, $rule): void {
 
         $itemMappingReasons = $mappingReasons;
         if ($calcUnreliable && $formula !== null) {
@@ -1260,7 +1335,7 @@ function kpiCompanyEvaluateRenewal(
         $item = [
             "mapping_ready" => !$itemMappingReasons,
             "confirmed_kpi_name" => $mapping["confirmed_kpi_name"] ?? null,
-            "value_rule" => KPI_COMPANY_RENEWAL_RULE,
+            "value_rule" => $rule,
             "action" => null,
             "section" => $section,
             "label" => $rawLabel,
@@ -1293,7 +1368,7 @@ function kpiCompanyEvaluateRenewal(
                     "actual" => $actual,
                     "competency_score" => null,
                     "note" => null
-                ],
+                ] + ($rule === KPI_COMPANY_NON_RENEWAL_RULE ? ["target" => $target] : []),
                 "errors" => []
             ];
         }
@@ -1393,8 +1468,11 @@ function kpiCompanyEvaluateRenewal(
         return;
     }
 
-    $out["notes"][] = "หัวข้อ \"" . KPI_COMPANY_RENEWAL_LABEL . "\" อ่านจากชีต {$summaryName} (Q = G/C: Total R ÷ Budget ของแต่ละเดือน ไม่รวมยอดขายใหม่)"
-        . " ไม่ใช้ช่อง \"ที่ทำได้\" ในแบบฟอร์ม " . KPI_COMPANY_FORM_SHEET;
+    $out["notes"][] = $nonRenewal
+        ? "หัวข้อ \"" . NON_RENEWAL_KPI_NAME . "\" อ่านจากชีต {$summaryName} (Actual = Total R (G) · Target = Budget (C) ของแต่ละเดือน)"
+            . " ไม่ใช้ช่อง \"ที่ทำได้\" ในแบบฟอร์ม " . KPI_COMPANY_FORM_SHEET
+        : "หัวข้อ \"" . KPI_COMPANY_RENEWAL_LABEL . "\" อ่านจากชีต {$summaryName} (Q = G/C: Total R ÷ Budget ของแต่ละเดือน ไม่รวมยอดขายใหม่)"
+            . " ไม่ใช้ช่อง \"ที่ทำได้\" ในแบบฟอร์ม " . KPI_COMPANY_FORM_SHEET;
 
     $read = function (string $coordinate) use ($summary): array {
         if (!$summary->cellExists($coordinate)) {
@@ -1504,6 +1582,7 @@ function kpiCompanyEvaluateRenewal(
         }
 
         $actual = null;
+        $target = null;
         $requires = null;
         $details = [];
 
@@ -1511,6 +1590,38 @@ function kpiCompanyEvaluateRenewal(
             $basisPoints = nonRenewalAchievementBasisPoints($g, $c);
             if ($basisPoints === null) {
                 $reasons[] = "คำนวณสัดส่วน Total R ÷ Budget ไม่ได้";
+            } elseif ($nonRenewal) {
+                /* KPI 9: Actual = Total R · Target = Budget ของเดือน (ตรวจแล้วว่าทศนิยมไม่เกิน 2 ตำแหน่ง) · ค่าเกินที่ระบบเก็บได้ → ไม่บันทึก */
+                $actual = sprintf("%.2f", (float) $g);
+                $target = sprintf("%.2f", (float) $c);
+                if ((float) $c > KPI_BUDGET_MAX || (float) $g > KPI_BUDGET_MAX) {
+                    $reasons[] = "Budget / Total R ของเดือน{$monthName} เกินค่าสูงสุดที่ระบบรองรับ (" . number_format(KPI_BUDGET_MAX, 2) . ")";
+                    $actual = $target = null;
+                } else {
+                    $achievement = sprintf("%d.%02d", intdiv($basisPoints, 100), $basisPoints % 100);
+                    $details = [
+                        "rule" => KPI_COMPANY_NON_RENEWAL_RULE,
+                        "budget" => number_format((float) $c, 2), "budget_cell" => "C{$row}",
+                        "total_r" => number_format((float) $g, 2), "total_r_cell" => "G{$row}",
+                        "ratio" => rtrim(rtrim(number_format((float) $q, 6, ".", ""), "0"), "."),
+                        "achievement" => $achievement, "actual" => $actual, "target" => $target
+                    ];
+                    $warnings[] = "Actual = Total R (G{$row}) " . $details["total_r"] . " · Target = Budget ของเดือน (C{$row}) " . $details["budget"]
+                        . " → Achievement {$achievement}% (Budget ใน Assignment ไม่ถูกใช้กับรายการนี้)";
+                    if ((float) $g == 0.0) {
+                        $monthEnd = date("Y-m-t", strtotime(sprintf("%04d-%02d-01", $year, $month)));
+                        if ($monthEnd >= date("Y-m-d")) {
+                            $reasons[] = "Budget " . $details["budget"] . " แต่ Total R = 0 และเดือน{$monthName} {$year} ยังไม่สิ้นสุด"
+                                . " ข้อมูลต้นทางอาจยังไม่ครบ ระบบจึงไม่บันทึกเดือนนี้";
+                            $actual = $target = null;
+                        } else {
+                            $requires = KPI_COMPANY_CONFIRM_ZERO_TOTAL_R;
+                            $warnings[] = "คำเตือน: Budget " . $details["budget"] . " แต่ Total R = 0 ผลคำนวณจะเป็น 0% (ระดับต่ำสุด)"
+                                . " ระบบแยกไม่ได้ว่าเป็นผลจริงหรือข้อมูลในไฟล์ยังไม่ครบ"
+                                . " กรุณาตรวจไฟล์ แล้วติ๊กยืนยันรายการนี้ก่อนบันทึก (ไม่ติ๊ก = ไม่บันทึกรายการนี้)";
+                        }
+                    }
+                }
             } else {
                 $actual = sprintf("%d.%02d", intdiv($basisPoints, 100), $basisPoints % 100);
                 $details = [
@@ -1544,7 +1655,7 @@ function kpiCompanyEvaluateRenewal(
             }
         }
 
-        $push($month, $source, $qFormula, $isNumber($q) ? $q + 0 : (is_scalar($q) ? (string) $q : null), $reasons, $warnings, $actual, $requires, $details);
+        $push($month, $source, $qFormula, $isNumber($q) ? $q + 0 : (is_scalar($q) ? (string) $q : null), $reasons, $warnings, $actual, $requires, $details, $target);
     }
 }
 
@@ -2146,6 +2257,10 @@ function kpiCompanyPrepare(PDO $pdo, int $employeeId, string $path, int $year, ?
             /* Actual เป็นร้อยละของ Budget จึงใช้ได้เฉพาะเมื่อ Target ใน Assignment = 100 (%) */
             $item["status"] = KPI_COMPANY_STATUS_REJECTED;
             $item["reasons"][] = "Target ของ KPI นี้ในระบบ (" . ($checked["target"] ?? "-") . ") ไม่ใช่ 100 (%) ตามที่ยืนยัน กรุณาติดต่อผู้ดูแลระบบ";
+        } elseif (($item["value_rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE && ($checked["target"] ?? null) !== ($item["details"]["target"] ?? false)) {
+            /* KPI 9: Target ที่ตรวจ/บันทึกต้องเป็น Budget ของเดือนจากไฟล์ (ไม่ใช่ Budget ใน Assignment) */
+            $item["status"] = KPI_COMPANY_STATUS_REJECTED;
+            $item["reasons"][] = "Target ของรายการนี้ไม่ตรงกับ Budget ของเดือนในไฟล์ ระบบจึงไม่บันทึก";
         } elseif (($item["value_rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE && ($checked["target"] ?? null) !== KPI_COMPANY_UPLIFT_TARGET) {
             /* Actual เป็นร้อยละการเพิ่มของมูลค่าสัญญา จึงใช้ได้เฉพาะเมื่อ Target ใน Assignment = 20 (%) */
             $item["status"] = KPI_COMPANY_STATUS_REJECTED;

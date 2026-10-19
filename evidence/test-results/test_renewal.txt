@@ -41,7 +41,7 @@ PASS Z7 Total R formula cannot be computed (#DIV/0! in source) -> REJECTED as er
 PASS P1 Template rows for kpi 14 -> error (template channel closed)
 PASS P2 forged preview + direct commit (template origin) for kpi 14 -> refused, nothing written
 PASS P3 Template rejected for other KPIs too (kpi 1, policy: company file only)
-PASS P4 company-only list = confirmed map entries only (kpi 14 and kpi 8 since 2026-10-18)
+PASS P4 company-only list = confirmed map entries only (14, 8, 9, 10, 11, 12, 15-19 since 2026-10-19)
 PASS M1 renewal rule attached to another KPI's row -> NEEDS_CONFIRMATION, never READY
 PASS M2 renewal rule with another KPI name in the mapping -> NEEDS_CONFIRMATION
 PASS T23 closed period -> REJECTED, commit closed

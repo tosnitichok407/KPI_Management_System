@@ -46,7 +46,7 @@ PASS M1 [test 21] uplift rule mapped to kpi_id 7 -> NEEDS_CONFIRMATION (rule onl
 PASS M2 [test 21] confirmed name differs -> NEEDS_CONFIRMATION
 PASS M3 [test 21] uplift rule put on the KPI 14 row -> NEEDS_CONFIRMATION (not applied to KPI 14)
 PASS M4 REAL map file (KPI 8 confirmed 2026-10-18): KPI 8 READY from ก.พ.69!S42 with Actual 20 and a KPI 8 import row
-PASS M5 REAL map file: confirmed KPI ids = {14, 8}
+PASS M5 REAL map file: confirmed KPI ids = {14, 8, 9, 10, 11, 12, 15-19} (2026-10-19)
 PASS M6 [test 23] KPI 14 in the same workbook with KPI 8 enabled: unchanged (Jan 95.00, Feb 99.99, Jun 40.00 READY)
 PASS P1 Feb prepare: KPI 8 READY insert, Actual 20, Target 20.00, score 4 from the system criteria, commit open
 PASS P2 floored integer Actual goes through the unchanged kpiCalculateScore(): 0->1, 4->1, 5->2, 9->2, 10->3, 14->3, 15->4, 20->4, 21->5, 57->5
@@ -64,6 +64,7 @@ PASS P13 criteria restored -> Jun READY again (Actual 57)
 PASS P14 [test 24] Template origin for KPI 8 is still rejected server side
 PASS P15 [test 24] Template commit for KPI 8 writes nothing
 PASS P16 negative month cannot reach commit (no rows, commit closed, DB unchanged)
-PASS P17 other employees' / other KPIs' rows untouched by the whole run
+PASS P17 other employees' / other KPIs' rows untouched by the whole run (KPI 9 checked in P17b)
+PASS P17b KPI 9 February: one new Draft, Target = monthly Budget 200000.00 (not the Assignment 500000), Actual = Total R 199990.00, score = nonRenewalKpiGrade
 
-TOTAL 67 · PASS 67 · FAIL 0
+TOTAL 68 · PASS 68 · FAIL 0

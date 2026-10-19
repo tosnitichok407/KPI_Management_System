@@ -110,3 +110,29 @@ button {
     }
 
 }
+
+/* ช่องที่ต้องกรอก (*) และข้อความ error ใต้ช่อง (รูปแบบเดียวกับหน้าเพิ่ม KPI) */
+.required-mark {
+    color: #dc2626;
+    font-weight: 600;
+    margin-left: 2px;
+}
+
+.required-note {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0 0 16px;
+}
+
+.form-group.has-error input,
+.form-group.has-error select,
+.form-group.has-error textarea {
+    border-color: #dc2626;
+    background: #fef2f2;
+}
+
+.field-error {
+    margin-top: 6px;
+    color: #991b1b;
+    font-size: 14px;
+}

@@ -514,6 +514,12 @@ $actionLabels = [
                                             <?php if (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE): ?>
                                                 ราคาเดิม (<?= $e($row["details"]["base_cell"]) ?>) <?= $e($row["details"]["base"]) ?>
                                                 <span class="import-sub">ผลต่าง (<?= $e($row["details"]["diff_cell"]) ?>) <?= $e($row["details"]["diff"]) ?> · สัดส่วน (<?= $e($row["details"]["ratio_cell"]) ?>) <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>% (ปัดลงเป็นจำนวนเต็ม)</span>
+                                            <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE): ?>
+                                                Total R (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> = Actual
+                                                <span class="import-sub">Budget ของเดือน (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?> = Target · Achievement <?= $e($row["details"]["achievement"]) ?>%</span>
+                                            <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_FORM_RATIO_RULE): ?>
+                                                ที่ทำได้ (<?= $e($row["details"]["cell"]) ?>) <?= $e($row["details"]["ratio"]) ?>
+                                                <span class="import-sub">สัดส่วนใน Excel × 100 → Actual <?= $e($row["details"]["actual"]) ?>%</span>
                                             <?php elseif (!empty($row["details"])): ?>
                                                 Budget (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?>
                                                 <span class="import-sub">Total R (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> · สัดส่วน <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>%</span>

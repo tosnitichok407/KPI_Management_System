@@ -52,6 +52,7 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 3. **Admin** มอบหมาย KPI ให้พนักงานรายปี กำหนด Target + Weight · น้ำหนักรวมต่อคนต่อปี ≤ 100% (`admin/kpi-assignment/`)
 4. **Employee** นำเข้าผลงานจาก **ไฟล์ Excel จริงของบริษัท** (`employee/kpi-import.php`) เดือนที่รอบยัง `Open` → Preview → ยืนยัน → บันทึกเป็น `Draft`
    - รับเฉพาะ KPI ที่ยืนยัน Mapping แล้ว: ปัจจุบันมี **KPI 14 "บรรลุเป้าหมายการต่อสัญญา"** (Actual = Total R ÷ Budget × 100 ตัด 2 ตำแหน่ง · Target 100 · คะแนนจาก `kpiCalculateScore()`) และ KPI 8
+   - **KPI 10 / 11 / 12** (ยืนยัน 2026-10-19): Actual = ช่อง "ที่ทำได้" ในแบบฟอร์ม KPI AM (แถว 15-17) × 100 ไม่ปัดเศษ · **Competency 15-19**: คะแนน 1-5 จากช่อง "ที่ทำได้" · **KPI 9 "มูลค่าไม่ต่อสัญญา"** (ยืนยัน 2026-10-19 · เจ้าของระบบเลือกแบบ ก): อ่านจากแถวของเดือนในชีต "สรุปทั้งปี.." (แถวเดียวกับ KPI 14 ตรวจต้นทางสูตรชุดเดียวกัน) · Actual = Total R (G) · **Target = Budget ของเดือนนั้น (C) จากไฟล์** ไม่ใช้ Budget ใน Assignment · คะแนนตามกฎ KPI 9 ของระบบ (Total R ÷ Budget ≥100 / 96 / 90 / 85%) · ไม่ใช้ช่อง K14 ในแบบฟอร์ม
    - **KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"**: **เปิดใช้งานแล้ว** (เจ้าของระบบอนุมัติ 2026-10-18) · ข้อมูล KPI 8 ของเดือนใดไม่ผ่าน → ไฟล์เดือนนั้นนำเข้าไม่ได้ทั้งไฟล์ (รวม KPI 14) · รายละเอียดกฎในหัวข้อ 6
    - ปิดแล้ว: หน้ากรอกเอง (`employee/kpi/kpi.php`, ฟอร์มใน `employee/kpi-detail.php`) และ System-generated Template (`employee/kpi-import-template.php` + Template upload/Preview/Commit ถูกปฏิเสธฝั่ง Server)
    - Budget > 0 แต่ Total R = 0: เดือนยังไม่สิ้นสุด → ไม่บันทึก · สิ้นสุดแล้ว → เตือน + ติ๊กยืนยันรายแถว (ไม่ติ๊ก = ไม่บันทึก)
@@ -70,8 +71,8 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 | `includes/kpi-score-helper.php` | **แหล่งหลัก** ตัดเกรด + โหลด/บันทึกเกณฑ์ |
 | `includes/monthly-period-helper.php` | หารอบตามเดือน, ตรวจการใช้งานรอบก่อนลบ |
 | `employee/kpi-import.php` | **ช่องทางเดียวที่บันทึกผล KPI**: นำเข้าไฟล์ Excel ของบริษัท → Preview → Commit (`Draft`) |
-| `includes/kpi-import-company-reader.php` | อ่าน/ตรวจแบบฟอร์ม KPI AM (allowlist ชีต, ตรวจสูตรทุกชั้น, กฎ KPI 14 และ KPI 8) |
-| `includes/kpi-import-company-map.php` | Mapping หัวข้อแบบฟอร์ม → KPI ในระบบ (ยืนยันแล้ว KPI 14 และ KPI 8) + Checklist 12 ข้อ |
+| `includes/kpi-import-company-reader.php` | อ่าน/ตรวจแบบฟอร์ม KPI AM (allowlist ชีต, ตรวจสูตรทุกชั้น, กฎ KPI 14, KPI 8, KPI 10-12 และ Competency) |
+| `includes/kpi-import-company-map.php` | Mapping หัวข้อแบบฟอร์ม → KPI ในระบบ (ยืนยันแล้ว KPI 14, 8, 9, 10, 11, 12, 15-19) + Checklist 12 ข้อ |
 | `includes/kpi-import-helper.php` | Validate / Commit กลาง (Transaction + ล็อก, Draft เท่านั้น, ปิด origin Template) |
 | `employee/kpi/kpi.php` | (ปิดแล้ว) ส่งต่อไปหน้านำเข้า |
 | `employee/kpi-detail.php` | รายละเอียด + ประวัติ (ดูอย่างเดียว · ไม่มีฟอร์มบันทึกแล้ว) |
@@ -161,6 +162,6 @@ Role: `1 = Admin`, `2 = Manager`, `3 = Employee` (hard-code ในโค้ด)
 - จำนวน KPI ที่ยังใช้เกณฑ์แบบเก่า (`kpi_score_levels` หรือ `score_5..1`)
 - ยอด Budget สูงสุดจริงของบริษัท (ถ้าเกิน 99,999,999.99 ต้องขยายคอลัมน์ `target_value`)
 - กฎธุรกิจว่า `Draft` ควรนับในรายงานหรือไม่ และจะมีขั้นตอนอนุมัติหรือไม่ (ผลจากการนำเข้าเป็น `Draft` ทั้งหมด)
-- Mapping ของ KPI อื่นในแบบฟอร์ม KPI AM (ชื่อหัวข้อบางข้อสะกดต่างจากชื่อในระบบ) และความสัมพันธ์ของ KPI 9 กับ KPI 14 (ใช้ Total R / Budget เหมือนกัน)
+- KPI 9: เกรดในแบบฟอร์ม Excel (K14 → ตารางจำนวนรายทั้งปี) ต่างจากวิธีของระบบ (มูลค่ารายเดือน แบบ ก · เจ้าของระบบยอมรับ 2026-10-19) · Budget ใน Assignment ของ KPI 9 (5.00) ไม่ถูกใช้ในการนำเข้าแล้ว แต่ยังแสดงในหน้าระดับ Assignment
 - KPI 8: กติกาสำหรับแถวที่มีราคา (O/R) แต่ไม่มีผลต่าง (S) · ความถูกต้องของค่า S ที่พิมพ์เอง · จะเลือกแก้ timezone ของ KPI 14 แบบใด
 - Manager ควรเห็นเฉพาะแผนกตัวเองหรือไม่ (ปัจจุบันเห็นทุกแผนก)

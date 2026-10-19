@@ -516,7 +516,7 @@ $performances =
                                     <td>
 
                                         <?= $isBudgetKpi
-                                            ? kpiFormatMoney($kpi["target_value"])
+                                            ? kpiFormatMoney($performance["target"] ?? $kpi["target_value"])
                                             : number_format(
                                                 $targetValue,
                                                 0
@@ -546,7 +546,7 @@ $performances =
                                         / 5
 
                                         <?php if ($isBudgetKpi): ?>
-                                            <?php $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $kpi["target_value"]); ?>
+                                            <?php /* KPI 9: เทียบกับ Budget ของเดือนที่บันทึกกับผลงาน (ถ้ามี) */ $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $performance["target"] ?? $kpi["target_value"]); ?>
                                             <br>
                                             <small>
                                                 คะแนนที่บันทึกไว้

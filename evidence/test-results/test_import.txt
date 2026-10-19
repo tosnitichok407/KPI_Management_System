@@ -54,6 +54,16 @@ PASS C8 KPI 2 (Jul-Dec) inserted for August
 PASS C9 Approved / Submitted / other employee rows untouched
 PASS C10 re-upload: confirmed row + inserts now 'unchanged', unconfirmed Draft still 'update'
 PASS C11 re-upload commit writes nothing (unchanged 5, skipped 1, no duplicates)
+PASS K9a KPI 9 uses the row Budget (600000) not the Assignment Budget (500000): 480000/600000 = 80% -> score 1
+PASS K9b KPI 9 from the company file without a monthly Budget -> error (no fallback to the Assignment Budget)
+PASS K9c Budget 0 -> error, no score
+PASS K9d negative Budget -> error, no score
+PASS K9e Budget with 3 decimals -> error, no score
+PASS K9f Budget above the system maximum -> error, no score
+PASS K9g Budget not a number -> error, no score
+PASS K9h a row Target on a KPI other than 9 -> error (only KPI 9 may carry a monthly Target)
+PASS K9i template origin: row Target ignored and the row is still rejected (template closed)
+PASS K9j validation only (nothing written)
 PASS X0 preview: insert Jul + update Jun Draft
 PASS X1 status changed after preview -> whole batch rolled back (Jul insert NOT written)
 PASS X2 row inserted elsewhere after preview -> rollback, nothing written
@@ -65,4 +75,4 @@ PASS TC2 commit with template origin (default) and a forged clean preview -> ref
 PASS TC3 commit with explicit template origin + forged confirmations -> refused, nothing written
 PASS TC4 unknown origin value -> treated as closed, nothing written
 
-TOTAL 64 · PASS 64 · FAIL 0
+TOTAL 74 · PASS 74 · FAIL 0

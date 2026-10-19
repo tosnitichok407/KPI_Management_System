@@ -116,6 +116,7 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 $error = "";
+$fieldErrors = [];   // ชื่อช่อง => ข้อความ error (แสดงใต้ช่องนั้น)
 
 
 /*
@@ -156,34 +157,51 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
 
-        if (!csrfVerify()) {
+    /* ตรวจทุกช่องแล้วแสดงข้อความใต้ช่องที่ผิด (ไม่หยุดที่ช่องแรก) */
+    $validCategoryIds = array_map(fn($category) => (string) $category["category_id"], $categories);
+
+    if ($category_id === "") {
+        $fieldErrors["category_id"] = "กรุณาเลือกหมวดหมู่ KPI";
+    } elseif (!ctype_digit($category_id) || !in_array($category_id, $validCategoryIds, true)) {
+        $fieldErrors["category_id"] = "หมวดหมู่ KPI ไม่ถูกต้อง";
+    }
+
+    if ($kpi_name === "") {
+        $fieldErrors["kpi_name"] = "กรุณากรอกชื่อ KPI";
+    } elseif (mb_strlen($kpi_name) > 255) {
+        $fieldErrors["kpi_name"] = "ชื่อ KPI ต้องไม่เกิน 255 ตัวอักษร";
+    }
+
+    if (!in_array($kpi_type, ["Performance", "Competency"], true)) {
+        $fieldErrors["kpi_type"] = "กรุณาเลือกประเภท KPI (Performance หรือ Competency)";
+    }
+
+    if ($weight === "") {
+        $fieldErrors["weight"] = "กรุณากรอก Weight";
+    } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
+        $fieldErrors["weight"] = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
+    }
+
+    if (mb_strlen($unit) > 50) {
+        $fieldErrors["unit"] = "หน่วยวัดต้องไม่เกิน 50 ตัวอักษร";
+    }
+
+    if ($max_score === "") {
+        $fieldErrors["max_score"] = "กรุณากรอกคะแนนสูงสุด";
+    } elseif (!is_numeric($max_score) || $max_score < 1 || $max_score > 5) {
+        $fieldErrors["max_score"] = "คะแนนสูงสุดต้องเป็นตัวเลขระหว่าง 1 - 5";
+    }
+
+    if (max(mb_strlen($score_5), mb_strlen($score_4), mb_strlen($score_3), mb_strlen($score_2), mb_strlen($score_1)) > 255) {
+        $fieldErrors["levels"] = "เกณฑ์คะแนนแต่ละระดับต้องไม่เกิน 255 ตัวอักษร";
+    }
+
+    if (!csrfVerify()) {
 
         $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
-    } elseif ($category_id === "" || !ctype_digit($category_id)) {
+    } elseif ($fieldErrors) {
 
-        $error = "กรุณาเลือก KPI Category";
-    } elseif ($kpi_name === "") {
-
-        $error = "กรุณากรอกชื่อ KPI";
-    } elseif (!in_array($kpi_type, ["Performance", "Competency"], true)) {
-
-        $error = "กรุณาเลือกประเภท KPI (Performance หรือ Competency)";
-    } elseif ($weight === "") {
-
-        $error = "กรุณากรอก Weight";
-    } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
-
-        $error = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
-    } elseif ($max_score === "" || !is_numeric($max_score) || $max_score < 1 || $max_score > 5) {
-
-        $error = "Max Score ต้องเป็นตัวเลขระหว่าง 1 - 5";
-    } elseif (
-        mb_strlen($kpi_name) > 255 || mb_strlen($unit) > 50 ||
-        mb_strlen($score_5) > 255 || mb_strlen($score_4) > 255 || mb_strlen($score_3) > 255 ||
-        mb_strlen($score_2) > 255 || mb_strlen($score_1) > 255
-    ) {
-
-        $error = "ข้อมูลยาวเกินกำหนด";
+        $error = "กรุณาตรวจสอบข้อมูลที่ไม่ถูกต้อง (" . count($fieldErrors) . " ช่อง)";
     } else {
 
         try {
@@ -351,7 +369,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../../assets/css/admin-kpi-edit.css">
+        href="../../assets/css/admin-kpi-edit.css?v=required-1">
 
 </head>
 
@@ -363,9 +381,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             <h1>Edit KPI</h1>
 
+            <p class="required-note"><span class="required-mark" aria-hidden="true">*</span> = ช่องที่ต้องกรอก</p>
+
             <?php if ($error !== ""): ?>
 
-                <div class="error">
+                <div class="error" role="alert">
 
                     <?= htmlspecialchars(
                         $error,
@@ -382,11 +402,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 <?= csrfField() ?>
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["category_id"]) ? " has-error" : "" ?>">
 
-                    <label>KPI Category</label>
+                    <label for="category_id">KPI Category <span class="required-mark" aria-hidden="true">*</span></label>
 
-                    <select name="category_id" required>
+                    <select id="category_id" name="category_id" aria-required="true"<?= isset($fieldErrors["category_id"]) ? " aria-invalid=\"true\" aria-describedby=\"error-category_id\"" : "" ?> required>
 
                         <option value="">
                             -- Select Category --
@@ -413,14 +433,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     </select>
 
+                    <?php if (isset($fieldErrors["category_id"])): ?>
+                        <div class="field-error" id="error-category_id"><?= htmlspecialchars($fieldErrors["category_id"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
+
                 </div>
 
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["kpi_type"]) ? " has-error" : "" ?>">
 
-                    <label>KPI Type</label>
+                    <label for="kpi_type">KPI Type <span class="required-mark" aria-hidden="true">*</span></label>
 
-                    <select name="kpi_type" <?= $isLockedKpi9 ? "disabled" : "required" ?>>
+                    <select id="kpi_type" name="kpi_type" <?= $isLockedKpi9 ? "disabled" : "required" ?>>
 
                         <option value="Performance" <?= ($kpi["kpi_type"] ?? "") === "Performance" ? "selected" : "" ?>>
                             Performance (วัดจาก Target / Actual)
@@ -432,21 +456,33 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                     </select>
 
+                    <?php if (isset($fieldErrors["kpi_type"])): ?>
+                        <div class="field-error" id="error-kpi_type"><?= htmlspecialchars($fieldErrors["kpi_type"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
+
                 </div>
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["kpi_name"]) ? " has-error" : "" ?>">
 
-                    <label>KPI Name</label>
+                    <label for="kpi_name">KPI Name <span class="required-mark" aria-hidden="true">*</span></label>
 
                     <input
                         type="text"
+                        id="kpi_name"
                         name="kpi_name"
+                        maxlength="255"
+                        <?= isset($fieldErrors["kpi_name"]) ? " aria-invalid=\"true\" aria-describedby=\"error-kpi_name\"" : "" ?>
                         value="<?= htmlspecialchars(
                                     $kpi["kpi_name"],
                                     ENT_QUOTES,
                                     "UTF-8"
                                 ) ?>"
                         <?= $isLockedKpi9 ? "disabled" : "required" ?>>
+
+
+                    <?php if (isset($fieldErrors["kpi_name"])): ?>
+                        <div class="field-error" id="error-kpi_name"><?= htmlspecialchars($fieldErrors["kpi_name"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
 
                     <?php if ($isLockedKpi9): ?>
                         <small>ชื่อและประเภทของ KPI นี้ถูกล็อก เพราะกฎคะแนนในระบบผูกกับ KPI ID 9 และ KPI นี้ต้องเป็นประเภท Performance</small>
@@ -468,13 +504,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
 
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["weight"]) ? " has-error" : "" ?>">
 
-                    <label>Weight</label>
+                    <label for="weight">Weight <span class="required-mark" aria-hidden="true">*</span></label>
 
                     <input
                         type="number"
+                        id="weight"
                         name="weight"
+                        aria-required="true"<?= isset($fieldErrors["weight"]) ? " aria-invalid=\"true\" aria-describedby=\"error-weight\"" : "" ?>
                         step="0.01"
                         min="0"
                         max="100"
@@ -485,32 +523,45 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                 ) ?>"
                         required>
 
+                    <?php if (isset($fieldErrors["weight"])): ?>
+                        <div class="field-error" id="error-weight"><?= htmlspecialchars($fieldErrors["weight"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
+
                 </div>
 
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["unit"]) ? " has-error" : "" ?>">
 
-                    <label>Unit</label>
+                    <label for="unit">Unit</label>
 
                     <input
                         type="text"
+                        id="unit"
                         name="unit"
+                        maxlength="50"
                         value="<?= htmlspecialchars(
                                     $kpi["unit"] ?? "",
                                     ENT_QUOTES,
                                     "UTF-8"
                                 ) ?>">
 
+                    <?php if (isset($fieldErrors["unit"])): ?>
+                        <div class="field-error" id="error-unit"><?= htmlspecialchars($fieldErrors["unit"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
+
                 </div>
 
 
-                <div class="form-group">
+                <div class="form-group<?= isset($fieldErrors["max_score"]) ? " has-error" : "" ?>">
 
-                    <label>Max Score</label>
+                    <label for="max_score">Max Score <span class="required-mark" aria-hidden="true">*</span></label>
 
                     <input
                         type="number"
+                        id="max_score"
                         name="max_score"
+                        aria-required="true"<?= isset($fieldErrors["max_score"]) ? " aria-invalid=\"true\" aria-describedby=\"error-max_score\"" : "" ?>
+                        required
                         step="0.01"
                         min="1"
                         max="5"
@@ -520,6 +571,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                     ENT_QUOTES,
                                     "UTF-8"
                                 ) ?>">
+
+                    <?php if (isset($fieldErrors["max_score"])): ?>
+                        <div class="field-error" id="error-max_score"><?= htmlspecialchars($fieldErrors["max_score"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
 
                 </div>
 
@@ -583,6 +638,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <?php endforeach; ?>
 
                 </div>
+
+                    <?php if (isset($fieldErrors["levels"])): ?>
+                        <div class="field-error" id="error-levels"><?= htmlspecialchars($fieldErrors["levels"], ENT_QUOTES, "UTF-8") ?></div>
+                    <?php endif; ?>
 
 
                 <div class="actions">

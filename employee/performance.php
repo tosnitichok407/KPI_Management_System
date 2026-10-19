@@ -324,6 +324,11 @@ foreach ($assignments as $assignment) {
         !empty($assignment["performance_id"])
     ) {
 
+        /* KPI 9: ใช้ Budget ที่บันทึกไว้กับผลงานของเดือนนี้ (นำเข้าจาก Budget รายเดือนในไฟล์บริษัท) แทน Budget ใน Assignment */
+        if (isNonRenewalKpi($assignment) && $assignment["target"] !== null) {
+            $target = (float) $assignment["target"];
+        }
+
         $actual =
             $assignment["actual"] !== null
             ? (float) $assignment["actual"]

@@ -1,0 +1,9 @@
+PASS D1 edit form: red * on category, type, name, weight, max score (+ legend)
+PASS D2 HTML required on the 5 required fields, not on unit
+PASS D3 empty/invalid -> summary (4 ช่อง) + error under category, name, weight, max score · nothing saved
+PASS D4 invalid CSRF -> Session error, nothing saved
+PASS D5 valid edit -> 302 to KPI management, name saved
+PASS D6 KPI 9: name and type still locked (disabled), lock note shown
+PASS D7 KPI 9 with empty weight -> weight error only (forged name/type ignored), nothing saved
+
+TOTAL 7 · PASS 7 · FAIL 0

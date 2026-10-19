@@ -494,7 +494,7 @@ POST /employee/kpi-import.php  action=upload  format=company  company_year  comp
   │      - รหัสพนักงานในชีต KPI AM ต้องตรงกับผู้ใช้ทุกตัวอักษร · ปีในชื่อชีตต้องตรงกับปีที่เลือก
   │      - อ่านเฉพาะเดือนที่เลือก · โหลดเฉพาะเซลล์ที่สูตรอ้างถึง (allowlist ชีต) · ไล่ตรวจสูตรทุกชั้น
   │      - เฉพาะหัวข้อที่ Mapping ยืนยันแล้ว (includes/kpi-import-company-map.php) → READY
-  │        ปัจจุบัน: KPI 14 "บรรลุเป้าหมายการต่อสัญญา" และ KPI 8 "จำนวนรายการปรับเพิ่มมูลค่าสัญญา"
+  │        ปัจจุบัน: KPI 14, KPI 8, KPI 9, KPI 10/11/12 และ Competency 15-19
   │          ชีต สรุปทั้งปี.. ตาราง Portfolio(มูลค่า) แถวเดือนจากคอลัมน์ B
   │          C = Budget ('เดือน'!O41 = SUM(O5:O39) ← Port26) · G = Total R = SUM(D:F) (ไม่รวม New) · Q = G/C
   │          Actual = Total R ÷ Budget × 100 ตัดลง 2 ตำแหน่ง · Target ต้องเป็น 100
@@ -508,8 +508,14 @@ POST /employee/kpi-import.php  action=upload  format=company  company_year  comp
   │          ปฏิเสธ: มี O/R แต่ S ว่าง · S = R-O แต่ R ว่างขณะที่ O มีค่า · S = R-O แต่ค่าที่เก็บไว้ ≠ R - O
   │                  (O และ R ว่างทั้งคู่ + S จากสูตร = 0 → แถวว่าง ไม่ปฏิเสธ) · ติดลบ · R ว่างทั้งเดือน · Error / External Link
   │                  · อ้างชีตเดือนอื่น · เดือนยังไม่สิ้นสุดตามเวลา Asia/Bangkok (kpiCompanyUpliftMonthEnded)
+  │        KPI 10/11/12 (value_rule kpi_am_cell_ratio_times_100): Actual = ช่อง "ที่ทำได้" (KPI AM แถว 15-17) × 100 ไม่ปัดเศษ
+  │        Competency 15-19 (competency_integer): คะแนน 1-5 จากช่อง "ที่ทำได้" (แถว 24-28)
+  │        KPI 9 (value_rule non_renewal_total_r_with_monthly_budget): แถวเดือนเดียวกับ KPI 14 + ตรวจต้นทางชุดเดียวกัน
+  │          Actual = Total R (G) · แถวนำเข้ามี target = Budget ของเดือน (C) · ไม่ใช้ K14 / Budget ใน Assignment
   │      - หัวข้ออื่น → NEEDS_CONFIRMATION (ไม่บันทึก) · ข้อมูล/สูตรผิด → REJECTED (ไม่บันทึกทั้งไฟล์)
   ├─ 4. kpiImportValidate(..., origin = company) — Assignment ของผู้ใช้, รอบ Open, Draft เท่านั้น, ซ้ำในไฟล์
+  │      Target = Assignment · ยกเว้น KPI 9 (origin company) = target ของแถว (ต้องมี · > 0 · ทศนิยม ≤ 2 · ≤ 99,999,999.99)
+  │      KPI อื่นที่มี target รายแถว → error · Template ไม่อ่าน target รายแถว
   │      คะแนนจาก kpiCalculateScore() (เกณฑ์ของ KPI ในระบบ) → เก็บ Preview ใน Session (token ใช้ครั้งเดียว)
   │
 POST action=confirm  import_token  confirm_update[]  confirm_flag[]
@@ -522,7 +528,7 @@ POST action=confirm  import_token  confirm_update[]  confirm_flag[]
 ```
 
 ผลทดสอบของเส้นทางนี้มาจาก **ฐานข้อมูลทดสอบแยก** (MariaDB socket-only + ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน/ตรวจโครงสร้าง
-**ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI อื่นยังไม่มี Mapping ที่ยืนยัน จึงนำเข้าไม่ได้
+**ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI 9 เปิดแล้ว 2026-10-19 (Budget รายเดือนจากไฟล์เป็น Target ของแต่ละเดือน)
 KPI 8 ทดสอบ Preview / ยืนยันอัปเดต Draft รายแถว / Rollback บนฐานข้อมูลทดสอบแยก (ก่อนเปิด Mapping จริง) · ค่า S ที่พิมพ์เองไม่มีต้นทางให้ตรวจ
 เวลาที่ใช้ตัดสินเดือนสิ้นสุด: KPI 8 = Asia/Bangkok · KPI 14 และการตรวจตอนบันทึก (`kpiImportCommit`) = `date.timezone` ของ PHP (XAMPP: Europe/Berlin)
 `kpiCompanyPrepare` / `kpiCompanyRead` รับพารามิเตอร์ `$now` (ไม่บังคับ) สำหรับทดสอบรอยต่อเดือนของ KPI 8 · หน้าเว็บไม่ส่งค่านี้ จึงใช้เวลาจริง
