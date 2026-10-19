@@ -135,7 +135,7 @@ if (!$kpi) {
 }
 
 
-/* KPI 9 มูลค่าไม่ต่อสัญญา: Target = Budget (จำนวนเงิน) ตามที่ Admin กำหนด ไม่บังคับเป็น 100 อีกต่อไป */
+/* KPI 9 มูลค่าไม่ต่อสัญญา: แสดงแบบเดียวกับ KPI อื่น (Target 100% · Actual = ร้อยละ) · คะแนนจากกฎ KPI 9 ในฟังก์ชันกลาง */
 $isBudgetKpi = isNonRenewalKpi($kpi);
 
 $targetValue = (float) $kpi["target_value"];
@@ -516,7 +516,7 @@ $performances =
                                     <td>
 
                                         <?= $isBudgetKpi
-                                            ? kpiFormatMoney($performance["target"] ?? $kpi["target_value"])
+                                            ? "100%"
                                             : number_format(
                                                 $targetValue,
                                                 0
@@ -527,11 +527,13 @@ $performances =
 
                                     <td>
 
-                                        <?= number_format(
-                                            (float)
-                                            $performance["actual"],
-                                            2
-                                        ) ?>
+                                        <?= $isBudgetKpi
+                                            ? kpiFormatAchievement(nonRenewalAchievement($performance["actual"], $performance["target"] ?? $kpi["target_value"]))
+                                            : number_format(
+                                                (float)
+                                                $performance["actual"],
+                                                2
+                                            ) ?>
 
                                     </td>
 
@@ -546,7 +548,7 @@ $performances =
                                         / 5
 
                                         <?php if ($isBudgetKpi): ?>
-                                            <?php /* KPI 9: เทียบกับ Budget ของเดือนที่บันทึกกับผลงาน (ถ้ามี) */ $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $performance["target"] ?? $kpi["target_value"]); ?>
+                                            <?php /* KPI 9: เทียบกับ Target ที่บันทึกกับผลงานของเดือนนั้น (ถ้ามี) */ $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $performance["target"] ?? $kpi["target_value"]); ?>
                                             <br>
                                             <small>
                                                 คะแนนที่บันทึกไว้
@@ -554,7 +556,7 @@ $performances =
                                                     · ตามเกณฑ์ปัจจุบัน <?= $historyResult["grade"] ?> / 5
                                                     (<?= kpiFormatAchievement($historyResult["achievement"]) ?>)
                                                 <?php elseif ($historyResult["error"] !== null): ?>
-                                                    · คำนวณตามเกณฑ์ปัจจุบันไม่ได้ (ยังไม่ได้กำหนด Budget)
+                                                    · คำนวณตามเกณฑ์ปัจจุบันไม่ได้ (ไม่มี Target)
                                                 <?php endif; ?>
                                             </small>
                                         <?php endif; ?>

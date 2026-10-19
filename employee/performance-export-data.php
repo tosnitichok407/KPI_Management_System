@@ -328,7 +328,7 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
         $kpi["criteria"] = $criteria[(int) $kpi["kpi_id"]] ?? [];
         /* ป้ายสำหรับแบบฟอร์ม PDF / Excel */
         $kpi["is_inactive"] = ($kpi["assignment_status"] ?? "Active") !== "Active";
-        /* KPI 9: Budget ของเดือนที่บันทึกกับผลงาน (นำเข้าจากไฟล์บริษัท) · ยังไม่มีผลงาน → Budget ใน Assignment */
+        /* KPI 9: Target ที่บันทึกกับผลงาน (นำเข้าจากไฟล์บริษัท = 100) · ยังไม่มีผลงาน → ค่าใน Assignment */
         $kpi["target_value"] = isNonRenewalKpi($kpi) && $kpi["target"] !== null ? $kpi["target"] : $kpi["assignment_target"];
         $kpi["actual_value"] = $kpi["actual"];
         /* KPI 9: ช่อง "ที่ทำได้" แสดง Achievement = Total R / Budget × 100 (ฟังก์ชันกลาง) */

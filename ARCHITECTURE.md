@@ -510,11 +510,11 @@ POST /employee/kpi-import.php  action=upload  format=company  company_year  comp
   │                  · อ้างชีตเดือนอื่น · เดือนยังไม่สิ้นสุดตามเวลา Asia/Bangkok (kpiCompanyUpliftMonthEnded)
   │        KPI 10/11/12 (value_rule kpi_am_cell_ratio_times_100): Actual = ช่อง "ที่ทำได้" (KPI AM แถว 15-17) × 100 ไม่ปัดเศษ
   │        Competency 15-19 (competency_integer): คะแนน 1-5 จากช่อง "ที่ทำได้" (แถว 24-28)
-  │        KPI 9 (value_rule non_renewal_total_r_with_monthly_budget): แถวเดือนเดียวกับ KPI 14 + ตรวจต้นทางชุดเดียวกัน
-  │          Actual = Total R (G) · แถวนำเข้ามี target = Budget ของเดือน (C) · ไม่ใช้ K14 / Budget ใน Assignment
+  │        KPI 9 (value_rule non_renewal_count_t_over_c_percent): ตาราง "Portfolio(จำนวนราย)" ของชีตสรุป (มกราคม = T23 = K14 ในแบบฟอร์ม)
+  │          T = G/C · G = SUM(D:F) · C/D/E/F อ้างชีตของเดือนนั้นแถวเดียวกัน · Actual = T × 100 ตัด 2 ตำแหน่ง · แถวนำเข้ามี target = 100
   │      - หัวข้ออื่น → NEEDS_CONFIRMATION (ไม่บันทึก) · ข้อมูล/สูตรผิด → REJECTED (ไม่บันทึกทั้งไฟล์)
   ├─ 4. kpiImportValidate(..., origin = company) — Assignment ของผู้ใช้, รอบ Open, Draft เท่านั้น, ซ้ำในไฟล์
-  │      Target = Assignment · ยกเว้น KPI 9 (origin company) = target ของแถว (ต้องมี · > 0 · ทศนิยม ≤ 2 · ≤ 99,999,999.99)
+  │      Target = Assignment · ยกเว้น KPI 9 (origin company) = target ของแถวจากตัวอ่าน (100 · ต้องมี · > 0 · ทศนิยม ≤ 2)
   │      KPI อื่นที่มี target รายแถว → error · Template ไม่อ่าน target รายแถว
   │      คะแนนจาก kpiCalculateScore() (เกณฑ์ของ KPI ในระบบ) → เก็บ Preview ใน Session (token ใช้ครั้งเดียว)
   │
@@ -528,7 +528,7 @@ POST action=confirm  import_token  confirm_update[]  confirm_flag[]
 ```
 
 ผลทดสอบของเส้นทางนี้มาจาก **ฐานข้อมูลทดสอบแยก** (MariaDB socket-only + ข้อมูลสังเคราะห์) · ไฟล์บริษัทจริงทดสอบเฉพาะการอ่าน/ตรวจโครงสร้าง
-**ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI 9 เปิดแล้ว 2026-10-19 (Budget รายเดือนจากไฟล์เป็น Target ของแต่ละเดือน)
+**ยังไม่ได้ทดสอบการบันทึกกับ Production** · KPI 9 เปิดแล้ว 2026-10-19 (Actual จาก สรุปทั้งปี69!T ของเดือน · Target 100)
 KPI 8 ทดสอบ Preview / ยืนยันอัปเดต Draft รายแถว / Rollback บนฐานข้อมูลทดสอบแยก (ก่อนเปิด Mapping จริง) · ค่า S ที่พิมพ์เองไม่มีต้นทางให้ตรวจ
 เวลาที่ใช้ตัดสินเดือนสิ้นสุด: KPI 8 = Asia/Bangkok · KPI 14 และการตรวจตอนบันทึก (`kpiImportCommit`) = `date.timezone` ของ PHP (XAMPP: Europe/Berlin)
 `kpiCompanyPrepare` / `kpiCompanyRead` รับพารามิเตอร์ `$now` (ไม่บังคับ) สำหรับทดสอบรอยต่อเดือนของ KPI 8 · หน้าเว็บไม่ส่งค่านี้ จึงใช้เวลาจริง
@@ -583,6 +583,20 @@ $grade = kpiPerformanceGrade(
 > `employee/kpi-detail.php` เป็นเส้นทางบันทึกเส้นที่สอง ทำเรื่องเดียวกันคนละหน้า
 > ต่างกันที่มันบันทึกเป็น `status = 'Submitted'` ส่วน `kpi/kpi.php` บันทึกเป็น `'Draft'`
 > **แก้กฎการคำนวณต้องดูทั้งสองไฟล์** (ตอนนี้ทั้งคู่เรียก `kpiPerformanceGrade()` แล้ว)
+
+### ไฟล์อัปโหลด — ประวัติการนำเข้า และหลักฐานผลงาน (Migration 20261019)
+
+```
+อัปโหลดไฟล์บริษัท → Preview ผ่าน → kpiImportHistoryStash(): คัดลอกไป storage/pending (ชื่อสุ่ม + SHA-256 ใน Session)
+  ยกเลิก / Preview หมดอายุ / ยืนยันไม่สำเร็จ → ลบไฟล์ pending · ไฟล์ค้างเกิน 1 ชม. ถูกลบตอนอัปโหลดครั้งถัดไป
+  ยืนยันสำเร็จ → kpiImportHistoryRecord(): ตรวจ SHA ซ้ำ → ย้ายไป storage/imports → INSERT kpi_import_history
+              → kpiImportHistoryPrune(): เก็บไฟล์ 3 ครั้งล่าสุดต่อพนักงาน (ที่เก่ากว่า: ลบไฟล์ · stored_name = NULL)
+หน้าผลการปฏิบัติงาน → POST employee/kpi-evidence-action.php (CSRF)
+  kpiEvidenceAdd(): ตรวจเนื้อไฟล์ → Transaction: ล็อกผลงาน (เจ้าของ + Draft) → นับ < 5 → ย้ายไฟล์ → INSERT
+  kpiEvidenceDelete(): ล็อกผลงาน (เจ้าของ + Draft) → DELETE → ลบไฟล์
+file-download.php?type=import|evidence&id= → เจ้าของ / Manager / Admin เท่านั้น (อื่น ๆ 404) · storage/ ปิดการเข้าถึงตรงด้วย .htaccess
+ยังไม่มีตารางของ Migration → kpiFileFeatureEnabled() = false → ไม่เก็บไฟล์ ไม่แสดงส่วนประวัติ/หลักฐาน (ทำงานแบบเดิม)
+```
 
 ### เส้นทาง C — ส่งออกแบบฟอร์มประเมิน
 

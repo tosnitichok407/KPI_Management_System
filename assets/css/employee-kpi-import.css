@@ -200,3 +200,45 @@
     font-size: 12px;
     color: #9a6a00;
 }
+
+/* =========================================================
+   ประวัติการนำเข้า (3 รายการล่าสุด / ดูทั้งหมด)
+========================================================= */
+
+.import-history-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+}
+
+.import-history-header h2 {
+    margin-bottom: 0;
+}
+
+.import-history-toggle {
+    padding: 6px 12px;
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    color: #244397;
+    font-size: 13px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.import-history-toggle:hover {
+    background: #eff6ff;
+}
+
+.import-history-table {
+    margin-top: 14px;
+}
+
+.import-history-table a {
+    display: inline-flex;
+    align-items: center;
+    color: #244397;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}

@@ -65,6 +65,6 @@ PASS P14 [test 24] Template origin for KPI 8 is still rejected server side
 PASS P15 [test 24] Template commit for KPI 8 writes nothing
 PASS P16 negative month cannot reach commit (no rows, commit closed, DB unchanged)
 PASS P17 other employees' / other KPIs' rows untouched by the whole run (KPI 9 checked in P17b)
-PASS P17b KPI 9 February: one new Draft, Target = monthly Budget 200000.00 (not the Assignment 500000), Actual = Total R 199990.00, score = nonRenewalKpiGrade
+PASS P17b KPI 9 February: one new Draft, Actual 87.50 (สรุปทั้งปี69!T24), Target 100.00 (not the Assignment 500000), score = nonRenewalKpiGrade
 
 TOTAL 68 · PASS 68 · FAIL 0

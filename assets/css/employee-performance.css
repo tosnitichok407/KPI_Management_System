@@ -10,216 +10,404 @@
     margin-top: 20px;
 }
 
-.performance-list {
-    padding: 20px;
+
+/* =========================================================
+   KPI แยกตามประเภท (Performance / Competency) · ตาราง 1 แถวต่อ KPI
+========================================================= */
+
+.perf-groups {
+    padding: 8px 20px 20px;
 }
 
-.performance-item {
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 15px;
+.perf-group + .perf-group {
+    margin-top: 22px;
 }
 
-.performance-item:last-child {
-    margin-bottom: 0;
-
-}
-
-.performance-item-top {
+.perf-group-header {
     display: flex;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    gap: 20px;
+    gap: 8px 16px;
+    padding: 12px 0 10px;
+    border-bottom: 2px solid #244397;
 }
 
-.performance-item h3 {
+.perf-group-competency .perf-group-header {
+    border-bottom-color: #7c3aed;
+}
+
+.perf-group-header h3 {
+    display: flex;
+    align-items: center;
     margin: 0;
-    font-size: 17px;
+    font-size: 16px;
+    color: #1f2937;
 }
 
-.performance-description {
-    margin-top: 5px;
+.perf-group-competency .perf-group-header .icon {
+    color: #7c3aed;
+}
+
+.perf-group-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
     color: #6b7280;
     font-size: 13px;
 }
 
-.performance-weight {
-    padding: 6px 12px;
-    border-radius: 20px;
-    background: #eff6ff;
-    color: #244397;
-    font-size: 13px;
-    font-weight: 600;
+.perf-group-stats strong {
+    color: #1f2937;
+}
+
+.perf-table {
+    width: 100%;
+    min-width: 0; /* ไม่ใช้ min-width ของตารางส่วนกลาง (employee-kpi.css / tables.css) */
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.perf-table th,
+.perf-table td {
+    background: transparent;
+    border-bottom: 0;
+}
+
+/* tables.css กำหนด th { white-space: nowrap } → ชื่อ KPI ยาวต้องขึ้นบรรทัดใหม่ได้ */
+.perf-table tbody th {
+    white-space: normal;
+}
+
+.perf-table thead th {
+    padding: 10px 10px;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.perf-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.perf-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.perf-table tbody th,
+.perf-table tbody td {
+    padding: 12px 10px;
+    vertical-align: middle;
+    text-align: left;
+    font-weight: 400;
+}
+
+.perf-table .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.perf-table .center {
+    text-align: center;
     white-space: nowrap;
 }
 
-    /* === KPI DATA=== */
-.kpi-data-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-top: 20px;
-}
-
-.kpi-data-box {
-
-    background: #f8fafc;
-
-    padding: 13px;
-
-    border-radius: 8px;
-
-}
-
-.kpi-data-box span {
-
-    display: block;
-
+.perf-table tr.is-empty .perf-kpi-name {
     color: #6b7280;
-
-    font-size: 12px;
-
 }
 
-.kpi-data-box strong {
+.perf-kpi {
+    min-width: 220px;
+}
 
+.perf-kpi-name {
     display: block;
-
-    margin-top: 4px;
-
-    font-size: 16px;
-
+    font-weight: 600;
+    color: #1f2937;
 }
 
-/*
-
-    =========================================================
-
-    PROGRESS
-
-    =========================================================
-
-    */
-
-.progress-area {
-
-    margin-top: 20px;
-
-}
-
-.progress-header {
-
-    display: flex;
-
-    justify-content: space-between;
-
-    margin-bottom: 7px;
-
-    font-size: 13px;
-
-}
-
-.progress-bar {
-
-    width: 100%;
-
-    height: 10px;
-
-    background: #e5e7eb;
-
-    border-radius: 20px;
-
-    overflow: hidden;
-
-}
-
-.progress-fill {
-
-    height: 100%;
-
-    background: #244397;
-
-    border-radius: 20px;
-
-}
-
-/*
-
-    =========================================================
-
-    PERFORMANCE STATUS
-
-    =========================================================
-
-    */
-
-.performance-status {
-
-    display: inline-block;
-
-    margin-top: 12px;
-
-    padding: 5px 10px;
-
-    border-radius: 15px;
-
-    background: #eff6ff;
-
-    color: #244397;
-
+.perf-kpi-desc,
+.perf-kpi-comment,
+.perf-kpi-date {
+    display: block;
+    margin-top: 2px;
+    color: #6b7280;
     font-size: 12px;
-
 }
 
-.no-performance {
-
-    color: #9ca3af;
-
-    font-size: 13px;
-
-    margin-top: 15px;
-
+/* คำอธิบายยาว → แสดงบรรทัดเดียว (ข้อความเต็มอยู่ใน title) */
+.perf-kpi-desc {
+    max-width: 420px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/*
-
-    =========================================================
-
-    ACTION
-
-    =========================================================
-
-    */
-
-.performance-actions {
-
-    margin-top: 18px;
-
+.perf-kpi-comment {
+    color: #475467;
 }
 
-.performance-button {
-
+.perf-badge-inactive {
     display: inline-block;
-
-    padding: 8px 15px;
-
-    background: #244397;
-
-    color: white;
-
-    border-radius: 7px;
-
-    text-decoration: none;
-
-    font-size: 13px;
-
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: #fdecea;
+    color: #b42318;
+    font-size: 11px;
+    font-weight: 500;
+    vertical-align: middle;
 }
 
-.performance-button:hover {
+.perf-unit {
+    color: #6b7280;
+    font-size: 12px;
+}
 
-    background: #1b3475;
+.perf-muted {
+    color: #9ca3af;
+    font-size: 13px;
+}
 
+.perf-progress-cell {
+    min-width: 140px;
+}
+
+.perf-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.perf-progress-bar {
+    flex: 1;
+    height: 8px;
+    min-width: 70px;
+    background: #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.perf-progress-bar span {
+    display: block;
+    height: 100%;
+    background: #244397;
+    border-radius: 10px;
+}
+
+.perf-progress strong {
+    min-width: 40px;
+    text-align: right;
+    font-size: 13px;
+}
+
+.perf-score {
+    display: inline-block;
+    min-width: 44px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.perf-score small {
+    font-weight: 400;
+    opacity: .7;
+}
+
+.perf-score-5 { background: #dcfce7; color: #166534; }
+.perf-score-4 { background: #e0f2fe; color: #075985; }
+.perf-score-3 { background: #fef9c3; color: #854d0e; }
+.perf-score-2 { background: #ffedd5; color: #9a3412; }
+.perf-score-1 { background: #fee2e2; color: #991b1b; }
+
+.perf-dots {
+    display: inline-flex;
+    gap: 3px;
+    vertical-align: middle;
+}
+
+.perf-dots i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #e5e7eb;
+}
+
+.perf-dots i.on {
+    background: #7c3aed;
+}
+
+.perf-dots-value {
+    margin-left: 6px;
+    font-size: 13px;
+}
+
+.perf-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #475467;
+    font-size: 12px;
+}
+
+.perf-status-submitted { background: #eff6ff; color: #244397; }
+.perf-status-approved  { background: #dcfce7; color: #166534; }
+.perf-status-rejected  { background: #fee2e2; color: #991b1b; }
+.perf-status-none      { background: transparent; color: #9ca3af; }
+
+.perf-action {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.perf-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border: 1px solid #c7d2fe;
+    border-radius: 7px;
+    color: #244397;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.perf-link:hover {
+    background: #eff6ff;
+}
+
+/* =========================================================
+   หลักฐานผลงาน (แนบไฟล์ต่อ KPI ต่อเดือน)
+========================================================= */
+
+.perf-evidence {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.perf-evidence summary {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    color: #344054;
+    cursor: pointer;
+    list-style: none;
+}
+
+.perf-evidence summary::-webkit-details-marker {
+    display: none;
+}
+
+.perf-evidence[open] summary {
+    background: #eff6ff;
+    border-color: #c7d2fe;
+    color: #244397;
+}
+
+.perf-evidence-list {
+    margin: 8px 0 4px;
+    padding: 0;
+    list-style: none;
+}
+
+.perf-evidence-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    padding: 4px 0;
+    border-bottom: 1px dashed #e5e7eb;
+}
+
+.perf-evidence-list a {
+    color: #244397;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.perf-evidence-meta,
+.perf-evidence-empty,
+.perf-evidence-note {
+    color: #6b7280;
+    font-size: 11px;
+}
+
+.perf-evidence-empty {
+    margin: 8px 0 4px;
+}
+
+.perf-evidence-delete {
+    margin: 0 0 0 auto;
+}
+
+.perf-evidence-delete button {
+    padding: 2px 8px;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    background: #fff;
+    color: #b42318;
+    font: inherit;
+    cursor: pointer;
+}
+
+.perf-evidence-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 8px;
+}
+
+.perf-evidence-form input[type="file"] {
+    max-width: 100%;
+    font: inherit;
+}
+
+.perf-evidence-form button {
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: #244397;
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.perf-evidence-note {
+    margin: 6px 0 0;
+    flex-basis: 100%;
+}
+
+.perf-flash {
+    margin: 0 0 20px;
+    padding: 12px 15px;
+    border-radius: 8px;
+}
+
+.perf-flash-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.perf-flash-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 .performance-export-actions {
@@ -355,56 +543,154 @@
 
     =========================================================
 
-    */
-
 @media (max-width: 1000px) {
 
-    .performance-summary {
-
-        grid-template-columns:
-
-            repeat(2, 1fr);
-
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
-    .kpi-data-grid {
+    .perf-kpi-desc {
+        max-width: 260px;
+    }
+}
 
-        grid-template-columns:
+/* จอแคบกว่า 1200px (แท็บเล็ต / มือถือ / แล็ปท็อปเล็กที่มีเมนูข้าง): แต่ละแถวเป็นการ์ดเล็ก ป้ายชื่อคอลัมน์มาจาก data-label */
+@media (max-width: 1200px) {
 
-            repeat(2, 1fr);
-
+    .perf-groups {
+        padding: 4px 14px 16px;
     }
 
+    .perf-table thead {
+        display: none;
+    }
+
+    .perf-table,
+    .perf-table tbody,
+    .perf-table tr {
+        display: block;
+    }
+
+    .perf-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px 12px;
+        padding: 12px 0;
+    }
+
+    .perf-table tbody tr:hover {
+        background: transparent;
+    }
+
+    .perf-table tbody th,
+    .perf-table tbody td {
+        display: block;
+        padding: 0;
+        text-align: left;
+    }
+
+    .perf-table tbody .num,
+    .perf-table tbody .center {
+        text-align: left;
+    }
+
+    .perf-table tbody td::before {
+        content: attr(data-label);
+        display: block;
+        color: #9ca3af;
+        font-size: 11px;
+    }
+
+    .perf-table .perf-kpi,
+    .perf-table .perf-progress-cell,
+    .perf-group-competency .perf-table .perf-action {
+        grid-column: 1 / -1;
+    }
+
+    /* Competency: ช่องคะแนน (จุด 1-5) กว้างกว่าช่องอื่น */
+    .perf-group-competency .perf-table tbody tr {
+        grid-template-columns: minmax(0, .6fr) minmax(0, 1.4fr) minmax(0, 1fr);
+    }
+
+    /* ป้ายคอลัมน์บอกหน่วยแล้ว (Budget / Total R) · ตัวเลขยาวขึ้นบรรทัดใหม่ได้ */
+    .perf-table tbody td .perf-unit {
+        display: none;
+    }
+
+    /* น้ำหนักสั้น → คอลัมน์แคบ · Target / Actual (รวมจำนวนเงินของ KPI 9) กว้างพอไม่ต้องตัดบรรทัด */
+    .perf-group-performance .perf-table tbody tr {
+        grid-template-columns: minmax(0, .7fr) minmax(0, 1.15fr) minmax(0, 1.15fr);
+    }
+
+    /* Performance: ปุ่มรายละเอียดอยู่แถวเดียวกับคะแนน / สถานะ */
+    .perf-group-performance .perf-table .perf-action {
+        align-self: end;
+    }
+
+    .perf-table .perf-action::before {
+        content: none;
+    }
+
+    .perf-kpi {
+        min-width: 0;
+    }
+
+    /* ชื่อ KPI ภาษาไทยยาวไม่มีช่องว่าง → ตัดบรรทัดได้ */
+    .perf-kpi-name {
+        overflow-wrap: anywhere;
+    }
+
+    .perf-table tbody .center {
+        white-space: normal;
+    }
+
+    .perf-status {
+        padding: 3px 8px;
+    }
+
+    .perf-kpi-desc {
+        max-width: 100%;
+    }
+
+    .perf-link {
+        width: 100%;
+        justify-content: center;
+        padding: 6px 4px;
+        font-size: 12px;
+    }
+
+    .perf-group-performance .perf-link .icon {
+        display: none;
+    }
+}
+
+/* แท็บเล็ต (761-1200px): ข้อมูลทั้งหมดของ KPI อยู่บรรทัดเดียวใต้ชื่อ (ลดความสูงของหน้า) */
+@media (min-width: 761px) and (max-width: 1200px) {
+
+    .perf-group-performance .perf-table tbody tr {
+        grid-template-columns: minmax(0, .6fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, 1fr);
+        align-items: end;
+    }
+
+    .perf-group-competency .perf-table tbody tr {
+        grid-template-columns: minmax(0, .6fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+        align-items: end;
+    }
+
+    .perf-table .perf-progress-cell,
+    .perf-group-competency .perf-table .perf-action {
+        grid-column: auto;
+    }
+
+    .perf-group-competency .perf-link .icon {
+        display: none;
+    }
 }
 
 @media (max-width: 700px) {
 
-    .performance-summary {
-
+    .summary-grid {
         grid-template-columns: 1fr;
-
-    }
-
-    .kpi-data-grid {
-
-        grid-template-columns: 1fr;
-
-    }
-
-    .performance-item-top {
-
-        flex-direction: column;
-
-    }
-
-    .performance-period-header {
-
-        flex-direction: column;
-
-        align-items: flex-start;
-
-        gap: 10px;
-
     }
 
     .performance-export-actions {
@@ -415,7 +701,6 @@
     .quarter-score-grid {
         grid-template-columns: 1fr;
     }
-
 }
 
 /* =========================================================
@@ -454,9 +739,4 @@
 
 .filter-footer .performance-export-actions {
     margin: 0;
-}
-
-/* รายละเอียดผลงานใต้สถานะ (เดิมเป็น inline style) */
-.performance-comment {
-    margin-top: 12px;
 }

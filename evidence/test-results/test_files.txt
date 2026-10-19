@@ -1,0 +1,43 @@
+PASS A1 storage area created under KPI_STORAGE_PATH + .htaccess (Require all denied)
+PASS A2 stored names are random 32-hex + .dat
+PASS A3 path traversal / bad names / unknown areas rejected
+PASS A4 display name cleaned (folders / control chars removed)
+PASS B1 valid PDF / PNG / JPG / JPEG (upper-case) / XLSX / XLS accepted by content
+PASS B2 PHP code renamed .jpg → rejected
+PASS B3 PNG renamed .pdf → rejected
+PASS B4 ZIP without a workbook renamed .xlsx → rejected
+PASS B5 .php file → rejected
+PASS B6 .exe file → rejected
+PASS B7 empty file → rejected
+PASS B8 file over 10 MB → rejected
+PASS B9 double extension evil.php.jpg (PHP content) rejected
+PASS B10 upload error codes: no file / ini size → clear messages
+PASS B11 web request: file not from PHP upload (is_uploaded_file) rejected
+PASS C0 fixture rows: perf 1 = emp 3 Draft · perf 2 = emp 3 Submitted · perf 6 = emp 4 Draft
+PASS C1 own Draft: PDF attached · row (name, ext, mime, size, sha) + file on disk with the same SHA-256
+PASS C2 file stored with random name, not the original name
+PASS C3 5 files attached; the 6th is refused (max 5) and nothing is written
+PASS C4 Submitted performance → refused (Draft only)
+PASS C5 another employee's performance → refused as not found (no information leak)
+PASS C6 non-existent performance → refused
+PASS C7 invalid content refused before any DB / disk write
+PASS C8 employee 3 cannot delete employee 4's evidence
+PASS C9 own Draft evidence deleted: row and file removed
+PASS C10 after the result is Submitted: evidence can be neither deleted nor added (locked)
+PASS C11 list by performance: perf 1 → 4 files, perf 6 → 1, perf 2 → none
+PASS C12 DB: a performance with evidence cannot be deleted (FK RESTRICT)
+PASS C13 DB CHECK refuses a file type outside the allow-list
+PASS D1 viewers: owner yes · other employee no · manager yes · admin yes · employee without employee_id no
+PASS E1 stash: copy in pending with random name, SHA-256, size, cleaned original name
+PASS E2 discard (cancel) removes the pending file, no history row
+PASS E3 record: history row (date, month, file, counts) + file moved from pending to imports, same SHA
+kpi-import-history: pending file missing or changed
+PASS E4 pending file changed after preview (SHA mismatch) → not recorded, pending file removed, message returned
+PASS E5 4 imports: all 4 kept in history, files kept only for the latest 3 (Apr, Mar, Feb); January file deleted and marked removed
+PASS E6 list: latest 3 by default (total 4) · all 4 when 'view all' · only own rows
+PASS E7 prune is per employee: employee 4's file kept
+PASS E8 abandoned pending files older than the limit are cleaned on the next upload; fresh ones kept
+PASS E9 DB CHECK: stored_name NULL requires file_removed_at (no silent loss of the file link)
+PASS E10 file size label
+
+TOTAL 40 · PASS 40 · FAIL 0

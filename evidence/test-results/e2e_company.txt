@@ -1,7 +1,7 @@
 PASS F1 upload form offers both formats + year
 PASS F2 company file (23.8 MB uncompressed) is read: results table shown
 PASS F3 month Jan, real map (KPI 14, 8, 10-12, 15-19 confirmed 2026-10-19): ready 0 / needs confirmation 0 / rejected 11 (K14 external link · KPI 14/8 no month data · KPI 10-12/15-19 not in this synthetic DB) / skipped 0
-PASS F4 table shows source and reason: KPI 9 row reads the summary sheet and is rejected (this fixture has no Portfolio(มูลค่า) table); K14 not used
+PASS F4 table shows source and reason: KPI 9 reads the count table of the summary sheet (not KPI AM!K14) and KPI 14 the value table — both rejected in this fixture (no Portfolio(จำนวนราย) / Portfolio(มูลค่า) table)
 PASS F5 no confirm button / no import token; DB unchanged
 PASS F6 nothing stored for confirmation (next GET shows upload form, no preview)
 PASS F7 wrong year -> error, no table

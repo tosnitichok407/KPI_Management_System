@@ -1,0 +1,11 @@
+PASS R1 rollback refused while the tables contain rows (nothing dropped)
+PASS R2 rollback on empty tables drops both tables only
+PASS O1 import page without the migration: no history section, page works
+PASS O2 import still works exactly as before (3 inserted), no file stored, no storage folder created
+PASS O3 performance page without the migration: no evidence box, page works
+PASS O4 evidence upload refused with 'not enabled' message, nothing stored
+PASS O5 download endpoint returns 404 (no SQL error) when the tables do not exist
+PASS O6 manager employee view works without the migration (no evidence links)
+PASS R3 migration re-applied after rollback (both tables back)
+
+TOTAL 9 · PASS 9 · FAIL 0

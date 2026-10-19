@@ -7,6 +7,7 @@ require_once __DIR__ . "/../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/kpi-import-helper.php";
 require_once __DIR__ . "/../includes/kpi-import-company-reader.php";
+require_once __DIR__ . "/../includes/kpi-import-history.php";
 require_once __DIR__ . "/includes/layout.php";
 
 /*
@@ -53,6 +54,7 @@ if (
     || time() - (int) ($pending["created_at"] ?? 0) > KPI_IMPORT_SESSION_TTL
     || ($pending["format"] ?? "template") !== "company"
 ) {
+    kpiImportHistoryDiscard(is_array($pending) ? ($pending["stash"] ?? null) : null);
     unset($_SESSION["kpi_import"]);
     $pending = null;
 }
@@ -74,6 +76,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif ($action === "upload" && (string) ($_POST["format"] ?? "company") === "company") {
 
         /* แบบฟอร์มบริษัท: อ่าน + ตรวจ Mapping กับระบบ + Validation เดิม (ไม่เขียนฐานข้อมูล) */
+        kpiImportHistoryDiscard($pending["stash"] ?? null);
         unset($_SESSION["kpi_import"]);
         $pending = null;
 
@@ -93,13 +96,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $fileErrors = $companyResult["errors"];
 
             /* มีรายการ READY → ใช้ Preview / ยืนยัน เดียวกับ Template (token ใช้ครั้งเดียว) */
-            if (!$companyResult["errors"] && $companyResult["rows"]) {
+            $historyEnabled = kpiFileFeatureEnabled($pdo, "kpi_import_history");
+            $stash = $historyEnabled && !$companyResult["errors"] && $companyResult["rows"]
+                ? kpiImportHistoryStash((string) $file["tmp_name"], (string) ($file["name"] ?? ""))
+                : null;
+
+            if ($historyEnabled && !$companyResult["errors"] && $companyResult["rows"] && $stash === null) {
+                $fileErrors[] = "ระบบจัดเก็บไฟล์ไม่พร้อมใช้งาน จึงยังนำเข้าไม่ได้ กรุณาติดต่อผู้ดูแลระบบ";
+            } elseif (!$companyResult["errors"] && $companyResult["rows"]) {
                 $_SESSION["kpi_import"] = [
                     "token" => bin2hex(random_bytes(16)),
                     "employee_id" => $employeeId,
                     "created_at" => time(),
                     "file_name" => mb_substr(basename((string) ($file["name"] ?? "")), 0, 120),
                     "format" => "company",
+                    /* ไฟล์ที่รอใน storage/pending + ปี/เดือนข้อมูล สำหรับประวัติการนำเข้า */
+                    "stash" => $stash,
+                    "data_year" => (int) ($_POST["company_year"] ?? 0),
+                    "data_month" => (int) ($_POST["company_month"] ?? 0),
                     "company" => [
                         "items" => $companyResult["items"],
                         "notes" => $companyResult["notes"],
@@ -129,11 +143,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($pending === null || !hash_equals((string) $pending["token"], $token)) {
 
             $errors[] = "ไม่พบรายการที่รอยืนยัน หรือรายการหมดอายุแล้ว กรุณาอัปโหลดไฟล์อีกครั้ง";
+            kpiImportHistoryDiscard($pending["stash"] ?? null);
             unset($_SESSION["kpi_import"]);
             $pending = null;
 
         } elseif ($action === "cancel") {
 
+            kpiImportHistoryDiscard($pending["stash"] ?? null);
             unset($_SESSION["kpi_import"]);
             $_SESSION["kpi_import_flash"] = ["type" => "info", "messages" => ["ยกเลิกการนำเข้าแล้ว ไม่มีข้อมูลถูกบันทึก"]];
             header("Location: kpi-import.php");
@@ -168,6 +184,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $summary = kpiImportCommit($pdo, $employeeId, $pending["parsed"], $pending["preview"], $confirmed, $origin, $confirmedFlags);
             }
 
+            $historyError = $summary["ok"] && ($pending["stash"] ?? null) !== null
+                ? kpiImportHistoryRecord($pdo, $employeeId, (int) $_SESSION["user_id"], (int) ($pending["data_year"] ?? 0), (int) ($pending["data_month"] ?? 0), $pending["stash"] ?? null, $summary)
+                : null;
+
+            if (!$summary["ok"]) {
+                kpiImportHistoryDiscard($pending["stash"] ?? null);
+            }
+
             $_SESSION["kpi_import_flash"] = $summary["ok"]
                 ? [
                     "type" => "success",
@@ -177,7 +201,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         ...(($summary["declined"] ?? 0) > 0
                             ? ["ไม่บันทึก {$summary["declined"]} รายการ เนื่องจากไม่ได้ยืนยันรายการที่ระบบเตือน (เช่น ผล 0% จาก Total R = 0)"]
                             : []),
-                        "รายการที่นำเข้ามีสถานะ Draft ดูผลได้ที่หน้าผลการปฏิบัติงาน"
+                        "รายการที่นำเข้ามีสถานะ Draft ดูผลได้ที่หน้าผลการปฏิบัติงาน",
+                        ...($historyError !== null ? [$historyError] : [])
                     ]
                 ]
                 : ["type" => "error", "messages" => $summary["errors"]];
@@ -190,6 +215,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $errors[] = "คำขอไม่ถูกต้อง";
     }
+}
+
+/* ประวัติการนำเข้า: 3 รายการล่าสุด หรือทั้งหมดเมื่อกด "ดูทั้งหมด" (?history=all) */
+$historyAll = ($_GET["history"] ?? "") === "all";
+$historyEnabled = kpiFileFeatureEnabled($pdo, "kpi_import_history");
+try {
+    $history = !$historyEnabled ? ["rows" => [], "total" => 0] : kpiImportHistoryList($pdo, $employeeId, $historyAll ? null : KPI_IMPORT_HISTORY_PREVIEW_ROWS);
+} catch (Throwable $exception) {
+    error_log("kpi-import: history query failed (" . get_class($exception) . ")");
+    $history = ["rows" => [], "total" => 0];
 }
 
 /* ตัวเลือกปีสำหรับ Template */
@@ -258,7 +293,7 @@ $actionLabels = [
 
     <link rel="stylesheet" href="../assets/css/icons.css?v=1">
     <link rel="stylesheet" href="../assets/css/employee-kpi.css?v=layout-employee-2">
-    <link rel="stylesheet" href="../assets/css/employee-kpi-import.css?v=1">
+    <link rel="stylesheet" href="../assets/css/employee-kpi-import.css?v=history-1">
 
 </head>
 
@@ -515,8 +550,8 @@ $actionLabels = [
                                                 ราคาเดิม (<?= $e($row["details"]["base_cell"]) ?>) <?= $e($row["details"]["base"]) ?>
                                                 <span class="import-sub">ผลต่าง (<?= $e($row["details"]["diff_cell"]) ?>) <?= $e($row["details"]["diff"]) ?> · สัดส่วน (<?= $e($row["details"]["ratio_cell"]) ?>) <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>% (ปัดลงเป็นจำนวนเต็ม)</span>
                                             <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE): ?>
-                                                Total R (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> = Actual
-                                                <span class="import-sub">Budget ของเดือน (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?> = Target · Achievement <?= $e($row["details"]["achievement"]) ?>%</span>
+                                                <?= $e($row["details"]["ratio_cell"]) ?> = <?= $e($row["details"]["ratio"]) ?>
+                                                <span class="import-sub">ต่อสัญญา (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> ราย ÷ Budget (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?> ราย → Actual <?= $e($row["details"]["actual"]) ?>%</span>
                                             <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_FORM_RATIO_RULE): ?>
                                                 ที่ทำได้ (<?= $e($row["details"]["cell"]) ?>) <?= $e($row["details"]["ratio"]) ?>
                                                 <span class="import-sub">สัดส่วนใน Excel × 100 → Actual <?= $e($row["details"]["actual"]) ?>%</span>
@@ -585,6 +620,68 @@ $actionLabels = [
             </section>
 
         <?php endif; ?>
+
+        <?php if ($historyEnabled): ?>
+        <section class="import-card import-history" id="import-history">
+
+            <div class="import-history-header">
+                <h2><?= icon("calendar") ?>ประวัติการนำเข้า</h2>
+                <?php if ($historyAll): ?>
+                    <a class="import-history-toggle" href="kpi-import.php#import-history">แสดงเฉพาะ <?= KPI_IMPORT_HISTORY_PREVIEW_ROWS ?> รายการล่าสุด</a>
+                <?php elseif ($history["total"] > count($history["rows"])): ?>
+                    <a class="import-history-toggle" href="kpi-import.php?history=all#import-history">ดูทั้งหมด (<?= (int) $history["total"] ?>)</a>
+                <?php endif; ?>
+            </div>
+
+            <?php if (!$history["rows"]): ?>
+
+                <p class="import-hint">ยังไม่มีประวัติการนำเข้า</p>
+
+            <?php else: ?>
+
+                <div class="import-table-wrapper">
+                    <table class="import-table import-history-table">
+                        <thead>
+                            <tr>
+                                <th>วันเวลาที่นำเข้า</th>
+                                <th>ข้อมูลเดือน</th>
+                                <th>ไฟล์ที่แนบ</th>
+                                <th>ผลการนำเข้า</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($history["rows"] as $entry): ?>
+                                <tr>
+                                    <td><?= $e(date("d/m/Y H:i", strtotime((string) $entry["imported_at"]))) ?> น.</td>
+                                    <td><?= $e(($thaiMonths[(int) $entry["data_month"]] ?? "-") . " " . (int) $entry["data_year"]) ?></td>
+                                    <td>
+                                        <?php if ($entry["stored_name"] !== null): ?>
+                                            <a href="../file-download.php?type=import&amp;id=<?= (int) $entry["history_id"] ?>"><?= icon("file-spreadsheet") ?><?= $e($entry["original_name"]) ?></a>
+                                            <span class="import-sub"><?= $e(kpiFormatFileSize((int) $entry["file_size"])) ?></span>
+                                        <?php else: ?>
+                                            <?= $e($entry["original_name"]) ?>
+                                            <span class="import-sub">ไฟล์ถูกลบแล้ว (ระบบเก็บไฟล์ไว้เฉพาะ <?= KPI_IMPORT_HISTORY_KEEP_FILES ?> ไฟล์ล่าสุด)</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        เพิ่มใหม่ <?= (int) $entry["rows_inserted"] ?> · อัปเดต <?= (int) $entry["rows_updated"] ?>
+                                        <span class="import-sub">
+                                            ไม่เปลี่ยนแปลง <?= (int) $entry["rows_unchanged"] ?> · ไม่ได้ยืนยันอัปเดต <?= (int) $entry["rows_skipped"] ?><?= (int) $entry["rows_declined"] > 0 ? " · ไม่บันทึก " . (int) $entry["rows_declined"] : "" ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="import-hint">ระบบเก็บประวัติทุกครั้งที่นำเข้า และเก็บไฟล์ไว้ให้ดาวน์โหลดเฉพาะ <?= KPI_IMPORT_HISTORY_KEEP_FILES ?> ไฟล์ล่าสุด</p>
+
+            <?php endif; ?>
+
+        </section>
+        <?php endif; ?>
+
 
     <?php employeeLayoutEnd("../"); ?>
 

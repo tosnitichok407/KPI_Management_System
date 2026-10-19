@@ -959,8 +959,8 @@ $avatar =
 
                                         <?php if (isNonRenewalKpi($kpi)): ?>
 
-                                            <?php /* KPI 9: Budget ของเดือนที่บันทึกกับผลงาน (ถ้ามี) */ ?>
-                                            Budget <?= kpiFormatMoney($kpi["performance_target"] ?? $kpi["assignment_target"]) ?>
+                                            <?php /* KPI 9: แสดงแบบเดียวกับ KPI อื่น · Target = 100% (Actual = ร้อยละจาก สรุปทั้งปี!T) */ ?>
+                                            100%
 
                                         <?php else: ?>
 
@@ -999,9 +999,7 @@ $avatar =
 
                                         <?php if (isNonRenewalKpi($kpi) && $kpi["actual_value"] !== null): ?>
 
-                                            Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
-                                            <br>
-                                            <small><?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["performance_target"] ?? $kpi["assignment_target"])) ?></small>
+                                            <?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["performance_target"] ?? $kpi["assignment_target"])) ?>
 
                                         <?php else: ?>
 

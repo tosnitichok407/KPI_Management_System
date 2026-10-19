@@ -24,6 +24,8 @@ $monthNames = $monthNames ?? monthlyPeriodMonths();
 $selectedPeriod = $selectedPeriod ?? null;
 
 
+require_once __DIR__ . "/../../includes/kpi-evidence.php";
+
 $filterEmployee = (int) ($_GET["employee_id"] ?? 0);
 
 $selectedEmployee = $yearData["employees"][$filterEmployee] ?? null;
@@ -127,6 +129,19 @@ if ($selectedEmployee !== null) {
             "avg_score" => $scores ? array_sum($scores) / count($scores) : null,
             "latest" => $performances ? end($performances) : null
         ];
+    }
+}
+
+/* ไฟล์หลักฐานของผลงานเดือนที่เลือก (หัวหน้าดู / ดาวน์โหลดได้ · แนบหรือลบไม่ได้) */
+$evidenceByPerformance = [];
+if ($filterMonth > 0 && !empty($employeeKpis) && kpiFileFeatureEnabled($pdo, "kpi_performance_evidence")) {
+    try {
+        $evidenceByPerformance = kpiEvidenceForPerformances($pdo, array_map(
+            fn($item) => (int) ($item["latest"]["performance_id"] ?? 0),
+            $employeeKpis
+        ));
+    } catch (Throwable $exception) {
+        error_log("manager employees: evidence query failed (" . get_class($exception) . ")");
     }
 }
 
@@ -461,6 +476,16 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                             <?php if ($item["latest"]["actual"] !== null): ?><?= isNonRenewalKpi($assignment) ? "Total R " . kpiFormatMoney($item["latest"]["actual"]) : "Actual " . number_format((float) $item["latest"]["actual"]) ?> · <?php endif; ?>
                                             <?= htmlspecialchars($item["latest"]["status"], ENT_QUOTES, "UTF-8") ?>
                                         </div>
+                                        <?php $latestEvidence = $evidenceByPerformance[(int) ($item["latest"]["performance_id"] ?? 0)] ?? []; ?>
+                                        <?php if ($latestEvidence): ?>
+                                            <div class="cell-sub">
+                                                หลักฐาน:
+                                                <?php foreach ($latestEvidence as $evidenceIndex => $evidence): ?>
+                                                    <?php $viewable = in_array($evidence["file_ext"], ["jpg", "jpeg", "png", "pdf"], true); ?>
+                                                    <?= $evidenceIndex > 0 ? " · " : "" ?><a href="../file-download.php?type=evidence&amp;id=<?= (int) $evidence["evidence_id"] ?><?= $viewable ? "&amp;view=1" : "" ?>"<?= $viewable ? ' target="_blank" rel="noopener"' : "" ?>><?= htmlspecialchars($evidence["original_name"], ENT_QUOTES, "UTF-8") ?></a>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         <div class="stat-main"><?= number_format($item["avg_score"], 2) ?> / <?= number_format((float) $assignment["max_score"]) ?> <small class="cell-muted">เฉลี่ย</small></div>
                                         <div class="cell-sub">ประเมินแล้ว <?= count($item["performances"]) ?> เดือน</div>

@@ -9,6 +9,8 @@ require_once __DIR__ . "/../includes/quarter-helper.php";
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/period-picker.php";
 require_once __DIR__ . "/../includes/kpi-score-helper.php";
+require_once __DIR__ . "/../includes/kpi-evidence.php";
+require_once __DIR__ . "/../includes/kpi-import-history.php";
 require_once __DIR__ . "/includes/layout.php";
 require_once __DIR__ . "/includes/feedback.php";
 
@@ -324,7 +326,7 @@ foreach ($assignments as $assignment) {
         !empty($assignment["performance_id"])
     ) {
 
-        /* KPI 9: ใช้ Budget ที่บันทึกไว้กับผลงานของเดือนนี้ (นำเข้าจาก Budget รายเดือนในไฟล์บริษัท) แทน Budget ใน Assignment */
+        /* KPI 9: ใช้ Target ที่บันทึกไว้กับผลงานของเดือนนี้ (นำเข้าจากไฟล์บริษัท = 100) แทนค่าใน Assignment */
         if (isNonRenewalKpi($assignment) && $assignment["target"] !== null) {
             $target = (float) $assignment["target"];
         }
@@ -442,6 +444,29 @@ foreach ($assignments as $assignment) {
 |--------------------------------------------------------------------------
 */
 
+/* ไฟล์หลักฐานของผลงานในเดือนที่เลือก (ดู includes/kpi-evidence.php) */
+$evidencePerformanceIds = [];
+foreach ($periods as $periodData) {
+    foreach ($periodData["kpis"] as $periodKpi) {
+        if (!empty($periodKpi["performance_id"])) {
+            $evidencePerformanceIds[] = (int) $periodKpi["performance_id"];
+        }
+    }
+}
+
+$evidenceEnabled = kpiFileFeatureEnabled($pdo, "kpi_performance_evidence");
+try {
+    $evidenceByPerformance = $evidenceEnabled ? kpiEvidenceForPerformances($pdo, $evidencePerformanceIds) : [];
+} catch (Throwable $exception) {
+    error_log("performance: evidence query failed (" . get_class($exception) . ")");
+    $evidenceByPerformance = [];
+}
+
+/* ผลการแนบ / ลบหลักฐาน (จาก kpi-evidence-action.php) · เปิดกล่องหลักฐานของรายการนั้นไว้ */
+$evidenceFlash = $_SESSION["perf_evidence_flash"] ?? null;
+unset($_SESSION["perf_evidence_flash"]);
+$evidenceOpen = (int) ($evidenceFlash["performance_id"] ?? 0);
+
 $averageScore = 0;
 
 if ($scoreCount > 0) {
@@ -462,15 +487,16 @@ if ($totalKpi > 0) {
     $progressSum = 0;
     $progressCount = 0;
 
-    foreach ($assignments as $assignment) {
-        if (
-            isset($assignment["progress"]) &&
-            !empty($assignment["performance_id"])
-        ) {
-            $progressSum +=
-                (float) $assignment["progress"];
-
-            $progressCount++;
+    /*
+    | ค่าความคืบหน้าคำนวณไว้ใน $periods (เดิมวนจาก $assignments ซึ่งไม่มีค่า progress จึงได้ 0% เสมอ)
+    | นับเฉพาะ KPI ที่มีผลงานและมี Actual (Competency ไม่มี Actual จึงไม่นับ)
+    */
+    foreach ($periods as $periodData) {
+        foreach ($periodData["kpis"] as $periodKpi) {
+            if (!empty($periodKpi["performance_id"]) && $periodKpi["actual_value"] !== null) {
+                $progressSum += (float) $periodKpi["progress"];
+                $progressCount++;
+            }
         }
     }
 
@@ -499,6 +525,29 @@ if ($totalPerformanceRecords === 0) {
 } else {
 
     $overallStatus = "ควรปรับปรุง";
+}
+
+/*
+|--------------------------------------------------------------------------
+| รูปแบบตัวเลขในตาราง (ไม่ตัดทศนิยม: 87.5 → 87.50 · 100 → 100)
+|--------------------------------------------------------------------------
+*/
+function perfFormatNumber(float $value): string
+{
+    return floor($value) == $value ? number_format($value) : number_format($value, 2);
+}
+
+function perfFormatValue($value, string $unit): string
+{
+    $text = perfFormatNumber((float) $value);
+
+    if ($unit === "%") {
+        return $text . "%";
+    }
+
+    return $unit === ""
+        ? $text
+        : $text . ' <span class="perf-unit">' . htmlspecialchars($unit, ENT_QUOTES, "UTF-8") . "</span>";
 }
 
 ?>
@@ -534,7 +583,7 @@ if ($totalPerformanceRecords === 0) {
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-performance.css">
+        href="../assets/css/employee-performance.css?v=evidence-1">
 
 </head>
 
@@ -673,6 +722,12 @@ if ($totalPerformanceRecords === 0) {
                 </article>
             <?php endforeach; ?>
         </section>
+
+        <?php if (is_array($evidenceFlash)): ?>
+            <div class="perf-flash perf-flash-<?= $evidenceFlash["type"] === "success" ? "success" : "error" ?>" role="status">
+                <?= htmlspecialchars((string) $evidenceFlash["message"], ENT_QUOTES, "UTF-8") ?>
+            </div>
+        <?php endif; ?>
 
         <?php if (isset($error)): ?>
 
@@ -846,280 +901,258 @@ if ($totalPerformanceRecords === 0) {
 
                     </div>
 
-                    <!-- KPI List -->
-                    <div class="performance-list">
+                    <?php
+                    /* แยก KPI ตามประเภท: Performance (Target / Actual / ความสำเร็จ) และ Competency (คะแนน 1-5) */
+                    $kpiGroups = [
+                        "performance" => [
+                            "title" => "KPI ผลงาน (Performance)",
+                            "icon" => "target",
+                            "kpis" => []
+                        ],
+                        "competency" => [
+                            "title" => "สมรรถนะ (Competency)",
+                            "icon" => "award",
+                            "kpis" => []
+                        ]
+                    ];
 
-                        <?php foreach (
-                            $period["kpis"]
-                            as $kpi
-                        ): ?>
+                    foreach ($period["kpis"] as $kpi) {
+                        $groupKey = strtolower(trim((string) $kpi["kpi_type"])) === "competency" ? "competency" : "performance";
+                        $kpiGroups[$groupKey]["kpis"][] = $kpi;
+                    }
+                    ?>
 
-                            <div class="performance-item">
+                    <div class="perf-groups">
 
-                                <div
-                                    class="performance-item-top">
+                        <?php foreach ($kpiGroups as $groupKey => $group): ?>
 
-                                    <div>
+                            <?php if (empty($group["kpis"])) continue; ?>
 
-                                        <h3>
+                            <?php
+                            $groupRecorded = array_values(array_filter($group["kpis"], fn($item) => !empty($item["performance_id"])));
+                            $groupScores = array_values(array_filter(array_column($groupRecorded, "score_value"), fn($value) => $value !== null));
+                            $groupWeight = array_sum(array_map(fn($item) => (float) $item["weight"], $group["kpis"]));
+                            $groupAverage = $groupScores ? array_sum($groupScores) / count($groupScores) : null;
+                            ?>
 
-                                            <?= htmlspecialchars(
-                                                $kpi["kpi_name"],
-                                                ENT_QUOTES,
-                                                "UTF-8"
-                                            ) ?>
+                            <section class="perf-group perf-group-<?= $groupKey ?>">
 
-                                            <?php if (($kpi["assignment_status"] ?? "Active") !== "Active"): ?>
-                                            <span class="badge" style="background:#fdecea;color:#b42318;margin-left:6px;" title="การมอบหมายนี้ปิดใช้งานแล้ว แสดงเป็นประวัติเพราะมีผลงานในเดือนนี้">ปิดใช้งาน</span>
+                                <header class="perf-group-header">
+
+                                    <h3>
+                                        <?= icon($group["icon"]) ?><?= htmlspecialchars($group["title"], ENT_QUOTES, "UTF-8") ?>
+                                    </h3>
+
+                                    <div class="perf-group-stats">
+                                        <span>บันทึกแล้ว <strong><?= count($groupRecorded) ?> / <?= count($group["kpis"]) ?></strong></span>
+                                        <span>น้ำหนักรวม <strong><?= perfFormatNumber($groupWeight) ?>%</strong></span>
+                                        <span>คะแนนเฉลี่ย <strong><?= $groupAverage === null ? "-" : number_format($groupAverage, 2) ?></strong></span>
+                                    </div>
+
+                                </header>
+
+                                <table class="perf-table">
+
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">KPI</th>
+                                            <th scope="col" class="num">น้ำหนัก</th>
+                                            <?php if ($groupKey === "performance"): ?>
+                                                <th scope="col" class="num">Target</th>
+                                                <th scope="col" class="num">Actual</th>
+                                                <th scope="col">ความสำเร็จ</th>
                                             <?php endif; ?>
+                                            <th scope="col" class="center">คะแนน</th>
+                                            <th scope="col" class="center">สถานะ</th>
+                                            <th scope="col"><span class="visually-hidden">ดูรายละเอียด</span></th>
+                                        </tr>
+                                    </thead>
 
-                                        </h3>
+                                    <tbody>
 
-                                        <div
-                                            class="performance-description">
+                                        <?php foreach ($group["kpis"] as $kpi): ?>
 
-                                            <?= htmlspecialchars(
-                                                $kpi["description"]
-                                                    ?? "-",
-                                                ENT_QUOTES,
-                                                "UTF-8"
-                                            ) ?>
+                                            <?php
+                                            $hasResult = !empty($kpi["performance_id"]);
+                                            $isBudget = isNonRenewalKpi($kpi);
+                                            $unit = trim((string) ($kpi["unit"] ?? ""));
+                                            $level = $hasResult && $kpi["score_value"] !== null ? kpiScoreLevel((float) $kpi["score_value"]) : null;
+                                            $statusText = (string) ($kpi["performance_status_value"] ?? "");
+                                            $detailUrl = "kpi-detail.php?assignment_id=" . (int) $kpi["assignment_id"] . "&year={$selectedYear}&month={$selectedMonth}&period_id={$selectedPeriodId}";
+                                            ?>
 
-                                        </div>
+                                            <tr class="<?= $hasResult ? "" : "is-empty" ?>">
 
-                                    </div>
+                                                <th scope="row" class="perf-kpi" data-label="KPI">
 
-                                    <span
-                                        class="performance-weight">
+                                                    <span class="perf-kpi-name">
+                                                        <?= htmlspecialchars($kpi["kpi_name"], ENT_QUOTES, "UTF-8") ?>
+                                                        <?php if (($kpi["assignment_status"] ?? "Active") !== "Active"): ?>
+                                                            <span class="perf-badge-inactive" title="การมอบหมายนี้ปิดใช้งานแล้ว แสดงเป็นประวัติเพราะมีผลงานในเดือนนี้">ปิดใช้งาน</span>
+                                                        <?php endif; ?>
+                                                    </span>
 
-                                        Weight
+                                                    <?php if (trim((string) ($kpi["description"] ?? "")) !== ""): ?>
+                                                        <span class="perf-kpi-desc" title="<?= htmlspecialchars($kpi["description"], ENT_QUOTES, "UTF-8") ?>">
+                                                            <?= htmlspecialchars($kpi["description"], ENT_QUOTES, "UTF-8") ?>
+                                                        </span>
+                                                    <?php endif; ?>
 
-                                        <?= number_format(
-                                            $kpi["weight"],
-                                            2
-                                        ) ?>%
+                                                    <?php if ($hasResult && !empty($kpi["comment_value"])): ?>
+                                                        <span class="perf-kpi-comment">
+                                                            หมายเหตุ: <?= htmlspecialchars($kpi["comment_value"], ENT_QUOTES, "UTF-8") ?>
+                                                        </span>
+                                                    <?php endif; ?>
 
-                                    </span>
+                                                    <?php if ($hasResult && !empty($kpi["performance_date_value"])): ?>
+                                                        <span class="perf-kpi-date">
+                                                            บันทึก <?= htmlspecialchars($kpi["performance_date_value"], ENT_QUOTES, "UTF-8") ?>
+                                                        </span>
+                                                    <?php endif; ?>
 
-                                </div>
+                                                    <?php if ($hasResult && $evidenceEnabled): ?>
+                                                        <?php
+                                                        $evidenceRows = $evidenceByPerformance[(int) $kpi["performance_id"]] ?? [];
+                                                        $evidenceEditable = $statusText === "Draft";
+                                                        ?>
+                                                        <details class="perf-evidence"<?= $evidenceOpen === (int) $kpi["performance_id"] ? " open" : "" ?>>
 
-                                <?php if (
-                                    !empty($kpi["performance_id"])
-                                ): ?>
+                                                            <summary>
+                                                                <?= icon("file-text") ?>หลักฐาน (<?= count($evidenceRows) ?>)
+                                                            </summary>
 
-                                    <!-- === KPI DATA === -->
+                                                            <?php if ($evidenceRows): ?>
+                                                                <ul class="perf-evidence-list">
+                                                                    <?php foreach ($evidenceRows as $evidence): ?>
+                                                                        <?php $viewable = in_array($evidence["file_ext"], ["jpg", "jpeg", "png", "pdf"], true); ?>
+                                                                        <li>
+                                                                            <a href="../file-download.php?type=evidence&amp;id=<?= (int) $evidence["evidence_id"] ?><?= $viewable ? "&amp;view=1" : "" ?>"<?= $viewable ? ' target="_blank" rel="noopener"' : "" ?>>
+                                                                                <?= htmlspecialchars($evidence["original_name"], ENT_QUOTES, "UTF-8") ?>
+                                                                            </a>
+                                                                            <span class="perf-evidence-meta">
+                                                                                <?= strtoupper(htmlspecialchars($evidence["file_ext"], ENT_QUOTES, "UTF-8")) ?> · <?= kpiFormatFileSize((int) $evidence["file_size"]) ?> · <?= htmlspecialchars(date("d/m/Y H:i", strtotime((string) $evidence["uploaded_at"])), ENT_QUOTES, "UTF-8") ?>
+                                                                            </span>
+                                                                            <?php if ($evidenceEditable): ?>
+                                                                                <form method="post" action="kpi-evidence-action.php" class="perf-evidence-delete">
+                                                                                    <?= csrfField() ?>
+                                                                                    <input type="hidden" name="action" value="delete">
+                                                                                    <input type="hidden" name="evidence_id" value="<?= (int) $evidence["evidence_id"] ?>">
+                                                                                    <input type="hidden" name="performance_id" value="<?= (int) $kpi["performance_id"] ?>">
+                                                                                    <input type="hidden" name="year" value="<?= (int) $selectedYear ?>">
+                                                                                    <input type="hidden" name="month" value="<?= (int) $selectedMonth ?>">
+                                                                                    <button type="submit" data-confirm="ลบไฟล์ <?= htmlspecialchars($evidence["original_name"], ENT_QUOTES, "UTF-8") ?> ?" aria-label="ลบไฟล์ <?= htmlspecialchars($evidence["original_name"], ENT_QUOTES, "UTF-8") ?>">ลบ</button>
+                                                                                </form>
+                                                                            <?php endif; ?>
+                                                                        </li>
+                                                                    <?php endforeach; ?>
+                                                                </ul>
+                                                            <?php else: ?>
+                                                                <p class="perf-evidence-empty">ยังไม่มีไฟล์หลักฐาน</p>
+                                                            <?php endif; ?>
 
-                                    <div class="kpi-data-grid">
+                                                            <?php if (!$evidenceEditable): ?>
+                                                                <p class="perf-evidence-note">แนบหรือลบหลักฐานได้เฉพาะผลงานสถานะ Draft</p>
+                                                            <?php elseif (count($evidenceRows) >= KPI_EVIDENCE_MAX_FILES): ?>
+                                                                <p class="perf-evidence-note">แนบครบ <?= KPI_EVIDENCE_MAX_FILES ?> ไฟล์แล้ว (ลบไฟล์เดิมก่อนจึงแนบเพิ่มได้)</p>
+                                                            <?php else: ?>
+                                                                <form method="post" action="kpi-evidence-action.php" enctype="multipart/form-data" class="perf-evidence-form">
+                                                                    <?= csrfField() ?>
+                                                                    <input type="hidden" name="action" value="upload">
+                                                                    <input type="hidden" name="performance_id" value="<?= (int) $kpi["performance_id"] ?>">
+                                                                    <input type="hidden" name="year" value="<?= (int) $selectedYear ?>">
+                                                                    <input type="hidden" name="month" value="<?= (int) $selectedMonth ?>">
+                                                                    <input type="file" name="evidence_file" accept="<?= KPI_EVIDENCE_ACCEPT ?>" required aria-label="เลือกไฟล์หลักฐานของ <?= htmlspecialchars($kpi["kpi_name"], ENT_QUOTES, "UTF-8") ?>">
+                                                                    <button type="submit">แนบไฟล์</button>
+                                                                    <span class="perf-evidence-note">Excel / รูปภาพ (JPG, PNG) / PDF · ไฟล์ละไม่เกิน 10 MB · สูงสุด <?= KPI_EVIDENCE_MAX_FILES ?> ไฟล์</span>
+                                                                </form>
+                                                            <?php endif; ?>
 
-                                        <div class="kpi-data-box">
+                                                        </details>
+                                                    <?php endif; ?>
 
-                                            <span>
-                                                วันที่บันทึก
-                                            </span>
 
-                                            <strong>
+                                                </th>
 
-                                                <?= htmlspecialchars(
-                                                    $kpi["performance_date_value"],
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                ) ?>
+                                                <td class="num" data-label="น้ำหนัก"><?= perfFormatNumber((float) $kpi["weight"]) ?>%</td>
 
-                                            </strong>
+                                                <?php if ($groupKey === "performance"): ?>
 
-                                        </div>
+                                                    <?php /* KPI 9 แสดงแบบเดียวกับ KPI อื่น: Target 100% · Actual = ร้อยละ (Actual ÷ Target × 100 · นำเข้าจาก สรุปทั้งปี!T) */ ?>
+                                                    <td class="num" data-label="Target">
+                                                        <?php if ($isBudget): ?>
+                                                            100%
+                                                        <?php elseif ($kpi["target_value"] === null): ?>
+                                                            -
+                                                        <?php else: ?>
+                                                            <?= perfFormatValue($kpi["target_value"], $unit) ?>
+                                                        <?php endif; ?>
+                                                    </td>
 
-                                        <div class="kpi-data-box">
+                                                    <td class="num" data-label="Actual">
+                                                        <?php if (!$hasResult || $kpi["actual_value"] === null): ?>
+                                                            <span class="perf-muted">-</span>
+                                                        <?php elseif ($isBudget): ?>
+                                                            <?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["target_value"])) ?>
+                                                        <?php else: ?>
+                                                            <?= perfFormatValue($kpi["actual_value"], $unit) ?>
+                                                        <?php endif; ?>
+                                                    </td>
 
-                                            <span>
-                                                Target
-                                            </span>
-
-                                            <strong>
-
-                                                <?php if (isNonRenewalKpi($kpi)): ?>
-
-                                                    Budget <?= kpiFormatMoney($kpi["target_value"]) ?>
-
-                                                <?php else: ?>
-
-                                                <?= number_format(
-                                                    (int) $kpi["target_value"]
-                                                ) ?>
-
-                                                <?= htmlspecialchars(
-                                                    $kpi["unit"] ?? "",
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                ) ?>
+                                                    <td class="perf-progress-cell" data-label="ความสำเร็จ">
+                                                        <?php if ($hasResult && $kpi["actual_value"] !== null): ?>
+                                                            <div class="perf-progress">
+                                                                <div class="perf-progress-bar" aria-hidden="true">
+                                                                    <span style="width: <?= (int) round((float) $kpi["progress"]) ?>%;"></span>
+                                                                </div>
+                                                                <strong><?= perfFormatNumber(floor((float) $kpi["progress"] * 100) / 100) ?>%</strong>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="perf-muted">ยังไม่มีผลงาน</span>
+                                                        <?php endif; ?>
+                                                    </td>
 
                                                 <?php endif; ?>
 
-                                            </strong>
-
-                                        </div>
-
-                                        <div class="kpi-data-box">
-
-                                            <span>
-                                                Actual
-                                            </span>
-
-                                            <strong>
-
-                                                <?php if (isNonRenewalKpi($kpi)): ?>
-
-                                                    Total R <?= kpiFormatMoney($kpi["actual_value"]) ?>
-                                                    <small>(<?= kpiFormatAchievement(nonRenewalAchievement($kpi["actual_value"], $kpi["target_value"])) ?>)</small>
-
-                                                <?php else: ?>
-
-                                                <?= number_format(
-                                                    (int) $kpi["actual_value"]
-                                                ) ?>
-
-                                                <?= htmlspecialchars(
-                                                    $kpi["unit"] ?? "",
-                                                    ENT_QUOTES,
-                                                    "UTF-8"
-                                                ) ?>
-
-                                                <?php endif; ?>
-
-                                            </strong>
-
-                                        </div>
-
-                                        <div class="kpi-data-box">
-
-                                            <span>
-                                                Score
-                                            </span>
-
-                                            <strong>
-
-                                                <?= number_format(
-                                                    (int) $kpi["score_value"]
-                                                ) ?>
-
-                                                / 5
-
-                                            </strong>
-
-                                        </div>
-
-                                    </div>
-
-                                    <!-- === PROGRESS === -->
-
-                                    <div class="progress-area">
-
-                                        <div
-                                            class="progress-header">
-
-                                            <span>
-                                                ความคืบหน้า
-                                            </span>
-
-                                            <strong>
-
-                                                <?= number_format(
-                                                    $kpi["progress"]
-                                                ) ?>%
-
-                                            </strong>
-
-                                        </div>
-
-                                        <div
-                                            class="progress-bar">
-
-                                            <div
-                                                class="progress-fill"
-                                                style="width: <?= (int) round((float) $kpi["progress"]) ?>%;">
-                                            </div>
-
-                                        </div>
-
-
-                                    </div>
-
-
-                                    <!-- === STATUS === -->
-
-                                    <span
-                                        class="performance-status">
-
-                                        <?= htmlspecialchars(
-                                            $kpi["performance_status_value"],
-                                            ENT_QUOTES,
-                                            "UTF-8"
-                                        ) ?>
-
-                                    </span>
-
-
-                                    <?php if (
-                                        !empty($kpi["comment_value"])
-                                    ): ?>
-
-                                        <div
-                                            class="performance-description performance-comment">
-
-                                            <strong>
-                                                รายละเอียด:
-                                            </strong>
-
-                                            <?= htmlspecialchars(
-                                                $kpi["comment_value"],
-                                                ENT_QUOTES,
-                                                "UTF-8"
-                                            ) ?>
-
-                                        </div>
-
-                                    <?php endif; ?>
-
-
-                                <?php else: ?>
-
-
-                                    <!-- === NO PERFORMANCE === -->
-
-                                    <div
-                                        class="no-performance">
-
-                                        ยังไม่มีการบันทึกผลงานสำหรับ KPI นี้
-
-                                    </div>
-
-
-                                <?php endif; ?>
-
-
-                                <!-- === ACTION === -->
-
-                                <div
-                                    class="performance-actions">
-
-
-                                    <a
-                                        href="kpi-detail.php?assignment_id=<?= (int) $kpi["assignment_id"] ?>&amp;year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>&amp;period_id=<?= $selectedPeriodId ?>"
-                                        class="performance-button">
-
-                                        <?= icon("eye") ?>ดูรายละเอียด
-
-                                    </a>
-
-
-                                </div>
-
-
-                            </div>
-
+                                                <td class="center" data-label="คะแนน">
+                                                    <?php if ($level === null): ?>
+                                                        <span class="perf-muted">-</span>
+                                                    <?php elseif ($groupKey === "competency"): ?>
+                                                        <span class="perf-dots" role="img" aria-label="คะแนน <?= $level ?> จาก 5">
+                                                            <?php for ($dot = 1; $dot <= 5; $dot++): ?><i class="<?= $dot <= $level ? "on" : "" ?>"></i><?php endfor; ?>
+                                                        </span>
+                                                        <strong class="perf-dots-value"><?= $level ?>/5</strong>
+                                                    <?php else: ?>
+                                                        <span class="perf-score perf-score-<?= $level ?>"><?= $level ?><small>/5</small></span>
+                                                    <?php endif; ?>
+                                                </td>
+
+                                                <td class="center" data-label="สถานะ">
+                                                    <?php if ($hasResult): ?>
+                                                        <span class="perf-status perf-status-<?= htmlspecialchars(strtolower($statusText), ENT_QUOTES, "UTF-8") ?>">
+                                                            <?= htmlspecialchars($statusText, ENT_QUOTES, "UTF-8") ?>
+                                                        </span>
+                                                    <?php else: ?>
+                                                        <span class="perf-status perf-status-none">ยังไม่บันทึก</span>
+                                                    <?php endif; ?>
+                                                </td>
+
+                                                <td class="perf-action">
+                                                    <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, "UTF-8") ?>" class="perf-link">
+                                                        <?= icon("eye") ?>รายละเอียด
+                                                    </a>
+                                                </td>
+
+                                            </tr>
+
+                                        <?php endforeach; ?>
+
+                                    </tbody>
+
+                                </table>
+
+                            </section>
 
                         <?php endforeach; ?>
-
 
                     </div>
 
@@ -1132,6 +1165,15 @@ if ($totalPerformanceRecords === 0) {
 
         <?php endif; ?>
 
+
+    <script>
+        document.addEventListener("submit", function (event) {
+            var button = event.submitter;
+            if (button && button.dataset.confirm && !window.confirm(button.dataset.confirm)) {
+                event.preventDefault();
+            }
+        });
+    </script>
 
     <?php employeeLayoutEnd("../"); ?>
 

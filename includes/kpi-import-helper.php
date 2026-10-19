@@ -556,7 +556,7 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
             "month_label" => ($month !== null && isset($thaiMonths[$month])) ? $thaiMonths[$month] . " " . $year : "-",
             "raw_actual" => $values["actual"] ?? null,
             "raw_competency" => $values["competency_score"] ?? null,
-            /* Target รายแถว: มาจากตัวอ่านไฟล์บริษัทเท่านั้น (KPI 9 = Budget ของเดือน) · Template ไม่มีช่องนี้ */
+            /* Target รายแถว: มาจากตัวอ่านไฟล์บริษัทเท่านั้น (KPI 9 = 100) · Template ไม่มีช่องนี้ */
             "raw_target" => $origin === KPI_IMPORT_ORIGIN_COMPANY ? ($values["target"] ?? null) : null,
             "comment" => $note === "" ? null : $note,
             "kpi_name" => null,
@@ -676,7 +676,7 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
 
         /*
         | Target ที่ใช้คำนวณและบันทึก: Target ใน Assignment
-        | ยกเว้น KPI 9 จากไฟล์บริษัท = Budget ของเดือนที่ตัวอ่านส่งมา (ต้องมี · ตัวเลข > 0 · ไม่เกินเพดาน Budget)
+        | ยกเว้น KPI 9 จากไฟล์บริษัท = Target ที่ตัวอ่านส่งมา (100 · ต้องมี · ตัวเลข > 0 · ไม่เกินเพดาน)
         | KPI อื่นห้ามมี Target รายแถว
         */
         $targetFilled = $result["raw_target"] !== null && $result["raw_target"] !== "";
@@ -685,9 +685,9 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
         if ($origin === KPI_IMPORT_ORIGIN_COMPANY && isNonRenewalKpi($assignment)) {
             $targetDecimal = $targetFilled ? kpiImportDecimal($result["raw_target"]) : ["value" => null, "error" => null];
             if (!$targetFilled) {
-                $result["errors"][] = "ไม่พบ Budget ของเดือน{$monthLabel}จากไฟล์ (KPI 9 ใช้ Budget รายเดือนเป็น Target)";
+                $result["errors"][] = "ไม่พบ Target ของเดือน{$monthLabel}จากไฟล์ (KPI 9 รับ Target จากตัวอ่านไฟล์บริษัท)";
             } elseif ($targetDecimal["error"] !== null || !kpiBudgetIsValid($targetDecimal["value"]) || (float) $targetDecimal["value"] > KPI_BUDGET_MAX) {
-                $result["errors"][] = "Budget ของเดือน{$monthLabel}จากไฟล์ต้องเป็นตัวเลขมากกว่า 0 ทศนิยมไม่เกิน 2 ตำแหน่ง และไม่เกิน " . number_format(KPI_BUDGET_MAX, 2);
+                $result["errors"][] = "Target ของเดือน{$monthLabel}จากไฟล์ต้องเป็นตัวเลขมากกว่า 0 ทศนิยมไม่เกิน 2 ตำแหน่ง และไม่เกิน " . number_format(KPI_BUDGET_MAX, 2);
             } else {
                 $targetValue = $targetDecimal["value"];
             }

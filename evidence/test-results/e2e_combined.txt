@@ -3,10 +3,10 @@ PASS C1 incomplete file: KPI 8 rejected with the row reason (แถว 7 ... ไ
 PASS C2 incomplete file: whole file blocked (no confirm button) although KPI 14 (สรุปทั้งปี69!Q6) is valid
 PASS C2b forced confirm with the page token (cancel-only) is refused server side (ยังนำเข้าไม่ได้), nothing written
 PASS C3 incomplete file: nothing written (KPI 8 and KPI 14 February rows absent)
-PASS C4 complete file: preview shows KPI 14 (สรุปทั้งปี69!Q6, 99.99), KPI 8 (ก.พ.69!S42, Actual 20%) and KPI 9 (Total R / monthly Budget C6) as รายการใหม่
+PASS C4 complete file: preview shows KPI 14 (สรุปทั้งปี69!Q6, 99.99), KPI 8 (ก.พ.69!S42, Actual 20%) and KPI 9 (สรุปทั้งปี69!T24 = 0.875 → 87.50%) as รายการใหม่
 PASS C5 preview wrote nothing
 PASS C6 confirm: success message, 3 new rows (KPI 14, 8, 9)
-PASS C6b KPI 9 February saved as Draft 199990.00 / score 4 / target = monthly Budget 200000.00
+PASS C6b KPI 9 February saved as Draft 87.50 / score 2 / target 100.00
 PASS C7 KPI 14 February saved as Draft 99.99 / score 3 / target 100.00
 PASS C8 KPI 8 February saved as Draft 20.00 / score 4 / target 20.00
 PASS C9 no Submitted/Approved created; other employees/KPIs untouched
