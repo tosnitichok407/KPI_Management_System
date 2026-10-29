@@ -65,12 +65,23 @@ if (!$kpi) {
 | เกณฑ์ / ชื่อ / ประเภท ถูกล็อก · แสดงเกณฑ์จากกฎในระบบ (NON_RENEWAL_KPI_CRITERIA)
 | และไม่อ่าน/ไม่เขียน kpi_score_criteria, kpi_score_levels, score_5..score_1 จากหน้านี้
 */
-$isLockedKpi9 = (int) $kpi["kpi_id"] === NON_RENEWAL_KPI_ID;
+/*
+| KPI ที่เกณฑ์คะแนนกำหนดในโค้ดตามที่เจ้าของระบบยืนยัน (ล็อกชื่อ ประเภท และเกณฑ์เหมือนกัน):
+|   KPI 9 (NON_RENEWAL_KPI_CRITERIA) · KPI 10 (UPSELL_KPI_CRITERIA · ไม่มีระดับ 1) · KPI 14 (RENEWAL_KPI_CRITERIA)
+*/
+$ruleCriteriaByKpi = [
+    NON_RENEWAL_KPI_ID => NON_RENEWAL_KPI_CRITERIA,
+    UPSELL_KPI_ID => UPSELL_KPI_CRITERIA,
+    RENEWAL_KPI_ID => RENEWAL_KPI_CRITERIA,
+];
+$ruleCriteria = $ruleCriteriaByKpi[(int) $kpi["kpi_id"]] ?? null;
+$isLockedKpi9 = $ruleCriteria !== null;
+$isKpi9 = (int) $kpi["kpi_id"] === NON_RENEWAL_KPI_ID;
 
 if ($isLockedKpi9) {
 
     for ($level = 5; $level >= 1; $level--) {
-        $kpi["score_" . $level] = NON_RENEWAL_KPI_CRITERIA[$level];
+        $kpi["score_" . $level] = $ruleCriteria[$level] ?? "";
     }
 } else {
 
@@ -94,8 +105,8 @@ if ($isLockedKpi9) {
     $kpi["max_score"] = (string) KPI_MAX_LEVEL;
 }
 
-$kpi9NameMismatch = $isLockedKpi9 && !nonRenewalKpiNameMatches($kpi);
-$kpi9TypeError = $isLockedKpi9 ? nonRenewalKpiTypeError($kpi) : null;
+$kpi9NameMismatch = $isKpi9 && !nonRenewalKpiNameMatches($kpi);
+$kpi9TypeError = $isKpi9 ? nonRenewalKpiTypeError($kpi) : null;
 
 
 /*
@@ -132,7 +143,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $kpi_type = trim($_POST["kpi_type"] ?? "");
     $description = trim($_POST["description"] ?? "");
     $weight = trim($_POST["weight"] ?? "");
-    $unit = trim($_POST["unit"] ?? "");
+    /* หน่วยกำหนดอัตโนมัติเป็น % (ไม่มีช่องหน่วยในฟอร์ม และไม่รับค่าจาก POST) */
+    $unit = KPI_DEFAULT_UNIT;
     $max_score = trim($_POST["max_score"] ?? "");
 
     $score_5 = trim($_POST["score_5"] ?? "");
@@ -149,11 +161,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $kpi_name = $lockedKpiName;
         $kpi_type = $lockedKpiType;
         $max_score = (string) KPI_MAX_LEVEL;
-        $score_5 = NON_RENEWAL_KPI_CRITERIA[5];
-        $score_4 = NON_RENEWAL_KPI_CRITERIA[4];
-        $score_3 = NON_RENEWAL_KPI_CRITERIA[3];
-        $score_2 = NON_RENEWAL_KPI_CRITERIA[2];
-        $score_1 = NON_RENEWAL_KPI_CRITERIA[1];
+        $score_5 = $ruleCriteria[5] ?? "";
+        $score_4 = $ruleCriteria[4] ?? "";
+        $score_3 = $ruleCriteria[3] ?? "";
+        $score_2 = $ruleCriteria[2] ?? "";
+        $score_1 = $ruleCriteria[1] ?? "";
     }
 
 
@@ -180,10 +192,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $fieldErrors["weight"] = "กรุณากรอก Weight";
     } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
         $fieldErrors["weight"] = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
-    }
-
-    if (mb_strlen($unit) > 50) {
-        $fieldErrors["unit"] = "หน่วยวัดต้องไม่เกิน 50 ตัวอักษร";
     }
 
     if ($max_score === "") {
@@ -485,7 +493,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <?php endif; ?>
 
                     <?php if ($isLockedKpi9): ?>
-                        <small>ชื่อและประเภทของ KPI นี้ถูกล็อก เพราะกฎคะแนนในระบบผูกกับ KPI ID 9 และ KPI นี้ต้องเป็นประเภท Performance</small>
+                        <small>ชื่อและประเภทของ KPI นี้ถูกล็อก เพราะกฎคะแนนในระบบผูกกับ KPI ID <?= (int) $kpi["kpi_id"] ?> และ KPI นี้ต้องเป็นประเภท Performance</small>
                     <?php endif; ?>
 
                 </div>
@@ -530,27 +538,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
 
 
-                <div class="form-group<?= isset($fieldErrors["unit"]) ? " has-error" : "" ?>">
-
-                    <label for="unit">Unit</label>
-
-                    <input
-                        type="text"
-                        id="unit"
-                        name="unit"
-                        maxlength="50"
-                        value="<?= htmlspecialchars(
-                                    $kpi["unit"] ?? "",
-                                    ENT_QUOTES,
-                                    "UTF-8"
-                                ) ?>">
-
-                    <?php if (isset($fieldErrors["unit"])): ?>
-                        <div class="field-error" id="error-unit"><?= htmlspecialchars($fieldErrors["unit"], ENT_QUOTES, "UTF-8") ?></div>
-                    <?php endif; ?>
-
-                </div>
-
 
                 <div class="form-group<?= isset($fieldErrors["max_score"]) ? " has-error" : "" ?>">
 
@@ -584,9 +571,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <?php if ($isLockedKpi9): ?>
 
                     <div class="error">
-                        เกณฑ์ของ KPI นี้กำหนดในระบบ แก้ไขที่หน้านี้ไม่ได้:
-                        Achievement = (Total R / Budget) × 100
-                        (ไม่รวม Total N และไม่ใช้ Total R+N) · กำหนด Budget ที่หน้ามอบหมาย KPI
+                        เกณฑ์ของ KPI นี้กำหนดในระบบตามที่เจ้าของระบบยืนยัน แก้ไขที่หน้านี้ไม่ได้:
+                        <?php if ($isKpi9): ?>
+                            ผลงาน (%) = จำนวนรายที่ต่อสัญญา ÷ จำนวนรายตาม Budget × 100
+                            (นำเข้าจากไฟล์บริษัท ชีตสรุปทั้งปี ตารางจำนวนราย คอลัมน์ U · Target 100%)
+                        <?php elseif ((int) $kpi["kpi_id"] === UPSELL_KPI_ID): ?>
+                            ผลงาน (%) = จำนวนลูกค้าที่ผลต่างราคา (S) มากกว่า 0 ÷ จำนวนลูกค้าเดิมที่ต่อสัญญา (B) × 100
+                            (นำเข้าจากชีตของเดือน · เป้าหมาย 10% · ไม่มีคะแนนระดับ 1)
+                        <?php else: ?>
+                            ผลงาน (%) = Total R ÷ Budget × 100 (ไม่รวมยอดขายใหม่ · ชีตสรุปทั้งปี คอลัมน์ R · เป้าหมาย 100%)
+                            · ผลที่อยู่ในช่วงที่สูตรบริษัทไม่กำหนดคะแนน (มากกว่า 89% แต่ต่ำกว่า 90% / มากกว่า 90% แต่ต่ำกว่า 91%) จะไม่ได้รับคะแนนจนกว่าเจ้าของระบบยืนยัน
+                        <?php endif; ?>
                         · คะแนนสูงสุดล็อกไว้ที่ <?= KPI_MAX_LEVEL ?>
                         <?php if ($kpi9NameMismatch): ?>
                             <br>

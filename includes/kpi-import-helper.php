@@ -27,6 +27,7 @@
 require_once __DIR__ . "/../vendor/autoload.php";
 require_once __DIR__ . "/kpi-score-helper.php";
 require_once __DIR__ . "/monthly-period-helper.php";
+require_once __DIR__ . "/kpi-approval.php";
 
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
@@ -47,6 +48,11 @@ const KPI_IMPORT_NOTE_MAX_LENGTH = 5000;                // เท่ากับ
 /* ที่มาของแถวข้อมูล (กำหนดฝั่ง Server จาก Session ไม่รับจากผู้ใช้) */
 const KPI_IMPORT_ORIGIN_TEMPLATE = "template";
 const KPI_IMPORT_ORIGIN_COMPANY = "company";
+/* ช่องกรอกในหน้า "ผลการปฏิบัติงาน" · รับเฉพาะ KPI ในรายการนี้ (2026-10-29: KPI 12 + Competency 15-19) */
+const KPI_IMPORT_ORIGIN_FORM = "form";
+const KPI12_FORM_KPI_ID = 12;
+const KPI_COMPETENCY_FORM_KPI_IDS = [15, 16, 17, 18, 19];
+const KPI_IMPORT_FORM_KPI_IDS = [12, 15, 16, 17, 18, 19];
 
 /*
 | KPI ที่ยืนยัน Mapping กับไฟล์ Excel ของบริษัทแล้ว → บันทึกได้จากไฟล์บริษัทเท่านั้น (ปิดทาง Template)
@@ -67,7 +73,186 @@ function kpiImportCompanyOnlyKpiIds(): array
 
     return $ids;
 }
-const KPI_IMPORT_SESSION_TTL = 1800;                    // Preview ค้างได้ไม่เกิน 30 นาที
+
+/*
+| KPI 12 "อัตราค้างสัญญาตัวจริงนำกลับ" จากช่องกรอกในหน้าผลการปฏิบัติงาน (เจ้าของระบบกำหนด 2026-10-29)
+|   กรอก "ทั้งหมด" (สัญญาตัวจริงที่ต้องนำกลับ) และ "นำกลับ" เป็นจำนวนเต็ม · ทั้งหมด > 0 · 0 ≤ นำกลับ ≤ ทั้งหมด
+|   Actual = นำกลับ ÷ ทั้งหมด × 100 ตัดทศนิยมลง 2 ตำแหน่ง · Target ตาม Assignment (แสดงเป็น "ไม่คงค้าง")
+|   คะแนนตามเกณฑ์ของ KPI 12 ในระบบ (kpiCalculateScore) · บันทึกผ่าน kpiImportValidate / kpiImportCommit (origin form) เป็น Draft
+|   จำนวนที่กรอกเก็บในหมายเหตุ (comment) รูปแบบ KPI12_FORM_COMMENT_FORMAT ใช้แสดงค่าเดิมในช่องกรอก
+*/
+const KPI12_FORM_MAX_COUNT = 100000;
+const KPI12_FORM_COMMENT_FORMAT = "นำกลับ %d จากทั้งหมด %d ฉบับ";
+const KPI12_FORM_COMMENT_PATTERN = '/^นำกลับ (\d+) จากทั้งหมด (\d+) ฉบับ$/u';
+
+/* คืน ["row" => แถวสำหรับ kpiImportValidate, "error" => ?string] */
+function kpi12FormRow(string $employeeCode, int $year, int $month, string $total, string $returned): array
+{
+    $total = trim($total);
+    $returned = trim($returned);
+
+    if ($total === "" || $returned === "") {
+        return ["row" => null, "error" => "กรุณากรอกจำนวนสัญญา \"ทั้งหมด\" และ \"นำกลับ\""];
+    }
+    if (!ctype_digit($total) || !ctype_digit($returned)) {
+        return ["row" => null, "error" => "จำนวนสัญญาต้องเป็นจำนวนเต็มไม่ติดลบ"];
+    }
+
+    $totalCount = (int) $total;
+    $returnedCount = (int) $returned;
+
+    if ($totalCount <= 0) {
+        return ["row" => null, "error" => "จำนวนสัญญา \"ทั้งหมด\" ต้องมากกว่า 0"];
+    }
+    if ($totalCount > KPI12_FORM_MAX_COUNT) {
+        return ["row" => null, "error" => "จำนวนสัญญาต้องไม่เกิน " . number_format(KPI12_FORM_MAX_COUNT)];
+    }
+    if ($returnedCount > $totalCount) {
+        return ["row" => null, "error" => "จำนวนที่ \"นำกลับ\" ต้องไม่มากกว่า \"ทั้งหมด\""];
+    }
+
+    $basisPoints = intdiv($returnedCount * 10000, $totalCount);   // ตัดเศษทิ้ง = ปัดลง
+
+    return [
+        "row" => [
+            "row" => 1,
+            "values" => [
+                "employee_code" => $employeeCode,
+                "kpi_id" => KPI12_FORM_KPI_ID,
+                "year" => $year,
+                "month" => $month,
+                "actual" => sprintf("%d.%02d", intdiv($basisPoints, 100), $basisPoints % 100),
+                "competency_score" => null,
+                "note" => sprintf(KPI12_FORM_COMMENT_FORMAT, $returnedCount, $totalCount)
+            ],
+            "errors" => []
+        ],
+        "error" => null
+    ];
+}
+
+/* จำนวนที่เคยกรอกจากหมายเหตุ → ["total" => int, "returned" => int] · ไม่ใช่รูปแบบของช่องกรอก → null */
+function kpi12FormParseComment(?string $comment): ?array
+{
+    if ($comment === null || !preg_match(KPI12_FORM_COMMENT_PATTERN, $comment, $match)) {
+        return null;
+    }
+
+    return ["total" => (int) $match[2], "returned" => (int) $match[1]];
+}
+
+/*
+| Competency 15-19 จากช่องกรอกในหน้าผลการปฏิบัติงาน (เจ้าของระบบกำหนด 2026-10-29)
+|   คะแนนเหมือนกันทุกเดือน: กรอกครั้งเดียว → บันทึกเป็น Draft ทุกเดือนของปีที่บันทึกได้
+|   เดือนที่บันทึกไม่ได้ (ไม่มีรอบ / รอบปิด / ส่งแล้ว / อนุมัติแล้ว / ไม่อยู่ในช่วง Assignment) → ข้ามรายการนั้น ไม่แก้ข้อมูลเดิม
+|   ตรวจและบันทึกด้วย kpiImportValidate / kpiImportCommit (origin form) · Manager ตรวจและอนุมัติรายเดือนตามขั้นตอนเดิม
+*/
+
+/* คะแนนที่กรอก [kpi_id => "1".."5"] → ["scores" => [kpi_id => int], "error" => ?string] (รับเฉพาะ KPI_COMPETENCY_FORM_KPI_IDS) */
+function kpiCompetencyFormScores(array $input): array
+{
+    $scores = [];
+
+    foreach ($input as $kpiId => $value) {
+        $kpiId = (int) $kpiId;
+        $value = trim((string) $value);
+        if (!in_array($kpiId, KPI_COMPETENCY_FORM_KPI_IDS, true)) {
+            return ["scores" => [], "error" => "KPI Competency ไม่ถูกต้อง"];
+        }
+        if (!in_array($value, ["1", "2", "3", "4", "5"], true)) {
+            return ["scores" => [], "error" => "คะแนน Competency ต้องเป็นจำนวนเต็ม 1-5 ครบทุกหัวข้อ"];
+        }
+        $scores[$kpiId] = (int) $value;
+    }
+
+    if (!$scores) {
+        return ["scores" => [], "error" => "กรุณาเลือกคะแนน Competency"];
+    }
+
+    ksort($scores);
+    return ["scores" => $scores, "error" => null];
+}
+
+/*
+| บันทึกคะแนน Competency ทุกเดือนของปีที่บันทึกได้
+| คืน ["ok" => bool, "saved_months" => [เดือน], "skipped" => [เดือน => [เหตุผล]], "summary" => ผล kpiImportCommit, "errors" => [...]]
+*/
+function kpiCompetencyFormSave(PDO $pdo, int $employeeId, string $employeeCode, int $year, array $scores): array
+{
+    $out = ["ok" => false, "saved_months" => [], "skipped" => [], "summary" => null, "errors" => []];
+    $build = function (array $keys) use ($employeeCode, $year, $scores): array {
+        $rows = [];
+        foreach ($keys as [$month, $kpiId]) {
+            $rows[] = [
+                "row" => count($rows) + 1,
+                "values" => [
+                    "employee_code" => $employeeCode, "kpi_id" => $kpiId, "year" => $year, "month" => $month,
+                    "actual" => null, "competency_score" => $scores[$kpiId], "note" => null
+                ],
+                "errors" => []
+            ];
+        }
+        return $rows;
+    };
+
+    $all = [];
+    for ($month = 1; $month <= 12; $month++) {
+        foreach (array_keys($scores) as $kpiId) {
+            $all[] = [$month, $kpiId];
+        }
+    }
+
+    /* รอบแรก: หาเดือน/KPI ที่บันทึกได้ (ไม่ล็อก) */
+    $keep = [];
+    foreach (kpiImportValidate($pdo, $employeeId, $build($all), false, KPI_IMPORT_ORIGIN_FORM)["rows"] as $index => $row) {
+        if ($row["action"] === "error") {
+            $out["skipped"][(int) $all[$index][0]] = array_values(array_unique(array_merge($out["skipped"][(int) $all[$index][0]] ?? [], $row["errors"])));
+        } else {
+            $keep[] = $all[$index];
+        }
+    }
+
+    if (!$keep) {
+        $out["errors"][] = "ไม่มีเดือนที่บันทึกคะแนน Competency ได้ (รอบประเมินปิด / ส่งแล้ว / อนุมัติแล้ว หรือไม่อยู่ในช่วงที่ได้รับมอบหมาย)";
+        return $out;
+    }
+
+    /* รอบสอง: ตรวจซ้ำเฉพาะที่บันทึกได้ แล้วบันทึกทั้งชุดใน Transaction เดียว (kpiImportCommit ตรวจซ้ำพร้อมล็อกอีกครั้ง) */
+    $rows = $build($keep);
+    $preview = kpiImportValidate($pdo, $employeeId, $rows, false, KPI_IMPORT_ORIGIN_FORM)["rows"];
+    foreach ($preview as $row) {
+        if ($row["action"] === "error") {
+            $out["errors"][] = "ข้อมูลในระบบเปลี่ยนระหว่างบันทึก กรุณาลองใหม่อีกครั้ง";
+            return $out;
+        }
+    }
+
+    $summary = kpiImportCommit($pdo, $employeeId, $rows, $preview, array_column($preview, "key"), KPI_IMPORT_ORIGIN_FORM);
+    $out["summary"] = $summary;
+    $out["ok"] = $summary["ok"];
+    $out["errors"] = $summary["errors"];
+    $out["saved_months"] = $summary["ok"] ? array_values(array_unique(array_column($keep, 0))) : [];
+
+    return $out;
+}
+
+/* KPI ที่ยืนยัน Mapping แล้วแต่ไม่อ่านค่าจาก Excel (KPI 11 / 12) → [kpi_id => channel] (ดู KPI_COMPANY_CHANNELS) */
+function kpiImportCompanyChannels(): array
+{
+    static $channels = null;
+
+    if ($channels === null) {
+        $channels = [];
+        foreach (require __DIR__ . "/kpi-import-company-map.php" as $entry) {
+            if (!empty($entry["confirmed"]) && is_int($entry["kpi_id"] ?? null) && !empty($entry["channel"])) {
+                $channels[$entry["kpi_id"]] = (string) $entry["channel"];
+            }
+        }
+    }
+
+    return $channels;
+}
+const KPI_IMPORT_SESSION_TTL = 1800;                   // Preview ค้างได้ไม่เกิน 30 นาที
 const KPI_IMPORT_ALLOWED_MIME = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/zip"
@@ -145,6 +330,7 @@ function kpiImportCheckUploadedFile(array $file, bool $requireUploadedFile = tru
 function kpiImportCheckPackage(string $path): ?string
 {
     if (!class_exists("ZipArchive")) {
+        error_log("kpiImportCheckPackage: PHP extension 'zip' (ZipArchive) is not loaded (PHP " . PHP_VERSION . ", ini " . (php_ini_loaded_file() ?: "none") . ")");
         return "เซิร์ฟเวอร์ไม่รองรับการอ่านไฟล์ .xlsx กรุณาติดต่อผู้ดูแลระบบ";
     }
 
@@ -490,8 +676,9 @@ function kpiImportFixed2(?string $value): ?string
 */
 function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $lock = false, string $origin = KPI_IMPORT_ORIGIN_TEMPLATE): array
 {
-    /* ปิดการนำเข้าผ่าน Template ของระบบทั้งหมด: รับเฉพาะแถวที่ตัวอ่านไฟล์บริษัทสร้าง (origin = company จาก Session) */
-    $templateClosed = $origin !== KPI_IMPORT_ORIGIN_COMPANY;
+    /* ปิดการนำเข้าผ่าน Template ของระบบทั้งหมด: รับเฉพาะแถวที่ตัวอ่านไฟล์บริษัทสร้าง (origin = company จาก Session)
+       หรือช่องกรอกในหน้าผลการปฏิบัติงาน (origin = form) เฉพาะ KPI_IMPORT_FORM_KPI_IDS */
+    $templateClosed = !in_array($origin, [KPI_IMPORT_ORIGIN_COMPANY, KPI_IMPORT_ORIGIN_FORM], true);
 
     $thaiMonths = monthlyPeriodMonths();
 
@@ -527,6 +714,8 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
 
         if ($kpiId === null || $kpiId <= 0) {
             $errors[] = "kpi_id ต้องเป็นจำนวนเต็มบวก";
+        } elseif ($origin === KPI_IMPORT_ORIGIN_FORM && !in_array($kpiId, KPI_IMPORT_FORM_KPI_IDS, true)) {
+            $errors[] = "KPI นี้บันทึกผ่านช่องกรอกในหน้าผลการปฏิบัติงานไม่ได้";
         }
 
         if ($year === null || $year < 2000 || $year > 2100) {
@@ -558,6 +747,9 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
             "raw_competency" => $values["competency_score"] ?? null,
             /* Target รายแถว: มาจากตัวอ่านไฟล์บริษัทเท่านั้น (KPI 9 = 100) · Template ไม่มีช่องนี้ */
             "raw_target" => $origin === KPI_IMPORT_ORIGIN_COMPANY ? ($values["target"] ?? null) : null,
+            /* ฐานตัดเกรดแบบไม่ปัดเศษจากตัวอ่านไฟล์บริษัท (KPI 10: จำนวนราย · KPI 14: สตางค์) · Template ไม่มี */
+            "grade_basis" => $origin === KPI_IMPORT_ORIGIN_COMPANY && is_array($values["grade_basis"] ?? null) ? $values["grade_basis"] : null,
+            "score_pending" => null,
             "comment" => $note === "" ? null : $note,
             "kpi_name" => null,
             "kpi_type" => null,
@@ -620,6 +812,13 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
     $assignmentLockStmt = $pdo->prepare($assignmentLockSql);
     $assignmentStmt = $pdo->prepare($assignmentSql);
     $existingStmt = $pdo->prepare($existingSql);
+
+    /* สถานะที่ล็อกเดือน (ส่งแล้ว / อนุมัติแล้ว) ของพนักงานในรอบประเมิน */
+    $lockedStmt = $pdo->prepare("
+        SELECT status FROM kpi_performances
+        WHERE employee_id = :employee_id AND period_id = :period_id AND status IN ('Submitted', 'Approved')
+        ORDER BY FIELD(status, 'Approved', 'Submitted') LIMIT 1
+    ");
 
     foreach ($results as &$result) {
 
@@ -725,7 +924,33 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
                     $levels = loadKpiScoreCriteria($pdo, [$assignment])[(int) $assignment["kpi_id"]] ?? [];
                     $score = kpiCalculateScore($assignment, $levels, $decimal["value"], $targetValue);
 
-                    if ($score["error"] !== null || $score["grade"] === null) {
+                    /*
+                    | KPI 10 / 11 / 14 จากไฟล์บริษัท: ตัดเกรดจากค่าจริงไม่ปัดเศษ (Actual ที่บันทึกตัดทศนิยมเหลือ 2 ตำแหน่ง)
+                    |   KPI 10: S > 0 (ราย) ÷ ลูกค้าต่อสัญญา (ราย) · KPI 11: ครั้งที่เข้าเยี่ยม ÷ ลูกค้าที่ต้องเยี่ยม (ราย)
+                    |   KPI 14: ค่าในเซลล์สรุปทั้งปี (สเกล 10^12)
+                    */
+                    $basis = $result["grade_basis"];
+                    if ($score["error"] === null && is_array($basis)) {
+                        $basisKpi = (int) ($basis["kpi_id"] ?? 0);
+                        $num = (int) ($basis["numerator"] ?? -1);
+                        $den = (int) ($basis["denominator"] ?? 0);
+                        if ($basisKpi === UPSELL_KPI_ID && (int) $assignment["kpi_id"] === UPSELL_KPI_ID) {
+                            $score["grade"] = kpiUpsellGradeExact($num, $den);
+                        } elseif ($basisKpi === VISIT_KPI_ID && (int) $assignment["kpi_id"] === VISIT_KPI_ID) {
+                            $score["grade"] = kpiVisitGradeExact($num, $den);
+                            $score["pending"] = $score["grade"] === null ? VISIT_KPI_GAP_MESSAGE : null;
+                        } elseif ($basisKpi === RENEWAL_KPI_ID && (int) $assignment["kpi_id"] === RENEWAL_KPI_ID) {
+                            $score["grade"] = kpiRenewalGradeExact($num, $den);
+                            $score["pending"] = $score["grade"] === null ? RENEWAL_KPI_GAP_MESSAGE : null;
+                        }
+                    }
+
+                    if ($score["error"] === null && $score["grade"] === null && !empty($score["pending"])) {
+                        /* KPI 14 ในช่องว่างของเกณฑ์: บันทึก Actual จริง แต่ไม่ให้คะแนน (รอเจ้าของระบบยืนยัน) */
+                        $result["actual"] = $decimal["value"];
+                        $result["score"] = null;
+                        $result["score_pending"] = (string) $score["pending"];
+                    } elseif ($score["error"] !== null || $score["grade"] === null) {
                         $result["errors"][] = $score["error"]
                             ?? "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
                     } else {
@@ -770,6 +995,13 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
         $existing = $existingStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if ($existing === null) {
+            /* เดือนที่ส่งแล้ว / อนุมัติแล้ว (มีแถว Submitted หรือ Approved) ห้ามเพิ่มรายการใหม่ */
+            $lockedStmt->execute([":employee_id" => $employeeId, ":period_id" => $result["period_id"]]);
+            $lockedStatus = $lockedStmt->fetchColumn();
+            if ($lockedStatus !== false) {
+                $result["errors"][] = "ผลการประเมินของเดือน{$monthLabel} " . ($lockedStatus === "Approved" ? "ได้รับการอนุมัติแล้ว" : "ส่งให้ Manager แล้ว") . " ไม่สามารถเพิ่มรายการใหม่ได้";
+                continue;
+            }
             $result["action"] = "insert";
             continue;
         }
@@ -788,10 +1020,11 @@ function kpiImportValidate(PDO $pdo, int $employeeId, array $parsedRows, bool $l
             continue;
         }
 
-        if ((string) $existing["status"] !== "Draft") {
+        /* แก้ไขได้เฉพาะ Draft และ Rejected (Manager ส่งกลับให้แก้ไข) */
+        if (!kpiStatusIsEditable((string) $existing["status"])) {
             $result["errors"][] = (string) $existing["status"] === "Approved"
                 ? "ผลงานของเดือน{$monthLabel} ได้รับการอนุมัติแล้ว ไม่สามารถนำเข้าทับได้"
-                : "ผลงานของเดือน{$monthLabel} อยู่ในสถานะ " . $existing["status"] . " นำเข้าทับได้เฉพาะสถานะ Draft";
+                : "ผลงานของเดือน{$monthLabel} อยู่ในสถานะ " . $existing["status"] . " นำเข้าทับได้เฉพาะสถานะ Draft หรือส่งกลับให้แก้ไข (Rejected)";
             continue;
         }
 
@@ -850,7 +1083,7 @@ function kpiImportCommit(PDO $pdo, int $employeeId, array $parsedRows, array $pr
         }
     }
 
-    if ($origin !== KPI_IMPORT_ORIGIN_COMPANY) {
+    if (!in_array($origin, [KPI_IMPORT_ORIGIN_COMPANY, KPI_IMPORT_ORIGIN_FORM], true)) {
         $summary["errors"][] = "ระบบปิดการนำเข้าผ่าน Template แล้ว ไม่มีข้อมูลถูกบันทึก";
         return $summary;
     }
@@ -911,10 +1144,11 @@ function kpiImportCommit(PDO $pdo, int $employeeId, array $parsedRows, array $pr
                 target = :target,
                 actual = :actual,
                 score = :score,
-                comment = :comment
+                comment = :comment,
+                status = 'Draft'
             WHERE performance_id = :performance_id
               AND employee_id = :employee_id
-              AND status = 'Draft'
+              AND status IN ('Draft', 'Rejected')
         ");
 
         foreach ($fresh["rows"] as $row) {

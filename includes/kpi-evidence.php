@@ -18,6 +18,7 @@
 */
 
 require_once __DIR__ . "/kpi-file-storage.php";
+require_once __DIR__ . "/kpi-approval.php";
 
 const KPI_EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
 const KPI_EVIDENCE_MAX_FILES = 5;
@@ -118,8 +119,8 @@ function kpiEvidenceLockEditable(PDO $pdo, int $employeeId, int $performanceId):
         return "ไม่พบผลงานรายการนี้";
     }
 
-    if ((string) $row["status"] !== "Draft") {
-        return "ผลงานสถานะ " . $row["status"] . " แนบหรือลบหลักฐานไม่ได้ (ทำได้เฉพาะสถานะ Draft)";
+    if (!kpiStatusIsEditable((string) $row["status"])) {
+        return "ผลงานสถานะ " . $row["status"] . " แนบหรือลบหลักฐานไม่ได้ (ทำได้เฉพาะสถานะ Draft หรือส่งกลับให้แก้ไข)";
     }
 
     return null;
@@ -249,7 +250,7 @@ function kpiEvidenceForPerformances(PDO $pdo, array $performanceIds): array
 
     $in = implode(",", array_fill(0, count($ids), "?"));
     $stmt = $pdo->prepare("
-        SELECT evidence_id, performance_id, original_name, file_ext, file_size, uploaded_at
+        SELECT evidence_id, performance_id, original_name, file_ext, file_size, file_sha256, uploaded_at
         FROM kpi_performance_evidence
         WHERE performance_id IN ({$in})
         ORDER BY uploaded_at, evidence_id

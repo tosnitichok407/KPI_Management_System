@@ -515,3 +515,10 @@ td {
     padding: 35px;
     color: #9ca3af;
 }
+
+/* บรรทัดรองใต้ตัวเลขในการ์ดสรุป (คะแนนจริงตามแบบฟอร์ม KPI AM) */
+.stat-sub {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #6b7280;
+}

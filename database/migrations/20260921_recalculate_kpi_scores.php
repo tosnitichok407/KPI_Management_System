@@ -69,7 +69,12 @@ $rows = $pdo->query("
         p.actual,
         p.score AS old_score,
         p.status,
-        a.target_value,
+        /*
+        | Target ที่ใช้ตัดเกรด = Target ที่บันทึกกับผลงานแถวนั้น (ค่าที่ใช้ตอนบันทึก) · ไม่มี → Target ของ Assignment
+        | (KPI 9 ที่นำเข้าจากไฟล์บริษัทบันทึก Target 100 แต่ Assignment ยังเก็บ Budget เดิม
+        |  ถ้าใช้ค่าใน Assignment จะได้คะแนนผิด เช่น 72.22% → 5)
+        */
+        COALESCE(p.target, a.target_value) AS target_value,
         k.kpi_id,
         k.kpi_name,
         k.kpi_type,

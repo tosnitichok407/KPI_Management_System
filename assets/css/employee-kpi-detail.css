@@ -315,3 +315,18 @@ a.submit-button {
 .back-button {
     margin-left: 5px;
 }
+
+/* เกณฑ์คะแนน Competency จากแบบฟอร์ม KPI AM */
+.competency-criteria-source {
+    margin: 0 0 8px;
+    color: #667085;
+    font-size: 13px;
+}
+.competency-criteria-description {
+    margin: 0 0 12px;
+    line-height: 1.6;
+}
+.competency-criteria td:first-child {
+    width: 90px;
+    text-align: center;
+}

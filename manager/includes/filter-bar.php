@@ -93,7 +93,8 @@ $hasFilter =
 
                 <option value="0">ทุกแผนก</option>
 
-                <?php foreach ($yearData["departments"] as $departmentId => $departmentName): ?>
+                <?php /* $departmentOptions: รายการแผนกเฉพาะหน้า (เช่น หน้ารายแผนกแสดงเฉพาะแผนกที่มี KPI) */ ?>
+                <?php foreach ($departmentOptions ?? $yearData["departments"] as $departmentId => $departmentName): ?>
                     <option value="<?= $departmentId ?>" <?= $departmentId === $filterDepartment ? "selected" : "" ?>>
                         <?= htmlspecialchars($departmentName, ENT_QUOTES, "UTF-8") ?>
                     </option>

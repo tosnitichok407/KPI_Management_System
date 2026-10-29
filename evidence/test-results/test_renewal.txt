@@ -1,15 +1,16 @@
 PASS T1 Actual = Total R / Budget x 100 truncated to 2dp: Jan 95.00 (0.95 float-safe), Feb 99.99 (99.995%), Mar 100.00, Apr 110.00, May 85.00, Jun 40.00 (shifted rows), Jul 0.00
-PASS T2 source = สรุปทั้งปี69!Q{row} of the value table (Q5..Q11), not KPI AM
-PASS T3 New sales excluded: G = SUM(D:F) only (New 77777 in column I ignored) and preview shows Total R / Budget / ratio
+PASS T2 source = สรุปทั้งปี69!R{row} of the value table (R5..R11, form 2026-10-19), not KPI AM
+PASS T3 New sales excluded: H = SUM(D:G) only (New 77777 in column J ignored) and preview shows Total R / Budget / ratio
 PASS T4 KPI AM cells of this KPI ignored (K12 linked / N12 typed 0.5): Feb still 99.99 from summary
 PASS T5 empty month (Aug: Budget 0 and Total R 0) skipped, nothing READY
 PASS T6 grades follow the system criteria of KPI 14 (not Excel): 95->3, 99.99->3, 100->4, 110->5, 85->2, 40->1, 0->1
-PASS T7 new_in_g (month 1) -> REJECTED: G5 ต้องเป็นสูตร =SUM(D5:F5)
-PASS T7 q_typed (month 2) -> REJECTED: Q6 ต้องเป็นสูตร =G6/C6
+PASS T7 new_in_g (month 1) -> REJECTED: H5 ต้องเป็นสูตร =SUM(D5:G5)
+PASS T7 q_typed (month 2) -> REJECTED: R6 ต้องเป็นสูตร =H6/C6
 PASS T7 zero_budget (month 7) -> REJECTED: Budget (C11) ต้องเป็นตัวเลขมากกว่า 0
 PASS T7 error_src (month 1) -> REJECTED: ค่า Error
 PASS T7 text_budget (month 1) -> REJECTED: Budget (C5) ต้องเป็นตัวเลขมากกว่า 0
-PASS T7 q_mismatch (month 1) -> REJECTED: ค่าใน Q5 ไม่เท่ากับ G5/C5
+PASS T7 q_mismatch (month 1) -> REJECTED: ค่าใน R5 ไม่เท่ากับ H5/C5
+PASS T7 renew3y_filled (month 2) -> REJECTED: Renew 3Y (F6)
 PASS T7 header (month 2) -> REJECTED: หัวตารางของชีต
 PASS T7 no_value_table (month 2) -> REJECTED: ไม่พบตาราง "Portfolio(มูลค่า)"
 PASS T7 two_value_tables (month 2) -> REJECTED: ไม่พบตาราง "Portfolio(มูลค่า)"
@@ -70,4 +71,4 @@ PASS S18 valid probe still prepares with commit open
 PASS T26 after all imports: other KPIs and other employee untouched
 PASS T27 Approved/Submitted/Rejected rows of KPI 14 unchanged
 
-TOTAL 71 · PASS 71 · FAIL 0
+TOTAL 72 · PASS 72 · FAIL 0

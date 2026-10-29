@@ -6,6 +6,8 @@ require_once __DIR__ . "/../config/database.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/includes/manager-data.php";
+require_once __DIR__ . "/../includes/kpi-correction.php";
+require_once __DIR__ . "/../includes/kpi-contract-return.php";
 
 
 /*
@@ -70,7 +72,13 @@ $pages = [
     "departments/departments.php",
 
     "employees" =>
-    "employees/employees.php"
+    "employees/employees.php",
+
+    "corrections" =>
+    "corrections/corrections.php",
+
+    "contract-returns" =>
+    "contract-returns/contract-returns.php"
 
 ];
 
@@ -174,7 +182,8 @@ $flash = $_GET["saved"] ?? "";
     <link rel="stylesheet" href="../assets/css/forms.css">
     <link rel="stylesheet" href="../assets/css/tables.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
-    <link rel="stylesheet" href="../assets/css/manager.css?v=manager-v3">
+    <link rel="stylesheet" href="../assets/css/manager.css?v=manager-v16">
+    <link rel="stylesheet" href="../assets/css/kpi-correction.css?v=3">
 
 
     <?php if ($page === "home"): ?>
@@ -335,6 +344,7 @@ $flash = $_GET["saved"] ?? "";
     </script>
 
     <script src="../assets/js/admin.js?v=scroll-3"></script>
+    <script src="../assets/js/manager-table.js?v=1"></script>
 
 </body>
 

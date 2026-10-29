@@ -1,7 +1,7 @@
 <?php
 
 $host = "localhost";
-$dbname = "kpi_management_system";
+$dbname = getenv("KPI_DB_NAME") ?: "kpi_management_system";
 $username = "root";
 $password = "";
 $port = 3306;

@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . "/../../includes/kpi-correction.php";
+require_once __DIR__ . "/../../includes/kpi-contract-return.php";
+
 /*
 |--------------------------------------------------------------------------
 | Employee Layout (โครงสร้างเดียวกับ Admin)
@@ -34,8 +37,20 @@ function employeeLayoutStart(string $activeNav, string $rootPath = "../"): void
         "import" => ["employee/kpi-import.php", "file-spreadsheet", "บันทึกผล KPI (Excel)"],
         "performance" => ["employee/performance.php", "chart-column", "ผลการปฏิบัติงาน"],
         "feedback" => ["employee/feedback.php", "message-square", "Feedback จากหัวหน้า"],
+        /* คำขอแก้ไขข้อมูล (แสดงเมื่อรัน Migration 20261026 แล้วเท่านั้น) */
+        "corrections" => ["employee/kpi-correction.php", "square-pen", "คำขอแก้ไขข้อมูล"],
+        /* KPI12 รับคืนสัญญาตัวจริง (แสดงเมื่อรัน Migration 20261028 แล้วเท่านั้น) */
+        "contract_returns" => ["employee/kpi-contract-returns.php", "file-text", "KPI12 รับคืนสัญญา"],
         "profile" => ["employee/profile.php", "circle-user", "ข้อมูลส่วนตัว"]
     ];
+
+    if (!isset($GLOBALS["pdo"]) || !function_exists("kpiCorrectionEnabled") || !kpiCorrectionEnabled($GLOBALS["pdo"])) {
+        unset($navItems["corrections"]);
+    }
+
+    if (!isset($GLOBALS["pdo"]) || !kpiContractReturnEnabled($GLOBALS["pdo"])) {
+        unset($navItems["contract_returns"]);
+    }
 
     ?>
 

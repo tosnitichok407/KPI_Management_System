@@ -249,9 +249,15 @@ $readinessStmt = $pdo->prepare("
 ");
 $readinessStmt->execute([":employee_id" => $employeeId, ":year" => (int) date("Y")]);
 $readiness = array_map(
-    fn($kpi) => $kpi + ["ready" => isset(kpiImportCompanyOnlyKpiIds()[(int) $kpi["kpi_id"]])],
+    fn($kpi) => $kpi + [
+        "ready" => isset(kpiImportCompanyOnlyKpiIds()[(int) $kpi["kpi_id"]]) && !isset(kpiImportCompanyChannels()[(int) $kpi["kpi_id"]]),
+        "channel" => kpiImportCompanyChannels()[(int) $kpi["kpi_id"]] ?? null
+    ],
     $readinessStmt->fetchAll(PDO::FETCH_ASSOC)
 );
+
+/* KPI12 กรอกในหน้าผลการปฏิบัติงาน (ช่อง "ทั้งหมด" / "นำกลับ" · employee/kpi12-entry-action.php) */
+$kpi12Link = '<span class="import-sub"><a href="performance.php#kpi12-entry">ไปกรอกที่หน้าผลการปฏิบัติงาน →</a></span>';
 
 $counts = ["insert" => 0, "update" => 0, "unchanged" => 0, "error" => 0];
 
@@ -328,14 +334,15 @@ $actionLabels = [
         <?php if ($companyView !== null && empty($companyView["errors"])): ?>
             <?php
             $companyResult = $companyView;
-            $statusCounts = ["READY" => 0, "NEEDS_CONFIRMATION" => 0, "REJECTED" => 0];
+            $statusCounts = ["READY" => 0, "NEEDS_CONFIRMATION" => 0, "REJECTED" => 0, KPI_COMPANY_STATUS_NOT_IMPORTED => 0];
             foreach ($companyResult["items"] as $item) {
                 $statusCounts[$item["status"]]++;
             }
             $statusLabels = [
                 "READY" => ["พร้อมนำเข้า", "badge-insert"],
                 "NEEDS_CONFIRMATION" => ["รอยืนยัน Mapping", "badge-update"],
-                "REJECTED" => ["ใช้ไม่ได้", "badge-error"]
+                "REJECTED" => ["ใช้ไม่ได้", "badge-error"],
+                KPI_COMPANY_STATUS_NOT_IMPORTED => ["ไม่นำเข้าจาก Excel", "badge-unchanged"]
             ];
             $formatValue = static fn($v): string => is_float($v) ? rtrim(rtrim(number_format($v, 6, ".", ""), "0"), ".") : (string) $v;
             ?>
@@ -355,6 +362,9 @@ $actionLabels = [
                     <span class="badge-insert">พร้อมนำเข้า <?= $statusCounts["READY"] ?></span>
                     <span class="badge-update">รอยืนยัน Mapping <?= $statusCounts["NEEDS_CONFIRMATION"] ?></span>
                     <span class="badge-error">ใช้ไม่ได้ <?= $statusCounts["REJECTED"] ?></span>
+                    <?php if ($statusCounts[KPI_COMPANY_STATUS_NOT_IMPORTED] > 0): ?>
+                        <span class="badge-unchanged">ไม่นำเข้าจาก Excel <?= $statusCounts[KPI_COMPANY_STATUS_NOT_IMPORTED] ?></span>
+                    <?php endif; ?>
                     <span class="badge-unchanged">เดือนที่ไม่มีข้อมูล (ข้าม) <?= (int) $companyResult["skipped_empty"] ?></span>
                 </div>
                 <div class="import-table-wrapper">
@@ -388,6 +398,11 @@ $actionLabels = [
                                         <?php foreach ($item["warnings"] ?? [] as $warning): ?>
                                             <span class="import-warning-text"><?= $e($warning) ?></span>
                                         <?php endforeach; ?>
+                                        <?php if (($item["channel"] ?? null) === "system_form_kpi12"): ?>
+                                            <?= $kpi12Link ?>
+                                        <?php elseif (($item["channel"] ?? null) === "system_form_competency"): ?>
+                                            <span class="import-sub"><a href="performance.php#competency-entry">ไปกรอกคะแนน Competency →</a></span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -422,7 +437,13 @@ $actionLabels = [
                                     <td><?= $e($kpi["kpi_name"]) ?></td>
                                     <td><?= $e($kpi["kpi_type"]) ?></td>
                                     <td>
-                                        <?php if ($kpi["ready"]): ?>
+                                        <?php if ($kpi["channel"] === "system_form_kpi12"): ?>
+                                            <span class="badge-unchanged">ไม่นำเข้าจาก Excel · กรอกในหน้าผลการปฏิบัติงาน</span>
+                                            <?= $kpi12Link ?>
+                                        <?php elseif ($kpi["channel"] === "system_form_competency"): ?>
+                                            <span class="badge-unchanged">ไม่นำเข้าจาก Excel · กรอกคะแนนในหน้าผลการปฏิบัติงาน</span>
+                                            <span class="import-sub"><a href="performance.php#competency-entry">ไปกรอกคะแนน Competency →</a></span>
+                                        <?php elseif ($kpi["ready"]): ?>
                                             <span class="badge-insert">พร้อมนำเข้าจากไฟล์บริษัท</span>
                                         <?php else: ?>
                                             <span class="badge-unchanged">ยังไม่พร้อมนำเข้า (รอยืนยัน Mapping)</span>
@@ -529,7 +550,7 @@ $actionLabels = [
                                         <td>
                                             <?php if ($row["kpi_name"] !== null): ?>
                                                 <strong><?= $e($row["kpi_id"]) ?></strong> <?= $e($row["kpi_name"]) ?>
-                                                <span class="import-sub"><?= $e($row["kpi_type"]) ?><?= $row["unit"] ? " · หน่วย " . $e($row["unit"]) : "" ?></span>
+                                                <span class="import-sub"><?= $e($row["kpi_type"]) ?><?= kpiDisplayUnit($row) !== "" ? " · หน่วย " . $e(kpiDisplayUnit($row)) : "" ?></span>
                                             <?php else: ?>
                                                 <?= $e($row["kpi_id"] ?? "-") ?>
                                             <?php endif; ?>
@@ -548,22 +569,49 @@ $actionLabels = [
                                         <td>
                                             <?php if (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_UPLIFT_RULE): ?>
                                                 ราคาเดิม (<?= $e($row["details"]["base_cell"]) ?>) <?= $e($row["details"]["base"]) ?>
-                                                <span class="import-sub">ผลต่าง (<?= $e($row["details"]["diff_cell"]) ?>) <?= $e($row["details"]["diff"]) ?> · สัดส่วน (<?= $e($row["details"]["ratio_cell"]) ?>) <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>% (ปัดลงเป็นจำนวนเต็ม)</span>
+                                                <span class="import-sub">ผลต่างที่ระบบคำนวณ (<?= $e($row["details"]["diff_cell"]) ?>) <?= $e($row["details"]["diff"]) ?> · สัดส่วน <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>% (ปัดลงเป็นจำนวนเต็ม)</span>
                                             <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_NON_RENEWAL_RULE): ?>
                                                 <?= $e($row["details"]["ratio_cell"]) ?> = <?= $e($row["details"]["ratio"]) ?>
                                                 <span class="import-sub">ต่อสัญญา (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> ราย ÷ Budget (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?> ราย → Actual <?= $e($row["details"]["actual"]) ?>%</span>
+                                            <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_UPSELL_RULE): ?>
+                                                ขายเพิ่ม <?= (int) $row["details"]["positive"] ?> ราย ÷ ลูกค้าต่อสัญญา (<?= $e($row["details"]["customers_cell"]) ?>) <?= (int) $row["details"]["customers"] ?> ราย
+                                                <span class="import-sub">= <?= $e($row["details"]["exact"]) ?>% → Actual <?= $e($row["details"]["actual"]) ?>%</span>
+                                                <span class="import-sub">R − O &gt; 0: <?=$row["details"]["positive_cells"] ? $e(implode(", ", $row["details"]["positive_cells"])) : "-" ?>
+                                                    · ระบุ "ขายเพิ่ม" ด้วยมือ: <?= !empty($row["details"]["manual_cells"]) ? $e(implode(", ", $row["details"]["manual_cells"])) : "-" ?>
+                                                    <?php if (!empty($row["details"]["duplicate_rows"])): ?> · นับครั้งเดียว (แถว <?= $e(implode(", ", $row["details"]["duplicate_rows"])) ?>)<?php endif; ?></span>
                                             <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_FORM_RATIO_RULE): ?>
                                                 ที่ทำได้ (<?= $e($row["details"]["cell"]) ?>) <?= $e($row["details"]["ratio"]) ?>
                                                 <span class="import-sub">สัดส่วนใน Excel × 100 → Actual <?= $e($row["details"]["actual"]) ?>%</span>
+                                            <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_VISIT_RULE): ?>
+                                                เข้าเยี่ยม <?= (int) $row["details"]["visits"] ?> ครั้ง ÷ ลูกค้าที่ต้องเยี่ยม <?= (int) $row["details"]["customers"] ?> ราย
+                                                <span class="import-sub">ชีต <?= $e(KPI_COMPANY_VISIT_SHEET) ?> แถว <?= $e($row["details"]["rows"]) ?> · ราคา ≥ <?= number_format(KPI_COMPANY_VISIT_MIN_PRICE) ?> → Actual <?= $e($row["details"]["actual"]) ?>%</span>
+                                                <?php if ((int) $row["details"]["future"] > 0 || !empty($row["details"]["excluded_rows"])): ?>
+                                                    <span class="import-sub">ไม่นับ: วันที่ในอนาคต <?= (int) $row["details"]["future"] ?> ช่อง · การเข้าเยี่ยมของ <?= count($row["details"]["excluded_rows"]) ?> ราย ที่เยี่ยมครั้งแรกห่างจากเดือนสัญญา &lt; <?= KPI_COMPANY_VISIT_MIN_LEAD_MONTHS ?> เดือน (ยังนับเป็นลูกค้า)</span>
+                                                <?php endif; ?>
+                                            <?php elseif (!empty($row["details"]) && ($row["details"]["rule"] ?? null) === KPI_COMPANY_RENEWAL_RULE): ?>
+                                                <?= $e($row["details"]["ratio_cell"]) ?> = <?= $e($row["details"]["ratio"]) ?>
+                                                <span class="import-sub">ค่าในเซลล์ × 100 → Actual <?= $e($row["details"]["actual"]) ?>% (ตัดทศนิยมลงเหลือ 2 ตำแหน่ง)</span>
                                             <?php elseif (!empty($row["details"])): ?>
                                                 Budget (<?= $e($row["details"]["budget_cell"]) ?>) <?= $e($row["details"]["budget"]) ?>
-                                                <span class="import-sub">Total R (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?> · สัดส่วน <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>%</span>
+                                                <span class="import-sub">Total R (<?= $e($row["details"]["total_r_cell"]) ?>) <?= $e($row["details"]["total_r"]) ?>
+                                                    <?php if (!empty($row["details"]["excluded_cells"])): ?>
+                                                        − ขายเพิ่มที่กรอกด้วยมือ <?= $e($row["details"]["excluded"]) ?> (<?= $e(implode(", ", $row["details"]["excluded_cells"])) ?>) = <?= $e($row["details"]["total_r_used"]) ?>
+                                                    <?php endif; ?>
+                                                    · สัดส่วน <?= $e($row["details"]["ratio"]) ?> → Actual <?= $e($row["details"]["actual"]) ?>%</span>
                                             <?php else: ?>
                                                 -
                                             <?php endif; ?>
                                         </td>
                                         <td><?= strtolower((string) $row["kpi_type"]) === "competency" ? "-" : $e($row["target"] ?? "-") ?></td>
-                                        <td><?= $row["action"] !== "error" && $row["score"] !== null ? $e($row["score"]) : "-" ?></td>
+                                        <td>
+                                            <?php if ($row["action"] !== "error" && $row["score"] !== null): ?>
+                                                <?= $e($row["score"]) ?>
+                                            <?php elseif ($row["action"] !== "error" && !empty($row["score_pending"])): ?>
+                                                <span class="import-warning-text" title="<?= $e($row["score_pending"]) ?>">รอยืนยันคะแนน</span>
+                                            <?php else: ?>
+                                                -
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <?php if ($row["existing"]): ?>
                                                 <?= $e($row["existing"]["status"]) ?>
@@ -629,7 +677,7 @@ $actionLabels = [
                 <?php if ($historyAll): ?>
                     <a class="import-history-toggle" href="kpi-import.php#import-history">แสดงเฉพาะ <?= KPI_IMPORT_HISTORY_PREVIEW_ROWS ?> รายการล่าสุด</a>
                 <?php elseif ($history["total"] > count($history["rows"])): ?>
-                    <a class="import-history-toggle" href="kpi-import.php?history=all#import-history">ดูทั้งหมด (<?= (int) $history["total"] ?>)</a>
+                    <a class="import-history-toggle" href="kpi-import.php?history=all#import-history">ดูเพิ่มเติม (<?= (int) $history["total"] - count($history["rows"]) ?> ไฟล์)</a>
                 <?php endif; ?>
             </div>
 
@@ -660,7 +708,7 @@ $actionLabels = [
                                             <span class="import-sub"><?= $e(kpiFormatFileSize((int) $entry["file_size"])) ?></span>
                                         <?php else: ?>
                                             <?= $e($entry["original_name"]) ?>
-                                            <span class="import-sub">ไฟล์ถูกลบแล้ว (ระบบเก็บไฟล์ไว้เฉพาะ <?= KPI_IMPORT_HISTORY_KEEP_FILES ?> ไฟล์ล่าสุด)</span>
+                                            <span class="import-sub"><?= $e(KPI_IMPORT_HISTORY_REMOVED_TEXT) ?></span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
@@ -675,7 +723,7 @@ $actionLabels = [
                     </table>
                 </div>
 
-                <p class="import-hint">ระบบเก็บประวัติทุกครั้งที่นำเข้า และเก็บไฟล์ไว้ให้ดาวน์โหลดเฉพาะ <?= KPI_IMPORT_HISTORY_KEEP_FILES ?> ไฟล์ล่าสุด</p>
+                <p class="import-hint">ระบบเก็บประวัติและไฟล์ที่นำเข้าทุกครั้งไว้ให้ดาวน์โหลด ไม่มีวันหมดอายุ · แสดง <?= KPI_IMPORT_HISTORY_PREVIEW_ROWS ?> ไฟล์ล่าสุด</p>
 
             <?php endif; ?>
 

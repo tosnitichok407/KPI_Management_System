@@ -106,7 +106,7 @@ function evaluationActualLabel(array $kpi): string
     $actual = (float) $kpi["actual_value"];
     $text = floor($actual) == $actual ? number_format($actual) : number_format($actual, 2);
 
-    return trim((string) $kpi["unit"]) === "%" ? $text . "%" : $text;
+    return kpiDisplayUnit($kpi) === "%" ? $text . "%" : $text;
 }
 
 
@@ -264,6 +264,10 @@ function requireEmployeeExportAccess(): array
     if (!isset($_SESSION["user_id"])) {
         http_response_code(401);
         exit("Unauthorized");
+    }
+    if ((int) ($_SESSION["role_id"] ?? 0) !== 3) {
+        http_response_code(403);
+        exit("Employee account is required");
     }
     $employeeId = (int) ($_SESSION["employee_id"] ?? 0);
     if ($employeeId <= 0) {

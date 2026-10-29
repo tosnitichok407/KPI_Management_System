@@ -8,19 +8,20 @@
 | ลำดับ:
 |   1. อัปโหลด + Preview ผ่าน → kpiImportHistoryStash() คัดลอกไฟล์ไป storage/pending (ชื่อสุ่ม + SHA-256)
 |      ข้อมูลไฟล์เก็บใน Session คู่กับ Preview
-|   2. ยืนยันสำเร็จ → kpiImportHistoryRecord() ตรวจ SHA-256 ซ้ำ ย้ายไฟล์ไป storage/imports
-|      บันทึกประวัติ 1 แถว แล้วเก็บตัวไฟล์ไว้เฉพาะ KPI_IMPORT_HISTORY_KEEP_FILES ครั้งล่าสุดของพนักงานคนนั้น
+|   2. ยืนยันสำเร็จ → kpiImportHistoryRecord() ตรวจ SHA-256 ซ้ำ ย้ายไฟล์ไป storage/imports แล้วบันทึกประวัติ 1 แถว
 |   3. ยกเลิก / ยืนยันไม่สำเร็จ / Preview หมดอายุ → kpiImportHistoryDiscard() ลบไฟล์ใน pending
 |      ไฟล์ pending ที่ค้างเกินเวลา (เช่น ปิดเบราว์เซอร์ไป) ถูกลบตอนมีการอัปโหลดครั้งถัดไป
-| ประวัติ (วันเวลา เดือนข้อมูล ชื่อไฟล์ ผลการนำเข้า) เก็บทุกครั้ง · ไฟล์ที่เก่ากว่า 3 ครั้งล่าสุดดาวน์โหลดไม่ได้แล้ว
+| ประวัติ (วันเวลา เดือนข้อมูล ชื่อไฟล์ ผลการนำเข้า) และตัวไฟล์ใน storage/imports เก็บถาวร ไม่มีวันหมดอายุ (2026-10-29)
+|   หน้าจอแสดง KPI_IMPORT_HISTORY_PREVIEW_ROWS ไฟล์ล่าสุด + ปุ่มดูเพิ่มเติม
+|   แถวที่ stored_name = NULL คือไฟล์ที่ถูกลบไปก่อนเปลี่ยนเป็นเก็บถาวร (เดิมเก็บเฉพาะ 3 ไฟล์ล่าสุด) · กู้คืนไม่ได้
 | บันทึกประวัติไม่สำเร็จไม่ทำให้การนำเข้าที่ Commit แล้วล้มเหลว (แจ้งผู้ใช้และเขียน error_log)
 |
 */
 
 require_once __DIR__ . "/kpi-file-storage.php";
 
-const KPI_IMPORT_HISTORY_KEEP_FILES = 3;
 const KPI_IMPORT_HISTORY_PREVIEW_ROWS = 3;
+const KPI_IMPORT_HISTORY_REMOVED_TEXT = "ไฟล์ถูกลบแล้วก่อนเปลี่ยนเป็นเก็บไฟล์ถาวร";
 /* ไฟล์ pending ที่เก่ากว่านี้ (วินาที) ถือว่าค้าง · มากกว่าอายุ Preview ใน Session (30 นาที) */
 const KPI_IMPORT_PENDING_MAX_AGE = 3600;
 
@@ -135,38 +136,7 @@ function kpiImportHistoryRecord(PDO $pdo, int $employeeId, int $userId, int $yea
         return $failed;
     }
 
-    kpiImportHistoryPrune($pdo, $employeeId);
-
     return null;
-}
-
-/* เก็บตัวไฟล์เฉพาะ KPI_IMPORT_HISTORY_KEEP_FILES ครั้งล่าสุด · ประวัติยังอยู่ (stored_name = NULL) */
-function kpiImportHistoryPrune(PDO $pdo, int $employeeId): void
-{
-    try {
-        $stmt = $pdo->prepare("
-            SELECT history_id, stored_name
-            FROM kpi_import_history
-            WHERE employee_id = :employee_id AND stored_name IS NOT NULL
-            ORDER BY imported_at DESC, history_id DESC
-        ");
-        $stmt->execute([":employee_id" => $employeeId]);
-        $old = array_slice($stmt->fetchAll(PDO::FETCH_ASSOC), KPI_IMPORT_HISTORY_KEEP_FILES);
-
-        $clear = $pdo->prepare("
-            UPDATE kpi_import_history
-            SET stored_name = NULL, file_removed_at = NOW()
-            WHERE history_id = :history_id AND employee_id = :employee_id AND stored_name = :stored_name
-        ");
-
-        foreach ($old as $row) {
-            if (kpiStorageDelete("imports", (string) $row["stored_name"])) {
-                $clear->execute([":history_id" => (int) $row["history_id"], ":employee_id" => $employeeId, ":stored_name" => $row["stored_name"]]);
-            }
-        }
-    } catch (Throwable $exception) {
-        error_log("kpi-import-history: prune failed (" . get_class($exception) . ")");
-    }
 }
 
 /* ประวัติของพนักงาน (ล่าสุดก่อน) · $limit = null → ทั้งหมด · คืน ["rows" => [...], "total" => int] */

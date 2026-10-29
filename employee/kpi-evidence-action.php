@@ -60,6 +60,35 @@ if (!kpiFileFeatureEnabled($pdo, "kpi_performance_evidence")) {
 
 $action = (string) ($_POST["action"] ?? "");
 
+if ($action === "upload_all") {
+    $periodStmt = $pdo->prepare("SELECT period_id FROM evaluation_periods WHERE period_year = :year AND period_month = :month LIMIT 1");
+    $periodStmt->execute([":year" => $year, ":month" => $month]);
+    $periodId = (int) $periodStmt->fetchColumn();
+    $performanceStmt = $pdo->prepare("SELECT performance_id, status FROM kpi_performances WHERE employee_id = :employee_id AND period_id = :period_id ORDER BY performance_id");
+    $performanceStmt->execute([":employee_id" => $employeeId, ":period_id" => $periodId]);
+    $performanceRows = $periodId > 0 ? $performanceStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    if (!$performanceRows) $flash("error", "ไม่พบผลงาน KPI ของเดือนนี้");
+    foreach ($performanceRows as $performance) {
+        if (!kpiStatusIsEditable((string) $performance["status"])) $flash("error", "แนบหลักฐานร่วมกันได้เมื่อผลงาน KPI ทุกตัวของเดือนนี้ยังไม่ได้ส่ง (Draft) หรือถูกส่งกลับให้แก้ไข");
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM kpi_performance_evidence WHERE performance_id = :id");
+        $countStmt->execute([":id" => (int) $performance["performance_id"]]);
+        if ((int) $countStmt->fetchColumn() >= KPI_EVIDENCE_MAX_FILES) $flash("error", "KPI อย่างน้อยหนึ่งรายการมีไฟล์ครบจำนวนสูงสุดแล้ว");
+    }
+    $file = $_FILES["evidence_file"] ?? [];
+    $createdEvidenceIds = [];
+    foreach ($performanceRows as $performance) {
+        $error = kpiEvidenceAdd($pdo, $employeeId, (int) $_SESSION["user_id"], (int) $performance["performance_id"], is_array($file) ? $file : [], false);
+        if ($error !== null) {
+            foreach ($createdEvidenceIds as $evidenceId) kpiEvidenceDelete($pdo, $employeeId, $evidenceId);
+            $flash("error", $error);
+        }
+        $idStmt = $pdo->prepare("SELECT evidence_id FROM kpi_performance_evidence WHERE performance_id = :performance_id ORDER BY evidence_id DESC LIMIT 1");
+        $idStmt->execute([":performance_id" => (int) $performance["performance_id"]]);
+        $createdEvidenceIds[] = (int) $idStmt->fetchColumn();
+    }
+    $flash("success", "แนบไฟล์หลักฐานให้ KPI ทุกตัวของเดือนนี้เรียบร้อยแล้ว");
+}
+
 if ($action === "upload") {
     $file = $_FILES["evidence_file"] ?? [];
     $error = kpiEvidenceAdd($pdo, $employeeId, (int) $_SESSION["user_id"], (int) ($_POST["performance_id"] ?? 0), is_array($file) ? $file : []);

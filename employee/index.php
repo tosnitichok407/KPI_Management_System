@@ -194,6 +194,8 @@ $pendingKpi = 0;
 
 $averageScore = 0;
 
+$weightedSummary = kpiWeightedSummary([]);
+
 $kpiData = [];
 
 $typeData = [];
@@ -312,6 +314,13 @@ if ($selectedPeriodData !== null) {
     $averageScore = $evaluatedKpi > 0
         ? $scoreSum / $evaluatedKpi
         : 0;
+
+    /* คะแนนรวมถ่วงน้ำหนัก: สูตรเดียวกับหน้า Manager / Admin และแบบฟอร์ม KPI AM ของบริษัท */
+    $weightedSummary = kpiWeightedSummary(array_map(fn($row) => [
+        "score" => $row["score"],
+        "weight" => $row["assignment_weight"],
+        "max_score" => $row["max_score"]
+    ], $kpiData));
 
     foreach ($typeTotals as $type => $totals) {
 
@@ -441,7 +450,7 @@ $avatar =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-dashboard.css">
+        href="../assets/css/employee-dashboard.css?v=weighted-1">
 
 </head>
 
@@ -655,21 +664,25 @@ $avatar =
             <div class="stat-card">
 
                 <div class="stat-title">
-                    คะแนนเฉลี่ย
+                    คะแนนรวม (ถ่วงน้ำหนัก)
                 </div>
 
                 <div class="stat-value">
 
-                    <?= number_format(
-                        $averageScore,
-                        2
-                    ) ?>
-
-                    <small>
-                        / 5
-                    </small>
+                    <?php if ($weightedSummary["percent"] === null): ?>
+                        -
+                    <?php else: ?>
+                        <?= number_format($weightedSummary["percent"], 1) ?><small>%</small>
+                    <?php endif; ?>
 
                 </div>
+
+                <?php if ($weightedSummary["percent"] !== null): ?>
+                    <div class="stat-sub">
+                        คะแนนจริง <?= number_format($weightedSummary["real"]) ?> / <?= number_format($weightedSummary["full"]) ?>
+                        · เฉลี่ย <?= number_format((float) $weightedSummary["average"], 2) ?> / 5
+                    </div>
+                <?php endif; ?>
 
             </div>
 
@@ -978,11 +991,11 @@ $avatar =
 
 
                                         <?php if (
-                                            !empty($kpi["unit"]) && !isNonRenewalKpi($kpi)
+                                            kpiDisplayUnit($kpi) !== "" && !isNonRenewalKpi($kpi)
                                         ): ?>
 
                                             <?= htmlspecialchars(
-                                                $kpi["unit"],
+                                                kpiDisplayUnit($kpi),
                                                 ENT_QUOTES,
                                                 "UTF-8"
                                             ) ?>

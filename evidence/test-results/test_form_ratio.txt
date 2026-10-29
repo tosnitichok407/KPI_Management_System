@@ -14,7 +14,7 @@ PASS F12 prepare: commit open, KPI 10/11/12 + KPI 14 + KPI 8 + KPI 9 + competenc
 PASS F13 scores of KPI 10/11/12 = the unchanged kpiCalculateScore() with the KPI's own criteria / target
 PASS F14 commit: 11 inserted as Draft · KPI 10/11/12 Actual 87.50/100.00/95.00 · competency 15 score 4 / 19 score 5 (Actual NULL)
 PASS F15 no Submitted / Approved; other assignments untouched
-PASS F15b KPI 9 February from the same file: Draft, Actual 87.50 (สรุปทั้งปี69!T24 = 7/8), Target 100.00, score = nonRenewalKpiGrade
+PASS F15b KPI 9 February from the same file: Draft, Actual 87.50 (สรุปทั้งปี69!U24 = 7/8), Target 100.00, score = nonRenewalKpiGrade
 PASS F16 a rejected KPI 10 cell blocks the whole file (no partial save)
 PASS F17 Template origin for KPI 10 still rejected
 

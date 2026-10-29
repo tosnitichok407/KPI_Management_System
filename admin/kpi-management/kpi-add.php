@@ -27,7 +27,6 @@ $form = [
     "kpi_name" => "",
     "description" => "",
     "weight" => "",
-    "unit" => "",
     "max_score" => "5",
     "levels" => [5 => "", 4 => "", 3 => "", 2 => "", 1 => ""]
 ];
@@ -63,7 +62,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $kpi_name = trim($_POST["kpi_name"] ?? "");
     $description = trim($_POST["description"] ?? "");
     $weight = trim($_POST["weight"] ?? "");
-    $unit = trim($_POST["unit"] ?? "");
     $max_score = trim($_POST["max_score"] ?? "5");
 
     $levels = [];
@@ -78,7 +76,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         "kpi_name" => $kpi_name,
         "description" => $description,
         "weight" => $weight,
-        "unit" => $unit,
         "max_score" => $max_score,
         "levels" => $levels
     ];
@@ -106,10 +103,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $fieldErrors["weight"] = "กรุณากรอก Weight";
     } elseif (!is_numeric($weight) || $weight < 0 || $weight > 100) {
         $fieldErrors["weight"] = "Weight ต้องเป็นตัวเลขระหว่าง 0 - 100";
-    }
-
-    if (mb_strlen($unit) > 50) {
-        $fieldErrors["unit"] = "หน่วยวัดต้องไม่เกิน 50 ตัวอักษร";
     }
 
     if ($max_score === "") {
@@ -179,9 +172,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     ? $description
                     : null,
                 ":weight" => $weight,
-                ":unit" => $unit !== ""
-                    ? $unit
-                    : null,
+                /* หน่วยกำหนดอัตโนมัติเป็น % (ไม่มีช่องหน่วยในฟอร์ม และไม่รับค่าจาก POST) */
+                ":unit" => KPI_DEFAULT_UNIT,
                 ":max_score" => $max_score,
                 ":score_5" => $levels[5] !== "" ? $levels[5] : null,
                 ":score_4" => $levels[4] !== "" ? $levels[4] : null,
@@ -404,26 +396,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 </div>
 
-
-                <div class="form-group<?= isset($fieldErrors["unit"]) ? " has-error" : "" ?>">
-
-                    <label for="unit">
-                        หน่วยวัด
-                    </label>
-
-                    <input
-                        type="text"
-                        id="unit"
-                        name="unit"
-                        value="<?= htmlspecialchars($form["unit"], ENT_QUOTES, "UTF-8") ?>"
-                        maxlength="50"
-                        placeholder="เช่น %, ราย, บาท">
-
-                    <?php if (isset($fieldErrors["unit"])): ?>
-                        <div class="field-error" id="error-unit"><?= htmlspecialchars($fieldErrors["unit"]) ?></div>
-                    <?php endif; ?>
-
-                </div>
 
 
                 <div class="form-group<?= isset($fieldErrors["max_score"]) ? " has-error" : "" ?>">

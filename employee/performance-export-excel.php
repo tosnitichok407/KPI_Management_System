@@ -244,7 +244,7 @@ function renderKpiSection(Worksheet $sheet, int $row, string $title, string $tot
         } elseif ($kpi["actual_value"] !== null) {
             $actual = (float) $kpi["actual_value"];
 
-            if (trim((string) $kpi["unit"]) === "%") {
+            if (kpiDisplayUnit($kpi) === "%") {
                 $sheet->setCellValue("J{$row}", $actual / 100);
                 $sheet->getStyle("J{$row}")->getNumberFormat()->setFormatCode(floor($actual) == $actual ? "0%" : "0.00%");
             } else {

@@ -1,0 +1,17 @@
+PASS M1 departments: 200 · compact table (#, แผนก, ประเมินแล้ว, คะแนนเฉลี่ย, actions) + search box + level filter
+PASS M2 every department row carries data-search + data-level (4 departments)
+PASS M3 filter script loaded once and served
+PASS M4 department monthly table: only months already started (Jan … current month), no future months
+PASS M5 department members table: search + level filter, 4 rows (incl. the escaped test name)
+PASS M6 names with HTML/quotes are escaped in cells and in data-search
+PASS M7 employee list (whole year): columns #, พนักงาน, ประเมินแล้ว, คะแนนเฉลี่ย, Feedback, actions · search + level filter, no Feedback filter
+PASS M8 employee list (Feb): Feedback filter shown · rows marked 'given' = employees with Feb feedback in DB (5)
+PASS M9 search text includes code, department and position (lower-case)
+PASS M10 employee detail: KPI table with search + type filter; KPI 9 target shown as 100% (no Budget amount)
+PASS M11 employee detail monthly table: no future months
+PASS M13 department without KPI (SYN ฝ่ายบริหาร, 1 employee, 0 KPI) not in the table nor in the department filter; KPI departments still listed (4)
+PASS M14 opening the no-KPI department by URL shows no drill-down (treated as all departments)
+PASS M15 employee page unchanged: its department filter still lists every department
+PASS M12 employee role cannot open the manager pages (redirected)
+
+TOTAL 15 · PASS 15 · FAIL 0

@@ -7,6 +7,7 @@ require_once __DIR__ . "/../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/kpi-score-helper.php";
+require_once __DIR__ . "/../includes/competency-criteria.php";
 require_once __DIR__ . "/includes/layout.php";
 
 
@@ -18,6 +19,18 @@ require_once __DIR__ . "/includes/layout.php";
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: ../login.php");
+    exit;
+}
+
+$roleId = (int) ($_SESSION["role_id"] ?? 0);
+
+if ($roleId !== 3) {
+    if ($roleId === 1) {
+        header("Location: ../admin/index.php");
+    } else {
+        redirectToRoleHome("../");
+    }
+
     exit;
 }
 
@@ -143,6 +156,12 @@ $targetValue = (float) $kpi["target_value"];
 /* เกณฑ์ระดับผลงาน 5..1 ของ KPI นี้ (ใช้ตัดเกรดแทนสูตรสัดส่วนเดิม) */
 $kpiLevels = loadKpiScoreCriteria($pdo, [$kpi])[(int) $kpi["kpi_id"]] ?? [];
 
+/* Competency: คำอธิบายพฤติกรรมและระดับผลงาน 5..1 จากแบบฟอร์ม KPI AM (includes/competency-criteria.php) */
+$competencyCriteria = COMPETENCY_CRITERIA[(int) $kpi["kpi_id"]] ?? null;
+
+/* ช่องทางบันทึกผล: KPI 12 และ Competency 15-19 กรอกในหน้าผลการปฏิบัติงาน · KPI อื่นนำเข้าจาก Excel */
+$recordInPerformancePage = in_array((int) $kpi["kpi_id"], [12, 15, 16, 17, 18, 19], true);
+
 $currentYear = (int) date("Y");
 $currentMonth = (int) date("n");
 $selectedYear = (int) ($_GET["year"] ?? $currentYear);
@@ -239,7 +258,7 @@ $performances =
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi-detail.css">
+        href="../assets/css/employee-kpi-detail.css?v=competency-1">
 
 </head>
 
@@ -331,7 +350,7 @@ $performances =
                     <strong>
 
                         <?= htmlspecialchars(
-                            $kpi["unit"] ?? "-",
+                            kpiDisplayUnit($kpi) !== "" ? kpiDisplayUnit($kpi) : "-",
                             ENT_QUOTES,
                             "UTF-8"
                         ) ?>
@@ -392,8 +411,54 @@ $performances =
         </section>
 
 
+        <?php if ($competencyCriteria !== null): ?>
+
+            <!-- =====================================================
+             เกณฑ์คะแนน Competency (แบบฟอร์ม KPI AM)
+        ====================================================== -->
+
+            <section class="card competency-criteria" id="competency-criteria">
+
+                <h2>
+                    เกณฑ์คะแนน Competency
+                </h2>
+
+                <p class="competency-criteria-source">
+                    <?= htmlspecialchars(COMPETENCY_CRITERIA_SOURCE, ENT_QUOTES, "UTF-8") ?> ·
+                    น้ำหนักในแบบฟอร์ม <?= (int) $competencyCriteria["weight"] ?> · คะแนนเต็ม <?= (int) $competencyCriteria["weight"] * 5 ?>
+                </p>
+
+                <p class="competency-criteria-description">
+                    <strong><?= htmlspecialchars($competencyCriteria["title"], ENT_QUOTES, "UTF-8") ?>:</strong>
+                    <?= htmlspecialchars($competencyCriteria["description"], ENT_QUOTES, "UTF-8") ?>
+                </p>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ระดับผลงาน</th>
+                                <th>คำอธิบายพฤติกรรม</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php for ($level = 5; $level >= 1; $level--): ?>
+                                <tr>
+                                    <td><strong><?= $level ?></strong></td>
+                                    <td><?= htmlspecialchars($competencyCriteria["levels"][$level] ?? "-", ENT_QUOTES, "UTF-8") ?></td>
+                                </tr>
+                            <?php endfor; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+        <?php endif; ?>
+
+
         <!-- =====================================================
-         บันทึกผลงาน → นำเข้า Excel
+         บันทึกผลงาน → นำเข้า Excel / ช่องกรอกในหน้าผลการปฏิบัติงาน
     ====================================================== -->
 
         <section class="card">
@@ -404,19 +469,41 @@ $performances =
             </h2>
 
 
-            <p>
-                การบันทึกผล KPI ทำผ่านหน้า "บันทึกผล KPI (Excel)" เท่านั้น
-                ดาวน์โหลดแบบฟอร์ม กรอกผลงาน แล้วนำเข้าเพื่อตรวจสอบก่อนยืนยันบันทึก
-            </p>
+            <?php if ($recordInPerformancePage): ?>
+
+                <p>
+                    KPI นี้กรอกในหน้า "ผลการปฏิบัติงาน"
+                    <?= $competencyCriteria !== null
+                        ? "(คะแนน 1-5 ครั้งเดียว ระบบบันทึกให้ทุกเดือนที่ยังเปิดและยังไม่ได้ส่ง)"
+                        : "(จำนวนสัญญาทั้งหมด และจำนวนที่นำกลับ)" ?>
+                    แล้ว Manager ตรวจและอนุมัติรายเดือน
+                </p>
+
+                <a
+                    href="performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>#<?= $competencyCriteria !== null ? "competency-entry" : "kpi12-entry" ?>"
+                    class="submit-button">
+
+                    <?= icon("square-pen") ?>ไปกรอกที่หน้าผลการปฏิบัติงาน
+
+                </a>
+
+            <?php else: ?>
+
+                <p>
+                    การบันทึกผล KPI ทำผ่านหน้า "บันทึกผล KPI (Excel)" เท่านั้น
+                    ดาวน์โหลดแบบฟอร์ม กรอกผลงาน แล้วนำเข้าเพื่อตรวจสอบก่อนยืนยันบันทึก
+                </p>
 
 
-            <a
-                href="kpi-import.php"
-                class="submit-button">
+                <a
+                    href="kpi-import.php"
+                    class="submit-button">
 
-                <?= icon("file-spreadsheet") ?>ไปหน้าบันทึกผล KPI (Excel)
+                    <?= icon("file-spreadsheet") ?>ไปหน้าบันทึกผล KPI (Excel)
 
-            </a>
+                </a>
+
+            <?php endif; ?>
 
             <a
                 href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"

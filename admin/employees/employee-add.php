@@ -81,7 +81,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } elseif (
         $employee_code === "" ||
         $first_name === "" ||
-        $last_name === ""
+        $last_name === "" ||
+        $department_id <= 0 ||
+        $position_id <= 0
     ) {
 
         $error = "Please fill in all required fields.";
@@ -95,6 +97,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ) {
 
         $error = "Input is too long.";
+
+    } elseif (
+        !in_array($department_id, array_map("intval", array_column($departments, "department_id")), true) ||
+        !in_array($position_id, array_map("intval", array_column($positions, "position_id")), true)
+    ) {
+
+        $error = "Invalid department or position.";
 
     } elseif (!in_array($gender, ["", null, "Male", "Female", "Other"], true)) {
 
@@ -195,7 +204,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <link
         rel="stylesheet"
-        href="../../assets/css/employee.css"
+        href="../../assets/css/employee.css?v=required-1"
     >
 
     <title>Add Employee</title>
@@ -242,13 +251,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                     รหัสพนักงาน *
+                     รหัสพนักงาน <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
                 <input
                     type="text"
                     name="employee_code"
-                    placeholder="EMP001"
+                    placeholder="AG-01234"
                     required
                 >
 
@@ -258,7 +267,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    ชื่อ *
+                    ชื่อ <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
                 <input
@@ -274,7 +283,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    นามสกุล *
+                    นามสกุล <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
                 <input
@@ -290,7 +299,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    เพศ *
+                    เพศ <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
                 <select name="gender">
@@ -347,10 +356,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    แผนก
+                    แผนก <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
-                <select name="department_id">
+                <select name="department_id" required aria-required="true">
 
                     <option value="">
                         เลือกแผนก
@@ -376,10 +385,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="form-group">
 
                 <label>
-                    ตำแหน่ง
+                    ตำแหน่ง <span class="required-mark" aria-hidden="true">*</span>
                 </label>
 
-                <select name="position_id">
+                <select name="position_id" required aria-required="true">
 
                     <option value="">
                         เลือกตำแหน่ง

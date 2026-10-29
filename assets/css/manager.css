@@ -414,6 +414,40 @@ button.btn-small:hover {
   font-weight: 400;
 }
 
+/* คำอธิบายใต้ตัวเลข (ช่วงที่นับ / ระดับ) */
+.employee-profile-stats em {
+  display: block;
+  margin-top: 4px;
+  color: #98a2b3;
+  font-size: 12px;
+  font-style: normal;
+}
+
+/* ตารางผลรายเดือนของพนักงาน: คำอธิบายตัวเลข + เดือนที่ประเมินยังไม่ครบ */
+.month-table-legend {
+  margin: 0;
+  padding: 10px 20px 12px;
+  border-bottom: 1px solid #eef0f4;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.month-table-legend strong { color: #344054; font-weight: 500; }
+
+.month-table th small {
+  color: #98a2b3;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.incomplete-mark {
+  display: inline-block;
+  margin-top: 4px;
+  color: #b54708;
+  font-size: 12px;
+}
+
 .employee-profile-actions {
   display: flex;
   gap: 8px;
@@ -429,6 +463,188 @@ button.btn-small:hover {
   border-radius: 14px;
   padding: 0;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.evidence-dialog {
+  width: min(1040px, calc(100% - 32px));
+  max-height: min(82vh, 760px);
+}
+
+.evidence-dialog-content {
+  position: relative;
+  padding: 26px 28px;
+  font-family: var(--font-family, "Kanit", sans-serif);
+}
+
+.evidence-dialog-content h2 {
+  margin: 0 0 4px;
+  padding-right: 30px;
+  font-size: 20px;
+  color: #244397;
+}
+
+.evidence-table-wrap {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.evidence-dialog .manager-table th,
+.evidence-dialog .manager-table td {
+  white-space: nowrap;
+}
+
+.evidence-dialog .manager-table td:nth-child(3) {
+  white-space: normal;
+  min-width: 150px;
+  overflow-wrap: anywhere;
+}
+
+/* หน้าต่าง "ดูเดือนนี้": ตาราง KPI ที่ได้รับมอบหมายของเดือนนั้น */
+.kpi-month-dialog {
+  width: min(1040px, calc(100% - 32px));
+  max-height: min(86vh, 820px);
+}
+
+.kpi-month-dialog-content {
+  position: relative;
+  padding: 26px 28px;
+  font-family: var(--font-family, "Kanit", sans-serif);
+}
+
+.kpi-month-dialog-content h2 {
+  margin: 0 0 4px;
+  padding-right: 30px;
+  font-size: 20px;
+  color: #244397;
+}
+
+.kpi-month-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 13px;
+}
+
+.kpi-month-summary strong { color: #1f2937; font-size: 15px; }
+.kpi-month-summary .incomplete-mark { margin-top: 0; }
+
+.kpi-month-dialog .table-wrapper {
+  max-height: 58vh;
+  overflow: auto;
+}
+
+/* หลักฐาน / ไฟล์ Excel ต้นฉบับของเดือนในหน้าต่าง "ดูเดือนนี้" */
+.kpi-month-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 20px 0 8px;
+  color: #344054;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.kpi-month-dialog .evidence-name {
+  min-width: 160px;
+  overflow-wrap: anywhere;
+}
+
+.kpi-month-imports {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.kpi-month-imports li { margin: 4px 0; overflow-wrap: anywhere; }
+.kpi-month-imports a { color: #244397; font-weight: 500; }
+
+.evidence-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.manager-evidence-upload {
+  margin: 6px 20px 14px 36px;
+}
+
+.manager-import-files {
+  margin: 0 20px 14px 36px;
+  font-size: 13px;
+}
+
+.manager-import-files > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.manager-import-files ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.manager-import-files li {
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+
+.manager-import-files a {
+  color: #244397;
+  font-weight: 500;
+}
+
+/* ไฟล์นำเข้าที่เก่ากว่า 3 ไฟล์ล่าสุด (ไฟล์เก็บถาวร) */
+.manager-import-more { margin-top: 4px; }
+.manager-import-more summary {
+  cursor: pointer;
+  color: #244397;
+  font-weight: 500;
+}
+
+.manager-evidence-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.manager-evidence-form select {
+  max-width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+}
+
+.manager-evidence-form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #244397;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.manager-month-evidence-btn {
+  white-space: nowrap;
+}
+
+.manager-month-evidence-btn > .icon,
+.manager-month-evidence-btn:hover > .icon {
+  color: #fff;
 }
 
 .feedback-dialog::backdrop {
@@ -519,6 +735,135 @@ button.btn-small:hover {
 }
 
 /* =========================================================
+   ตารางแบบกระชับ + ค้นหา / ตัวกรอง (manager/includes/table-tools.php)
+========================================================= */
+
+.table-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px 14px;
+}
+
+.table-search {
+  display: flex;
+  flex: 1 1 260px;
+  align-items: center;
+  gap: 6px;
+  max-width: 420px;
+  padding: 0 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #667085;
+}
+
+.table-search:focus-within {
+  border-color: #244397;
+  box-shadow: 0 0 0 3px rgba(36, 67, 151, 0.12);
+}
+
+.table-search input {
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+}
+
+.table-select select {
+  padding: 9px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.table-count {
+  margin-left: auto;
+  color: #667085;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ป้ายซ่อน (visually-hidden) ในหัวตารางต้องอยู่ในกล่องเลื่อน ไม่ดันหน้าให้กว้างเกินจอ */
+.table-card .table-wrapper {
+  position: relative;
+}
+
+.manager-table.manager-table-compact {
+  min-width: 720px;
+}
+
+.manager-table-compact td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.manager-table-compact .person strong {
+  white-space: nowrap;
+}
+
+.score-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.score-line strong {
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.score-line small,
+.stat-main small {
+  color: #98a2b3;
+  font-weight: 400;
+}
+
+.score-line .level {
+  margin-left: 4px;
+  padding: 2px 10px;
+}
+
+.col-actions {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.badge-inactive {
+  margin-left: 6px;
+  background: #fdecea;
+  color: #b42318;
+}
+
+.text-open {
+  color: #166534;
+}
+
+.text-closed {
+  color: #991b1b;
+}
+
+.evidence-links a {
+  color: #244397;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* =========================================================
    RESPONSIVE
 ========================================================= */
 
@@ -537,6 +882,18 @@ button.btn-small:hover {
 }
 
 @media (max-width: 650px) {
+  .table-tools {
+    padding: 0 14px 12px;
+  }
+
+  .table-search {
+    max-width: none;
+  }
+
+  .table-count {
+    margin-left: 0;
+  }
+
   .stat-cards,
   .manager-filter {
     grid-template-columns: 1fr;
@@ -551,3 +908,94 @@ button.btn-small:hover {
     gap: 18px;
   }
 }
+
+/* ===== การส่งผลและการอนุมัติ ===== */
+.approval-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f2f4f7;
+  color: #344054;
+  white-space: nowrap;
+}
+.approval-badge.approval-submitted { background: #fffaeb; color: #b54708; }
+.approval-badge.approval-approved { background: #ecfdf3; color: #027a48; }
+.approval-badge.approval-rejected,
+.approval-badge.approval-mixed { background: #fef3f2; color: #b42318; }
+.approval-badge.approval-none { background: #f9fafb; color: #667085; }
+.approval-body { padding: 4px 20px 18px; font-size: 14px; }
+.approval-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+.approval-form { display: grid; gap: 8px; max-width: 720px; }
+.approval-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
+}
+.approval-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.approval-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  color: #fff;
+}
+.approval-btn.approve { background: #039855; }
+.approval-btn.return { background: #d92d20; }
+.approval-history-title { margin: 16px 0 6px; font-size: 14px; }
+.approval-history { margin: 0; padding-left: 18px; }
+.approval-history li { margin: 6px 0; overflow-wrap: anywhere; }
+.approval-pending .empty-state { padding: 12px 20px 18px; margin: 0; }
+
+/* ===== ตรวจคะแนนก่อนอนุมัติ ===== */
+.score-check {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+.score-check > strong { display: inline-flex; align-items: center; gap: 6px; }
+.score-check-ok { border-left-color: #12b76a; background: #f6fef9; }
+.score-check-warning { border-left-color: #f79009; background: #fffcf5; }
+.score-check-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.score-check .table-wrapper { margin-top: 8px; }
+.check-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  margin: 0 4px 2px 0;
+}
+.check-pill.check-ok { background: #ecfdf3; color: #027a48; }
+.check-pill.check-mismatch { background: #fef3f2; color: #b42318; }
+.check-pill.check-pending { background: #fffaeb; color: #b54708; }
+.check-pill.check-unverifiable { background: #f2f4f7; color: #344054; }
+.score-check-table td { vertical-align: top; }
+.approval-ack {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fffaeb;
+  font-size: 13px;
+}
+.approval-ack input { margin-top: 3px; }
+
+.approval-btn .icon, .approval-btn:hover .icon { color: #fff; }
+
+/* ข้อความสำเร็จ (คู่กับ .alert-error ใน components.css) */
+.alert-success { background: #dcfce7; color: #166534; }

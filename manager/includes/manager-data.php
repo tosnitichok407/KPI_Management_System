@@ -149,6 +149,7 @@ function managerLoadYearData(PDO $pdo, int $year): array
             kp.period_id,
             ep.period_month,
             ep.quarter,
+            kp.target,
             kp.actual,
             kp.score,
             kp.status

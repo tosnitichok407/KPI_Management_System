@@ -13,11 +13,12 @@
 |   pending/   ไฟล์นำเข้าที่รอผู้ใช้กดยืนยัน (ลบเมื่อยกเลิก / ยืนยันแล้ว / ค้างเกินเวลา)
 |   imports/   ไฟล์นำเข้าที่ยืนยันแล้ว (เก็บ 3 ไฟล์ล่าสุดต่อพนักงาน)
 |   evidence/  ไฟล์หลักฐานผลงาน
+|   contract_returns/  หลักฐานการรับคืนสัญญาตัวจริง (KPI12 · includes/kpi-contract-return.php)
 | storage/ ไม่ขึ้น Git (.gitignore) เพราะมีข้อมูลบริษัท / ข้อมูลพนักงาน
 |
 */
 
-const KPI_STORAGE_AREAS = ["pending", "imports", "evidence"];
+const KPI_STORAGE_AREAS = ["pending", "imports", "evidence", "corrections", "contract_returns"];
 const KPI_STORAGE_NAME_PATTERN = '/^[a-f0-9]{32}\.dat$/';
 
 /*

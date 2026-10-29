@@ -14,6 +14,7 @@ env/
 
 # macOS
 .DS_Store
+._*
 
 # VS Code
 .vscode/
@@ -33,3 +34,6 @@ database/backups/
 
 # ไฟล์นำเข้า / หลักฐานที่ผู้ใช้อัปโหลด (มีข้อมูลบริษัท / ข้อมูลพนักงาน ไม่ควรเข้า git)
 storage/
+
+# Local-only credentials for the isolated screenshot QA database
+screenshots/report/test-accounts.local.txt
