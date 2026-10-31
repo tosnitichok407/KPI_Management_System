@@ -1,0 +1,51 @@
+PASS A1 bomb fixture: template package check still rejects (>20 MB uncompressed, unchanged behaviour)
+PASS A2 bomb fixture: common file checks pass (size/ext/MIME)
+PASS A3 company read of bomb fixture succeeds without decompressing drawings (allowlist) — peak +4 MB, zip:// opens 0
+PASS A4 only needed sheets loaded (KPI AM + formula sources)
+PASS A5 allowlist excludes drawings / externalLinks / calcChain / other sheets
+PASS A6 runtime enforcement: a part outside the allowlist is refused (sharedStrings removed from allowlist)
+PASS A7 default (empty) allowlist refuses everything
+PASS A8 macro package rejected
+PASS A9 more than 200 zip entries rejected
+PASS A10 parts that must be read > 20 MB (huge sharedStrings) rejected — ceiling not raised
+PASS A11 file over 2 MB rejected by common check
+PASS B1 file-level: no errors, year note present
+PASS B2 employee code of another user -> error only, NO items/values exposed
+PASS B3 code with extra trailing space -> rejected (must match exactly)
+PASS B4 selected year contradicts sheet names (ปี69 = 2026) -> error
+PASS B5 22 items read, 110 blank month cells skipped (11 rows x 12 months = 132)
+PASS B6 every item comes from a 'ที่ทำได้' month column (grade/score columns never read)
+PASS B7 no item for blank months although grade formulas there evaluate to 1
+PASS B8 internal formula chain (KPI AM -> สรุปทั้งปี69 -> ม.ค.69) accepted using Excel's cached value; only mapping pending
+PASS B9 chain reaching an external link ([1]) rejected
+PASS B10 error value (#DIV/0!) rejected
+PASS B11 volatile TODAY() rejected
+PASS B12 dynamic INDIRECT() rejected
+PASS B13 whole-column reference rejected
+PASS B14 defined name rejected
+PASS B15 competency 6 rejected
+PASS B16 competency 3.5 rejected
+PASS B17 typed values pending mapping (K15/K16/K17/N12)
+PASS B18 nothing READY with the real (unconfirmed) map -> no internal rows
+PASS B19 row not in the mapping -> NEEDS_CONFIRMATION (no guessing)
+PASS B20 weight differs from confirmed mapping -> NEEDS_CONFIRMATION reason
+PASS B21 workbook without KPI AM -> error
+PASS B22 KPI AM without section structure -> layout error (no guessing rows)
+PASS B23 invalid year input rejected
+PASS B24 no personal-data-looking content in notes/errors (no name from D6)
+PASS C1 synthetic confirmed competency mapping -> READY items K24 (Jan) / N24 (Feb) / T24 (Apr)
+PASS C2 performance with kpi_id but no confirmed value rule stays NEEDS_CONFIRMATION (no unit/target guessing)
+PASS C3 internal rows use the template format
+PASS C4 existing validation applied to company rows: Jan closed -> error, Feb existing Draft score 3 -> unchanged, Apr -> insert
+PASS C5 validation of company rows wrote nothing
+PASS C6 same rows under another employee's session -> rejected by existing employee_code check
+PASS D1 formula-source sheets keep only referenced cells (ม.ค.69: O41, D78, D80, S42 = 4)
+PASS D2 formula-derived items carry the cache warning; typed items do not
+PASS D3 calcMode=manual: note shown; formula item T24 blocked (not READY); typed K24 still READY
+PASS D4 fullCalcOnLoad=1: formula item T24 blocked
+PASS D5 formula without cached value -> REJECTED (not silently skipped)
+PASS D6 any row mapped to kpi_id 9 (even 'confirmed') is never READY
+PASS D7 the 'มูลค่าไม่ต่อสัญญา' row carries the KPI 9 separation reason
+PASS D8 internal rows exclude every KPI 9 item
+
+TOTAL 49 · PASS 49 · FAIL 0

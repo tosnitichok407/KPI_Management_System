@@ -1,0 +1,30 @@
+PASS H1 upload form has company month selector
+PASS H2 Feb preview: 1 ready (insert), source สรุปทั้งปี69!R6 =H6/C6, Actual 99.99, Total R / Budget shown, confirm button
+PASS H3 preview wrote nothing
+PASS H4 confirm -> inserted 1; DB Draft 99.99 score 3 target 100.00
+PASS H4b (E13) replaying the same confirm (token reuse) writes nothing
+PASS H5 other KPIs / other employee untouched
+PASS H6 re-upload Feb -> unchanged, no confirm button, nothing written
+PASS H7 March (existing Approved) -> blocked with Approved reason, no confirm, nothing written
+PASS H8 no month selected -> error, nothing stored
+PASS H9 Total R formula includes New -> rejected with reason, no confirm
+PASS H10 performance page (Feb) shows the KPI with Actual 100% (99.99 rounded up to an integer for display), score 3/5 (from the real 99.99) and Draft
+   dashboard Feb before: 7 2 5 2.00 · after: 7 3 4 2.33
+PASS H11 dashboard Feb: evaluated +1 (Draft counted, as in the existing rules)
+PASS H12 employee B uploads A's file -> code error, nothing written
+PASS H13 manager POST company upload -> redirected away, nothing written
+PASS Z1 July: warning shows Budget 100,000.00 / Total R = 0 / 0%, per-row confirm checkbox, nothing written yet
+PASS Z2 confirm without ticking the warning -> user told 1 item not saved, DB unchanged
+PASS Z3 confirm with the warning ticked -> saved as Draft 0.00 score 1
+PASS Z4 December (not ended) Budget > 0 / Total R = 0 -> blocked (data may be incomplete), no confirm
+PASS P1 Template file with kpi 14 (format=template) -> closed message, no preview/confirm
+PASS P2 direct POST confirm for that template preview -> nothing written
+PHP Fatal error:  Uncaught Error: Call to a member function getHighestDataRow() on null in Command line code:1
+Stack trace:
+#0 {main}
+  thrown in Command line code on line 1
+PASS P3 Template download closed (no xlsx served)
+PASS Bwrong_month_ref HTTP: probe 'wrong_month_ref' -> rejected with reason, no confirm button, DB unchanged
+PASS Bdecimals_hidden HTTP: probe 'decimals_hidden' -> rejected with reason, no confirm button, DB unchanged
+
+TOTAL 23 · PASS 23 · FAIL 0

@@ -93,7 +93,8 @@ $hasFilter =
 
                 <option value="0">ทุกแผนก</option>
 
-                <?php foreach ($yearData["departments"] as $departmentId => $departmentName): ?>
+                <?php /* $departmentOptions: รายการแผนกเฉพาะหน้า (เช่น หน้ารายแผนกแสดงเฉพาะแผนกที่มี KPI) */ ?>
+                <?php foreach ($departmentOptions ?? $yearData["departments"] as $departmentId => $departmentName): ?>
                     <option value="<?= $departmentId ?>" <?= $departmentId === $filterDepartment ? "selected" : "" ?>>
                         <?= htmlspecialchars($departmentName, ENT_QUOTES, "UTF-8") ?>
                     </option>
@@ -109,13 +110,13 @@ $hasFilter =
     <div class="filter-actions">
 
         <button type="submit" class="btn btn-primary">
-            แสดงผล
+            <?= icon("filter") ?>แสดงผล
         </button>
 
         <?php if ($hasFilter): ?>
 
             <a href="index.php?page=<?= htmlspecialchars($page, ENT_QUOTES, "UTF-8") ?>" class="btn btn-secondary">
-                ล้างตัวกรอง
+                <?= icon("rotate-ccw") ?>ล้างตัวกรอง
             </a>
             
         <?php endif; ?>

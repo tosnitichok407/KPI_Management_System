@@ -7,6 +7,7 @@ require_once __DIR__ . "/../config/database.php";
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 require_once __DIR__ . "/../includes/monthly-period-helper.php";
 require_once __DIR__ . "/../includes/kpi-score-helper.php";
+require_once __DIR__ . "/../includes/competency-criteria.php";
 require_once __DIR__ . "/includes/layout.php";
 
 
@@ -21,6 +22,18 @@ if (!isset($_SESSION["user_id"])) {
     exit;
 }
 
+$roleId = (int) ($_SESSION["role_id"] ?? 0);
+
+if ($roleId !== 3) {
+    if ($roleId === 1) {
+        header("Location: ../admin/index.php");
+    } else {
+        redirectToRoleHome("../");
+    }
+
+    exit;
+}
+
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +45,22 @@ $employeeId = (int) ($_SESSION["employee_id"] ?? 0);
 
 if ($employeeId <= 0) {
     header("Location: ../login.php");
+    exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ปิดการกรอกผล KPI ด้วยตนเอง
+|--------------------------------------------------------------------------
+|
+| หน้านี้แสดงรายละเอียดและประวัติผลงานเท่านั้น · บันทึกผลผ่าน employee/kpi-import.php
+| POST ทุกคำขอถูกส่งต่อก่อนอ่านฐานข้อมูล จึงไม่มีการบันทึกจากหน้านี้
+|
+*/
+
+if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
+    header("Location: kpi-import.php", true, 303);
     exit;
 }
 
@@ -68,6 +97,7 @@ $sql = "
         a.status AS assignment_status,
 
         k.kpi_name,
+        k.kpi_type,
         k.description,
         k.unit,
         k.max_score,
@@ -118,272 +148,37 @@ if (!$kpi) {
 }
 
 
-$error = "";
-
-$success = "";
+/* KPI 9 มูลค่าไม่ต่อสัญญา: แสดงแบบเดียวกับ KPI อื่น (Target 100% · Actual = ร้อยละ) · คะแนนจากกฎ KPI 9 ในฟังก์ชันกลาง */
+$isBudgetKpi = isNonRenewalKpi($kpi);
 
 $targetValue = (float) $kpi["target_value"];
 
 /* เกณฑ์ระดับผลงาน 5..1 ของ KPI นี้ (ใช้ตัดเกรดแทนสูตรสัดส่วนเดิม) */
 $kpiLevels = loadKpiScoreCriteria($pdo, [$kpi])[(int) $kpi["kpi_id"]] ?? [];
 
+/* Competency: คำอธิบายพฤติกรรมและระดับผลงาน 5..1 จากแบบฟอร์ม KPI AM (includes/competency-criteria.php) */
+$competencyCriteria = COMPETENCY_CRITERIA[(int) $kpi["kpi_id"]] ?? null;
+
+/* ช่องทางบันทึกผล: KPI 12 และ Competency 15-19 กรอกในหน้าผลการปฏิบัติงาน · KPI อื่นนำเข้าจาก Excel */
+$recordInPerformancePage = in_array((int) $kpi["kpi_id"], [12, 15, 16, 17, 18, 19], true);
+
 $currentYear = (int) date("Y");
 $currentMonth = (int) date("n");
-$selectedYear = (int) ($_GET["year"] ?? $_POST["year"] ?? $currentYear);
-$selectedMonth = (int) ($_GET["month"] ?? $_POST["month"] ?? $currentMonth);
+$selectedYear = (int) ($_GET["year"] ?? $currentYear);
+$selectedMonth = (int) ($_GET["month"] ?? $currentMonth);
 if ($selectedYear < 2000 || $selectedYear > 2100) {
     $selectedYear = $currentYear;
 }
 if ($selectedMonth < 1 || $selectedMonth > 12) {
     $selectedMonth = $currentMonth;
 }
-$performanceDateForMonth = sprintf("%04d-%02d-01", $selectedYear, $selectedMonth);
-$monthEnd = date("Y-m-t", strtotime($performanceDateForMonth));
 // รอบประเมินหาจากปี + เดือนที่เลือก (Assignment ไม่ผูกกับรอบประเมิน)
 $selectedPeriod = findEvaluationPeriodByMonth($pdo, $selectedYear, $selectedMonth);
-$selectedPeriodId = $selectedPeriod ? (int) $selectedPeriod["period_id"] : 0;
-if ($selectedPeriod) {
-    $performanceDateForMonth = $selectedPeriod["start_date"];
-}
 $kpi["period_name"] = $selectedPeriod
     ? $selectedPeriod["period_name"] . " " . $selectedYear . " (" . $selectedPeriod["quarter"] . ")"
     : "ยังไม่มีรอบประเมินของเดือน" . monthlyPeriodMonths()[$selectedMonth] . " " . $selectedYear;
 
 
-/*
-|--------------------------------------------------------------------------
-| Add Performance
-|--------------------------------------------------------------------------
-*/
-
-if (($_SERVER["REQUEST_METHOD"] ?? "GET") === "POST") {
-
-    $performanceDate = $performanceDateForMonth;
-
-    $actual =
-        $_POST["actual"] ?? "";
-
-    $comment =
-        trim($_POST["comment"] ?? "");
-
-
-    /*
-    --------------------------------------------------------------
-    Validation
-    --------------------------------------------------------------
-    */
-
-        if (!csrfVerify()) {
-
-        $error = "Session หมดอายุ กรุณาลองใหม่อีกครั้ง";
-    } elseif (mb_strlen($comment) > 5000) {
-
-        $error = "รายละเอียดผลงานยาวเกินกำหนด";
-    } elseif (!$selectedPeriod) {
-
-        $error = "ไม่พบรอบประเมินของเดือนที่เลือก";
-    } elseif ($performanceDate === "") {
-
-        $error =
-            "กรุณาเลือกวันที่";
-    } elseif (
-        $selectedPeriod["end_date"] < $kpi["start_date"] ||
-        $selectedPeriod["start_date"] > $kpi["end_date"]
-    ) {
-
-        $error =
-            "KPI นี้ไม่ได้มีผลในเดือนที่เลือก";
-    } elseif ($actual === "") {
-
-        $error =
-            "กรุณากรอก Actual";
-    } elseif (!preg_match('/^\d{1,13}(\.\d{1,2})?$/', (string) $actual)) {
-
-        $error =
-            "Actual ต้องเป็นตัวเลขไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง)";
-    } else {
-
-
-        /*
-        ----------------------------------------------------------
-        Calculate Score
-        ----------------------------------------------------------
-        */
-
-        $actualValue =
-            (float) $actual;
-
-
-        /*
-        ------------------------------------------------------
-        เกรด = ระดับผลงานตามเกณฑ์ (Criteria) ที่ Admin กำหนด
-
-        เดิมใช้สูตรสัดส่วน Actual / Target × 5 ซึ่งไม่ตรงกับเกณฑ์
-        ที่แสดงไว้ เช่น "5 : >100%" กับ "4 : 100%" แต่สูตรเดิม
-        ให้ Actual เท่ากับ Target (100%) ได้ 5 เต็ม
-
-        รายละเอียดอยู่ใน includes/kpi-score-helper.php
-        ------------------------------------------------------
-        */
-
-        $score = kpiPerformanceGrade(
-            $kpiLevels,
-            $actualValue,
-            $targetValue > 0 ? $targetValue : null
-        );
-
-
-        if ($score === null) {
-
-            $error =
-                "KPI นี้ยังไม่ได้กำหนดเกณฑ์ระดับผลงานและเป้าหมาย กรุณาติดต่อผู้ดูแลระบบ";
-        } else {
-
-
-            /*
-            ------------------------------------------------------
-            Check Duplicate
-            ------------------------------------------------------
-            */
-
-            $check = $pdo->prepare("
-                SELECT performance_id
-
-                FROM kpi_performances
-
-                WHERE assignment_id = :assignment_id
-
-                AND employee_id = :employee_id
-
-                AND period_id = :period_id
-
-                LIMIT 1
-            ");
-
-
-            $check->execute([
-
-                ":assignment_id" =>
-                $assignmentId,
-
-                ":employee_id" => $employeeId,
-
-                ":period_id" => $selectedPeriodId
-
-            ]);
-
-
-            $existingPerformance = $check->fetch(PDO::FETCH_ASSOC);
-
-            if ($existingPerformance) {
-                try {
-                    $update = $pdo->prepare("
-                        UPDATE kpi_performances
-                        SET target = :target, actual = :actual, score = :score,
-                            comment = :comment, status = 'Submitted'
-                        WHERE performance_id = :performance_id
-                          AND employee_id = :employee_id
-                    ");
-                    $update->execute([
-                        ":target" => $targetValue,
-                        ":actual" => $actualValue,
-                        ":score" => $score,
-                        ":comment" => $comment !== "" ? $comment : null,
-                        ":performance_id" => $existingPerformance["performance_id"],
-                        ":employee_id" => $employeeId
-                    ]);
-                    $success = "อัปเดตผลงานของเดือนที่เลือกเรียบร้อยแล้ว";
-                                } catch (PDOException $e) {
-                    error_log("Update KPI performance failed: " . $e->getMessage());
-                    $error = "ไม่สามารถอัปเดตผลงานได้";
-                }
-            } else {
-
-
-                /*
-                --------------------------------------------------
-                Insert
-                --------------------------------------------------
-                */
-
-                try {
-
-                    $insert = $pdo->prepare("
-
-                        INSERT INTO kpi_performances
-
-                        (
-                            assignment_id,
-                            employee_id,
-                            period_id,
-                            performance_date,
-                            target,
-                            actual,
-                            score,
-                            comment,
-                            status
-                        )
-
-                        VALUES
-
-                        (
-                            :assignment_id,
-                            :employee_id,
-                            :period_id,
-                            :performance_date,
-                            :target,
-                            :actual,
-                            :score,
-                            :comment,
-                            'Submitted'
-                        )
-
-                    ");
-
-
-                    $insert->execute([
-
-                        ":assignment_id" =>
-                        $assignmentId,
-
-                        ":employee_id" =>
-                        $employeeId,
-
-                        ":period_id" => $selectedPeriodId,
-
-                        ":performance_date" =>
-                        $performanceDate,
-
-                        ":target" =>
-                        $targetValue,
-
-                        ":actual" =>
-                        $actualValue,
-
-                        ":score" =>
-                        $score,
-
-                        ":comment" =>
-                        $comment !== ""
-                            ? $comment
-                            : null
-
-                    ]);
-
-
-                    $success =
-                        "บันทึกผลงานเรียบร้อยแล้ว";
-                                } catch (PDOException $e) {
-
-                    error_log("Insert KPI performance failed: " . $e->getMessage());
-
-                    $error =
-                        "ไม่สามารถบันทึกผลงานได้";
-                }
-            }
-        }
-    }
-}
 
 
 /*
@@ -455,13 +250,15 @@ $performances =
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet">
 
+    <link rel="stylesheet" href="../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../assets/css/employee-kpi.css?v=layout-employee-2">
 
     <link
         rel="stylesheet"
-        href="../assets/css/employee-kpi-detail.css">
+        href="../assets/css/employee-kpi-detail.css?v=competency-1">
 
 </head>
 
@@ -553,7 +350,7 @@ $performances =
                     <strong>
 
                         <?= htmlspecialchars(
-                            $kpi["unit"] ?? "-",
+                            kpiDisplayUnit($kpi) !== "" ? kpiDisplayUnit($kpi) : "-",
                             ENT_QUOTES,
                             "UTF-8"
                         ) ?>
@@ -614,42 +411,54 @@ $performances =
         </section>
 
 
-        <!-- =====================================================
-         ALERT
-    ====================================================== -->
+        <?php if ($competencyCriteria !== null): ?>
 
-        <?php if ($error !== ""): ?>
+            <!-- =====================================================
+             เกณฑ์คะแนน Competency (แบบฟอร์ม KPI AM)
+        ====================================================== -->
 
-            <div class="alert error">
+            <section class="card competency-criteria" id="competency-criteria">
 
-                <?= htmlspecialchars(
-                    $error,
-                    ENT_QUOTES,
-                    "UTF-8"
-                ) ?>
+                <h2>
+                    เกณฑ์คะแนน Competency
+                </h2>
 
-            </div>
+                <p class="competency-criteria-source">
+                    <?= htmlspecialchars(COMPETENCY_CRITERIA_SOURCE, ENT_QUOTES, "UTF-8") ?> ·
+                    น้ำหนักในแบบฟอร์ม <?= (int) $competencyCriteria["weight"] ?> · คะแนนเต็ม <?= (int) $competencyCriteria["weight"] * 5 ?>
+                </p>
+
+                <p class="competency-criteria-description">
+                    <strong><?= htmlspecialchars($competencyCriteria["title"], ENT_QUOTES, "UTF-8") ?>:</strong>
+                    <?= htmlspecialchars($competencyCriteria["description"], ENT_QUOTES, "UTF-8") ?>
+                </p>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ระดับผลงาน</th>
+                                <th>คำอธิบายพฤติกรรม</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php for ($level = 5; $level >= 1; $level--): ?>
+                                <tr>
+                                    <td><strong><?= $level ?></strong></td>
+                                    <td><?= htmlspecialchars($competencyCriteria["levels"][$level] ?? "-", ENT_QUOTES, "UTF-8") ?></td>
+                                </tr>
+                            <?php endfor; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
 
         <?php endif; ?>
 
 
-        <?php if ($success !== ""): ?>
-
-            <div class="alert success">
-
-                <?= htmlspecialchars(
-                    $success,
-                    ENT_QUOTES,
-                    "UTF-8"
-                ) ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
         <!-- =====================================================
-         ADD PERFORMANCE
+         บันทึกผลงาน → นำเข้า Excel / ช่องกรอกในหน้าผลการปฏิบัติงาน
     ====================================================== -->
 
         <section class="card">
@@ -660,92 +469,49 @@ $performances =
             </h2>
 
 
-                        <form
-                method="POST">
+            <?php if ($recordInPerformancePage): ?>
 
-                <?= csrfField() ?>
-
-                <div class="form-grid">
-
-
-                    <div class="form-group">
-
-                        <label>
-                            เดือนที่บันทึก
-                        </label>
-                        <div class="target-value">
-                            <?= htmlspecialchars(date("F Y", strtotime($performanceDateForMonth)), ENT_QUOTES, "UTF-8") ?>
-                        </div>
-                        <input type="hidden" name="year" value="<?= $selectedYear ?>">
-                        <input type="hidden" name="month" value="<?= $selectedMonth ?>">
-                        <input type="hidden" name="period_id" value="<?= $selectedPeriodId ?>">
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label>
-                            Target
-                        </label>
-
-                        <div class="target-value">
-                            <?= number_format($targetValue, 0) ?>
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label>
-                            Actual
-                        </label>
-
-                        <input
-                            type="number"
-                            name="actual"
-                            step="0.01"
-                            min="0"
-                            placeholder="เช่น 100"
-                            required>
-
-                    </div>
-
-
-                    <div class="form-group full">
-
-                        <label>
-                            รายละเอียดผลงาน
-                        </label>
-
-                        <textarea
-                            name="comment"
-                            placeholder="อธิบายรายละเอียดผลงานของคุณ"></textarea>
-
-                    </div>
-
-
-                </div>
-
-
-                <button
-                    type="submit"
-                    class="submit-button">
-
-                    บันทึกผลงาน
-
-                </button>
+                <p>
+                    KPI นี้กรอกในหน้า "ผลการปฏิบัติงาน"
+                    <?= $competencyCriteria !== null
+                        ? "(คะแนน 1-5 ครั้งเดียว ระบบบันทึกให้ทุกเดือนที่ยังเปิดและยังไม่ได้ส่ง)"
+                        : "(จำนวนสัญญาทั้งหมด และจำนวนที่นำกลับ)" ?>
+                    แล้ว Manager ตรวจและอนุมัติรายเดือน
+                </p>
 
                 <a
-                    href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
-                    class="btn btn-secondary back-button">
+                    href="performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>#<?= $competencyCriteria !== null ? "competency-entry" : "kpi12-entry" ?>"
+                    class="submit-button">
 
-                    ย้อนกลับ
+                    <?= icon("square-pen") ?>ไปกรอกที่หน้าผลการปฏิบัติงาน
 
                 </a>
 
-            </form>
+            <?php else: ?>
+
+                <p>
+                    การบันทึกผล KPI ทำผ่านหน้า "บันทึกผล KPI (Excel)" เท่านั้น
+                    ดาวน์โหลดแบบฟอร์ม กรอกผลงาน แล้วนำเข้าเพื่อตรวจสอบก่อนยืนยันบันทึก
+                </p>
+
+
+                <a
+                    href="kpi-import.php"
+                    class="submit-button">
+
+                    <?= icon("file-spreadsheet") ?>ไปหน้าบันทึกผล KPI (Excel)
+
+                </a>
+
+            <?php endif; ?>
+
+            <a
+                href="../employee/performance.php?year=<?= $selectedYear ?>&amp;month=<?= $selectedMonth ?>"
+                class="btn btn-secondary back-button">
+
+                <?= icon("arrow-left") ?>ย้อนกลับ
+
+            </a>
 
         </section>
 
@@ -836,34 +602,51 @@ $performances =
 
                                     <td>
 
-                                        <?= number_format(
-                                            $targetValue,
-                                            0
-                                        ) ?>
+                                        <?= $isBudgetKpi
+                                            ? "100%"
+                                            : number_format(
+                                                $targetValue,
+                                                0
+                                            ) ?>
 
                                     </td>
 
 
                                     <td>
 
-                                        <?= number_format(
-                                            (float)
-                                            $performance["actual"],
-                                            2
-                                        ) ?>
+                                        <?= $isBudgetKpi
+                                            ? kpiFormatAchievement(nonRenewalAchievement($performance["actual"], $performance["target"] ?? $kpi["target_value"]))
+                                            : number_format(
+                                                (float)
+                                                $performance["actual"],
+                                                2
+                                            ) ?>
 
                                     </td>
 
 
                                     <td class="score">
 
-                                        <?= number_format(
+                                        <?= kpiScoreLevel(
                                             (float)
-                                            $performance["score"],
-                                            2
+                                            $performance["score"]
                                         ) ?>
 
                                         / 5
+
+                                        <?php if ($isBudgetKpi): ?>
+                                            <?php /* KPI 9: เทียบกับ Target ที่บันทึกกับผลงานของเดือนนั้น (ถ้ามี) */ $historyResult = kpiCalculateScore($kpi, $kpiLevels, $performance["actual"], $performance["target"] ?? $kpi["target_value"]); ?>
+                                            <br>
+                                            <small>
+                                                คะแนนที่บันทึกไว้
+                                                <?php if ($historyResult["grade"] !== null): ?>
+                                                    · ตามเกณฑ์ปัจจุบัน <?= $historyResult["grade"] ?> / 5
+                                                    (<?= kpiFormatAchievement($historyResult["achievement"]) ?>)
+                                                <?php elseif ($historyResult["error"] !== null): ?>
+                                                    · คำนวณตามเกณฑ์ปัจจุบันไม่ได้ (ไม่มี Target)
+                                                <?php endif; ?>
+                                            </small>
+                                        <?php endif; ?>
 
                                     </td>
 

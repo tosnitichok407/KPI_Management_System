@@ -3,6 +3,7 @@
 require_once __DIR__ . "/../../includes/security.php";
 
 require_once __DIR__ . "/../../config/database.php";
+require_once __DIR__ . "/../../includes/kpi-score-helper.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
 
@@ -32,6 +33,17 @@ csrfRequirePost("../index.php?page=kpi-management");
 $id = (int) ($_POST["id"] ?? 0);
 
 if ($id <= 0) {
+    header("Location: ../index.php?page=kpi-management");
+    exit;
+}
+
+/*
+| KPI 9 (มูลค่าไม่ต่อสัญญา) มีกฎคะแนนเฉพาะในระบบ · ห้ามลบเสมอ
+| ตรวจที่ฝั่ง server ก่อนแตะฐานข้อมูล (กันทั้งปุ่มในหน้าเว็บและ POST ตรง)
+*/
+if ($id === NON_RENEWAL_KPI_ID) {
+    $_SESSION["kpi_error"] =
+        "ไม่สามารถลบ KPI นี้ได้ เนื่องจากเป็น KPI ที่มีกฎคะแนนเฉพาะของระบบ (มูลค่าไม่ต่อสัญญา)";
     header("Location: ../index.php?page=kpi-management");
     exit;
 }

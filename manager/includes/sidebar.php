@@ -55,7 +55,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🏠
+                <?= icon("house") ?>
             </span>
 
             <span>
@@ -73,7 +73,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                🏢
+                <?= icon("building-2") ?>
             </span>
 
             <span>
@@ -91,7 +91,7 @@ $currentPage =
         >
 
             <span class="nav-icon">
-                👥
+                <?= icon("users") ?>
             </span>
 
             <span>
@@ -99,6 +99,46 @@ $currentPage =
             </span>
 
         </a>
+
+
+        <!-- คำขอแก้ไขข้อมูล (แสดงเมื่อรัน Migration 20261026 แล้ว) -->
+
+        <?php if (function_exists("kpiCorrectionEnabled") && isset($pdo) && kpiCorrectionEnabled($pdo)): ?>
+        <a
+            href="index.php?page=corrections"
+            class="nav-item <?= $currentPage === "corrections" ? "active" : "" ?>"
+        >
+
+            <span class="nav-icon">
+                <?= icon("square-pen") ?>
+            </span>
+
+            <span>
+                คำขอแก้ไขข้อมูล
+            </span>
+
+        </a>
+        <?php endif; ?>
+
+
+        <!-- KPI12 รับคืนสัญญาตัวจริง (แสดงเมื่อรัน Migration 20261028 แล้ว) -->
+
+        <?php if (function_exists("kpiContractReturnEnabled") && isset($pdo) && kpiContractReturnEnabled($pdo)): ?>
+        <a
+            href="index.php?page=contract-returns"
+            class="nav-item <?= $currentPage === "contract-returns" ? "active" : "" ?>"
+        >
+
+            <span class="nav-icon">
+                <?= icon("file-text") ?>
+            </span>
+
+            <span>
+                KPI12 รับคืนสัญญา
+            </span>
+
+        </a>
+        <?php endif; ?>
 
 
     </nav>
@@ -111,10 +151,10 @@ $currentPage =
     <div class="sidebar-bottom">
 
         <a
-            href="../logout.php"
+            href="<?= htmlspecialchars(logoutUrl("../"), ENT_QUOTES, "UTF-8") ?>"
             class="logout-button">
 
-            ออกจากระบบ
+            <?= icon("log-out") ?>ออกจากระบบ
 
         </a>
 

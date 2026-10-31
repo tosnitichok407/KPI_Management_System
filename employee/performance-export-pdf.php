@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . "/../includes/security.php";
+
 require_once __DIR__ . "/../config/database.php";
 
 /** @var PDO $pdo ตัวเชื่อมต่อฐานข้อมูลจาก config/database.php */
@@ -86,7 +88,7 @@ foreach ($form["sections"] as $sectionIndex => $section) {
         }
 
         $rows .= "<tr>"
-            . "<td class='topic'>" . thaiPdfWrap($pdf, ($index + 1) . "." . $kpi["kpi_name"], $innerWidth(0), 14) . "</td>"
+            . "<td class='topic'>" . thaiPdfWrap($pdf, ($index + 1) . "." . $kpi["kpi_name"] . (!empty($kpi["is_inactive"]) ? " (ปิดใช้งาน)" : ""), $innerWidth(0), 14) . "</td>"
             . "<td class='indicator'>" . thaiPdfWrap($pdf, (string) ($kpi["description"] ?? ""), $innerWidth(1), 12.5) . "</td>"
             . "<td class='c weight'>" . $fmt($row["weight"]) . "</td>"
             . $levels
@@ -307,7 +309,7 @@ h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
             <tr class='percent'><td colspan='3' class='r'>คิดเป็นร้อยละ (คะแนนที่ได้ ÷ คะแนนเต็ม)</td><td class='c'>{$percentText}</td></tr>
             <tr class='grade'><td colspan='3' class='r'>เกรดของผลงาน (ตามเกณฑ์สรุปผลการประเมิน)</td><td class='c'>" . $e($monthGrade ?? "-") . "</td></tr>
         </table>
-        <div class='note'>วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × {$fullGrade} · คะแนนจริง = น้ำหนัก × เกรด · KPI ที่ยังไม่ประเมินนับเป็น 0</div>
+        <div class='note'>วิธีคำนวณ: คะแนนเต็ม = น้ำหนัก × {$fullGrade} · คะแนนจริง = น้ำหนัก × เกรด (ปัดเศษทศนิยมลง) · KPI ที่ยังไม่ประเมินนับเป็น 0</div>
     </td>
     <td style='width:50%'>
         <table class='scale'>

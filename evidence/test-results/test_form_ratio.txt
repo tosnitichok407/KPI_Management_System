@@ -1,0 +1,21 @@
+PASS F0 real map: confirmed KPI ids = 14, 8, 9, 10, 11, 12, 15-19
+PASS F1 KPI 10/11/12 READY: N15 0.875 -> 87.5, N16 1 -> 100, N17 0.95 -> 95 (× 100, source KPI AM!N15-N17)
+PASS F2 preview details: rule, cell N15, ratio 0.875 -> Actual 87.5 (no rounding)
+PASS F3 Competency 15-19 READY with the typed 1-5 scores (4, 5, 3, 4, 5)
+PASS F4 import rows: KPI 10/11/12 carry Actual (no competency score), competency rows carry the score (no Actual)
+PASS F5 empty month (March: no values in Q15-Q17 / Q24-Q28) -> no item for these KPIs (skipped as empty)
+PASS F6 N15 0.12345 -> × 100 has 3 decimals -> REJECTED, no rounding
+PASS F7 N16 negative -> REJECTED
+PASS F8 N17 text -> REJECTED (not a number)
+PASS F9 competency N24 = 6 -> REJECTED (1-5)
+PASS F10 N15 formula with an external workbook -> REJECTED
+PASS F11 × 100 rule put on KPI 8 -> NEEDS_CONFIRMATION (rule only for kpi_id 10, 11, 12)
+PASS F12 prepare: commit open, KPI 10/11/12 + KPI 14 + KPI 8 + KPI 9 + competency 15-19 all insert
+PASS F13 scores of KPI 10/11/12 = the unchanged kpiCalculateScore() with the KPI's own criteria / target
+PASS F14 commit: 11 inserted as Draft · KPI 10/11/12 Actual 87.50/100.00/95.00 · competency 15 score 4 / 19 score 5 (Actual NULL)
+PASS F15 no Submitted / Approved; other assignments untouched
+PASS F15b KPI 9 February from the same file: Draft, Actual 87.50 (สรุปทั้งปี69!U24 = 7/8), Target 100.00, score = nonRenewalKpiGrade
+PASS F16 a rejected KPI 10 cell blocks the whole file (no partial save)
+PASS F17 Template origin for KPI 10 still rejected
+
+TOTAL 19 · PASS 19 · FAIL 0

@@ -1,0 +1,31 @@
+PASS H1 import page shows the history section (empty)
+PASS H2 upload + preview: file waits in storage/pending (1), no history yet
+cnt: no matches found: /private/tmp/claude-501/-Applications-XAMPP-xamppfiles-htdocs-KPI-System/3ded0590-5d2d-4022-b649-ac827ab4beb3/scratchpad/final_review_r19/impt/app/storage/pending/*.dat
+PASS H3 cancel: pending file removed, no history row, nothing imported
+cnt: no matches found: /private/tmp/claude-501/-Applications-XAMPP-xamppfiles-htdocs-KPI-System/3ded0590-5d2d-4022-b649-ac827ab4beb3/scratchpad/final_review_r19/impt/app/storage/pending/*.dat
+PASS H4 confirm: 1 history row (Feb 2026, u_default.xlsx, inserted 3), file moved pending → imports
+PASS H5 history table shows date/time, data month, file link and result
+PASS H6 download own import file: 200, same SHA-256 as uploaded, attachment with file name, nosniff
+PASS H7 4 imports: page lists only the latest 3 + button 'ดูทั้งหมด (4)'; files kept = 3
+PASS H8 'view all': 4 rows; the oldest (u_default.xlsx) shown as file removed (keep latest 3), no link
+PASS H9 download of the pruned file → 410 with explanation
+PASS H10 import file access: other employee 404 · manager 200 · admin 200 · not logged in → login
+PASS H11 other employee's import page shows only their own (empty) history
+PASS E1 performance page Feb: evidence box per result, upload form for Draft results
+PASS E2 upload PDF to own Draft result: saved, success message, file listed with view link, box opened
+PASS E3 PHP code renamed .jpg → refused with message, nothing saved
+PASS E4 missing/invalid CSRF token → refused, nothing saved
+PASS E5 forged performance_id of another employee → 'not found', nothing saved
+PASS E6 Submitted result → refused (Draft only)
+PASS E7 file over 10 MB → refused
+PASS E8 own evidence view: 200, same SHA-256, inline (PDF) with CSP sandbox + nosniff
+PASS E9 evidence access: other employee 404 · manager 200 · admin 200 · unknown id 404
+PASS E10 manager employee view (Feb): evidence link shown under the result (view only, no upload/delete)
+PASS E11 other employee cannot delete it (forged evidence_id)
+PASS E12 GET to the action endpoint does nothing (POST only)
+cnt: no matches found: /private/tmp/claude-501/-Applications-XAMPP-xamppfiles-htdocs-KPI-System/3ded0590-5d2d-4022-b649-ac827ab4beb3/scratchpad/final_review_r19/impt/app/storage/evidence/*.dat
+PASS E13 owner deletes (Draft): row and file removed, success message
+PASS E14 5 files (PNG, JPG, XLSX, XLS, PDF) accepted; then the form is replaced by 'แนบครบ 5 ไฟล์' and a 6th upload is refused
+PASS E15 Submitted result: evidence still listed and downloadable, but no upload form / delete buttons
+
+TOTAL 26 · PASS 26 · FAIL 0

@@ -54,7 +54,14 @@ $sql = "
         e.status,
 
         d.department_name,
-        p.position_name
+        p.position_name,
+        /* ประวัติ KPI + Feedback (ผู้รับและผู้ให้) · ใช้ปิดปุ่มลบ (ฝั่ง server ตรวจซ้ำใน employee-delete.php) */
+        (
+            (SELECT COUNT(*) FROM kpi_performances kp WHERE kp.employee_id = e.employee_id)
+            + (SELECT COUNT(*) FROM manager_feedback f
+               WHERE f.employee_id = e.employee_id
+                  OR f.manager_id IN (SELECT u.user_id FROM users u WHERE u.employee_id = e.employee_id))
+        ) AS history_count
 
     FROM employees e
 
@@ -127,6 +134,8 @@ try {
     $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 
+        error_log("admin/employees/employees: " . $e->getMessage());
+
     $employees = [];
 
     $error = "Unable to load employee data.";
@@ -157,7 +166,7 @@ try {
                 <a
                     href="employees/employee-add.php"
                     class="btn btn-primary">
-                    + เพิ่มพนักงาน
+                    <?= icon("plus") ?>เพิ่มพนักงาน
                 </a>
 
             </div>
@@ -224,13 +233,13 @@ try {
                     <button
                         type="submit"
                         class="btn btn-primary">
-                        ค้นหา
+                        <?= icon("search") ?>ค้นหา
                     </button>
 
                     <a
                         href="index.php?page=employees"
                         class="btn btn-secondary">
-                        ล้าง
+                        <?= icon("rotate-ccw") ?>ล้าง
                     </a>
 
                 </div>
@@ -266,11 +275,24 @@ try {
 
 
             <?php if (isset($_GET["error"]) && $_GET["error"] === "delete"): ?>
-
                 <div class="alert alert-error">
                     ไม่สามารถลบพนักงานได้ เนื่องจากพนักงานคนนี้มีข้อมูลที่เกี่ยวข้องกับระบบอื่น
                 </div>
+            <?php endif; ?>
 
+            <?php
+            $employeeErrorMessages = [
+                "has_history" => "ไม่สามารถลบพนักงานได้ เนื่องจากมีประวัติผลงาน KPI หรือ Feedback อยู่ในระบบ · ใช้ \"ปิดใช้งาน\" แทนเพื่อเก็บประวัติไว้",
+                "self_delete" => "ไม่สามารถลบข้อมูลพนักงานของบัญชีที่กำลังใช้งานอยู่ได้",
+                "self_deactivate" => "ไม่สามารถปิดใช้งานบัญชีที่กำลังใช้งานอยู่ได้",
+                "busy" => "มีการบันทึกข้อมูลของพนักงานคนนี้อยู่ในขณะนี้ ระบบยังไม่ได้ลบ กรุณาลองใหม่อีกครั้ง",
+            ];
+            $employeeError = (string) ($_GET["error"] ?? "");
+            ?>
+            <?php if (isset($employeeErrorMessages[$employeeError])): ?>
+                <div class="alert alert-error">
+                    <?= htmlspecialchars($employeeErrorMessages[$employeeError], ENT_QUOTES, "UTF-8") ?>
+                </div>
             <?php endif; ?>
 
 
@@ -421,12 +443,21 @@ try {
                                             <a
                                                 href="employees/employee-edit.php?id=<?= (int) $employee["employee_id"] ?>"
                                                 class="btn-small edit">
-                                                แก้ไข
+                                                <?= icon("square-pen") ?>แก้ไข
                                             </a>
 
 
                                             <!-- Activate / Deactivate -->
-                                            <?php if ($employee["status"] === "Active"): ?>
+                                            <?php $isSelf = (int) $employee["employee_id"] === (int) ($_SESSION["employee_id"] ?? 0); ?>
+
+                                            <?php if ($employee["status"] === "Active" && $isSelf): ?>
+
+                                                <button type="button" class="btn-small danger" disabled
+                                                    title="ไม่สามารถปิดใช้งานบัญชีที่กำลังใช้งานอยู่ได้">
+                                                    <?= icon("user-x") ?>Deactivate
+                                                </button>
+
+                                            <?php elseif ($employee["status"] === "Active"): ?>
 
                                                 <form
                                                     method="POST"
@@ -437,7 +468,7 @@ try {
                                                     <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                     <input type="hidden" name="action" value="deactivate">
                                                     <button type="submit" class="btn-small danger">
-                                                        Deactivate
+                                                        <?= icon("user-x") ?>Deactivate
                                                     </button>
                                                 </form>
 
@@ -452,24 +483,37 @@ try {
                                                     <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                     <input type="hidden" name="action" value="activate">
                                                     <button type="submit" class="btn-small activate">
-                                                        Activate
+                                                        <?= icon("user-check") ?>Activate
                                                     </button>
                                                 </form>
 
                                             <?php endif; ?>
 
-                                            <!-- Delete -->
+                                            <!-- Delete: เฉพาะพนักงานที่ไม่มีประวัติ (server ตรวจซ้ำ) -->
+                                            <?php if ((int) $employee["history_count"] > 0 || $isSelf): ?>
+
+                                                <button type="button" class="btn-small danger" disabled
+                                                    title="<?= $isSelf
+                                                        ? "ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้"
+                                                        : "มีประวัติผลงาน KPI หรือ Feedback · ใช้ปิดใช้งานแทนเพื่อเก็บประวัติ" ?>">
+                                                    <?= icon("trash-2") ?>ลบ
+                                                </button>
+
+                                            <?php else: ?>
+
                                             <form
                                                 method="POST"
                                                 action="employees/employee-delete.php"
                                                 class="inline-form"
-                                                onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้? ข้อมูลจะถูกลบถาวร');">
+                                                onsubmit="return confirm('ลบพนักงานคนนี้ถาวรหรือไม่? บัญชีผู้ใช้และการมอบหมาย KPI ที่ยังไม่มีผลงานจะถูกลบด้วย (ระบบไม่อนุญาตให้ลบพนักงานที่มีประวัติ KPI หรือ Feedback)');">
                                                 <?= csrfField() ?>
                                                 <input type="hidden" name="id" value="<?= (int) $employee["employee_id"] ?>">
                                                 <button type="submit" class="btn-small danger">
-                                                    ลบ
+                                                    <?= icon("trash-2") ?>ลบ
                                                 </button>
                                             </form>
+
+                                            <?php endif; ?>
 
                                         </div>
                                     </td>

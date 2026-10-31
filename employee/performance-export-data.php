@@ -10,8 +10,19 @@ require_once __DIR__ . "/../includes/kpi-score-helper.php";
 |
 | ส่วนที่ 1 = Performance, ส่วนที่ 2 = Competency
 | คะแนนเต็ม = น้ำหนัก × 5, คะแนนจริง = น้ำหนัก × เกรด (สูตรเดียวกับไฟล์ Excel)
+| เกรดเป็นจำนวนเต็มเสมอ (kpiScoreLevel: 4.75 → 4) คะแนนจริงปัดเศษทศนิยมลง
 |
 */
+
+/* ปัดเศษลง: round 6 ตำแหน่งก่อน กัน floating point เช่น 0.57 × 100 = 56.999… */
+function evaluationFloor(float $value, int $decimals = 0): float
+{
+    $factor = 10 ** $decimals;
+
+    return floor(round($value * $factor, 6)) / $factor;
+}
+
+
 function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
 {
     $definitions = [
@@ -42,9 +53,9 @@ function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
             }
 
             $weight = (float) $kpi["weight_value"];
-            $grade = $kpi["score_value"] !== null ? (float) $kpi["score_value"] : null;
+            $grade = $kpi["score_value"] !== null ? (float) kpiScoreLevel((float) $kpi["score_value"]) : null;
             $full = $weight * $fullGrade;
-            $real = $grade === null ? null : $weight * $grade;
+            $real = $grade === null ? null : evaluationFloor($weight * $grade);
 
             $rows[] = [
                 "kpi" => $kpi,
@@ -67,7 +78,7 @@ function buildEvaluationForm(array $kpis, int $fullGrade = 5): array
     }
 
     $totals["percent"] = $totals["full"] > 0
-        ? $totals["actual"] / $totals["full"] * 100
+        ? evaluationFloor($totals["actual"] / $totals["full"] * 100, 2)
         : null;
 
     return [
@@ -85,10 +96,17 @@ function evaluationActualLabel(array $kpi): string
         return "";
     }
 
+    /* KPI 9: แสดง Achievement (%) · Budget 0 / NULL → คำนวณไม่ได้ */
+    if (isNonRenewalKpi($kpi)) {
+        return $kpi["achievement_value"] !== null
+            ? kpiFormatAchievement($kpi["achievement_value"])
+            : "ไม่มี Budget";
+    }
+
     $actual = (float) $kpi["actual_value"];
     $text = floor($actual) == $actual ? number_format($actual) : number_format($actual, 2);
 
-    return trim((string) $kpi["unit"]) === "%" ? $text . "%" : $text;
+    return kpiDisplayUnit($kpi) === "%" ? $text . "%" : $text;
 }
 
 
@@ -146,6 +164,7 @@ function evaluationShortMonths(): array
 | คะแนนรายเดือนทั้งปีของพนักงาน (ตารางสรุปท้ายแบบฟอร์ม)
 | [1..12 => full, actual, percent, grade] — สูตรเดียวกับแบบฟอร์มรายเดือน:
 | คะแนนเต็ม = Σ น้ำหนัก × 5, คะแนนที่ทำได้ = Σ น้ำหนัก × เกรด (เฉพาะ KPI ที่มีผลในเดือนนั้น)
+| เกรด คะแนนที่ทำได้ และร้อยละ ปัดเศษทศนิยมลง
 | เดือนที่ยังไม่มีผลประเมินเลย → actual/percent/grade = null
 */
 function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullGrade = 5): array
@@ -154,13 +173,18 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
         SELECT
             a.assignment_id,
             a.weight,
+            a.status,
             COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) AS start_date,
             COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) AS end_date
         FROM kpi_assignments a
         WHERE a.employee_id = :employee_id
           AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :year_end
           AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :year_start
-          AND a.status = 'Active'
+          /* Inactive: ใช้เฉพาะเป็นประวัติ (มีผลงานจริง) · นับเฉพาะเดือนที่มีผลงานในลูปด้านล่าง */
+          AND (
+              a.status = 'Active'
+              OR EXISTS (SELECT 1 FROM kpi_performances kx WHERE kx.assignment_id = a.assignment_id)
+          )
     ");
     $assignmentStmt->execute([
         ":employee_id" => $employeeId,
@@ -202,12 +226,17 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
                 continue;
             }
 
+            /* Assignment ที่ปิดใช้งาน: นับทั้งคะแนนเต็มและคะแนนที่ได้ เฉพาะเดือนที่มีผลงานจริง */
+            if ($assignment["status"] !== "Active" && !isset($scores[$month][(int) $assignment["assignment_id"]])) {
+                continue;
+            }
+
             $weight = (float) $assignment["weight"];
             $hasKpi = true;
             $full += $weight * $fullGrade;
 
             if (isset($scores[$month][(int) $assignment["assignment_id"]])) {
-                $actual += $weight * $scores[$month][(int) $assignment["assignment_id"]];
+                $actual += evaluationFloor($weight * kpiScoreLevel($scores[$month][(int) $assignment["assignment_id"]]));
                 $hasResult = true;
             }
         }
@@ -217,7 +246,7 @@ function loadEmployeeYearScores(PDO $pdo, int $employeeId, int $year, int $fullG
         $months[$month] = [
             "full" => $hasKpi ? $full : null,
             "actual" => $hasResult ? $actual : null,
-            "percent" => $hasResult && $full > 0 ? $actual / $full * 100 : null,
+            "percent" => $hasResult && $full > 0 ? evaluationFloor($actual / $full * 100) : null,
             "grade" => $grade["grade"] ?? null
         ];
     }
@@ -235,6 +264,10 @@ function requireEmployeeExportAccess(): array
     if (!isset($_SESSION["user_id"])) {
         http_response_code(401);
         exit("Unauthorized");
+    }
+    if ((int) ($_SESSION["role_id"] ?? 0) !== 3) {
+        http_response_code(403);
+        exit("Employee account is required");
     }
     $employeeId = (int) ($_SESSION["employee_id"] ?? 0);
     if ($employeeId <= 0) {
@@ -268,6 +301,7 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $periodId = (int) ($periodStmt->fetchColumn() ?: 0);
     $stmt = $pdo->prepare("
         SELECT a.assignment_id, a.target_value AS assignment_target, a.weight AS assignment_weight,
+               a.status AS assignment_status,
                k.kpi_id, k.kpi_type, c.category_name, k.kpi_name, k.description, k.unit,
                COALESCE(k.max_score, 5) AS max_score,
                k.score_5, k.score_4, k.score_3, k.score_2, k.score_1,
@@ -285,7 +319,8 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
         WHERE a.employee_id = :employee_id
           AND COALESCE(a.start_date, CONCAT(a.assignment_year, '-01-01')) <= :month_end
           AND COALESCE(a.end_date, CONCAT(a.assignment_year, '-12-31')) >= :month_start
-          AND a.status = 'Active'
+          /* Inactive แสดงเป็นประวัติเฉพาะเมื่อมีผลงานในเดือนที่เลือก */
+          AND (a.status = 'Active' OR p.performance_id IS NOT NULL)
         ORDER BY k.kpi_type, a.assignment_id
     ");
     $stmt->execute([":period_id" => $periodId, ":employee_id" => $employeeId, ":month_start" => $start, ":month_end" => $end]);
@@ -295,8 +330,15 @@ function loadEmployeePerformanceReport(PDO $pdo, int $employeeId, int $year, int
     $competencyScore = 0;
     foreach ($kpis as &$kpi) {
         $kpi["criteria"] = $criteria[(int) $kpi["kpi_id"]] ?? [];
-        $kpi["target_value"] = $kpi["assignment_target"];
+        /* ป้ายสำหรับแบบฟอร์ม PDF / Excel */
+        $kpi["is_inactive"] = ($kpi["assignment_status"] ?? "Active") !== "Active";
+        /* KPI 9: Target ที่บันทึกกับผลงาน (นำเข้าจากไฟล์บริษัท = 100) · ยังไม่มีผลงาน → ค่าใน Assignment */
+        $kpi["target_value"] = isNonRenewalKpi($kpi) && $kpi["target"] !== null ? $kpi["target"] : $kpi["assignment_target"];
         $kpi["actual_value"] = $kpi["actual"];
+        /* KPI 9: ช่อง "ที่ทำได้" แสดง Achievement = Total R / Budget × 100 (ฟังก์ชันกลาง) */
+        $kpi["achievement_value"] = isNonRenewalKpi($kpi)
+            ? nonRenewalAchievement($kpi["actual"], $kpi["target_value"])
+            : null;
         $kpi["score_value"] = $kpi["score"];
         $kpi["weight_value"] = (float) $kpi["assignment_weight"];
         $kpi["status_value"] = $kpi["performance_status"] ?? "ยังไม่มีผลงาน";

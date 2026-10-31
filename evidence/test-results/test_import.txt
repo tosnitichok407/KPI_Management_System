@@ -1,0 +1,78 @@
+in-process guard: PASS (/private/tmp/kpi-throwaway-imp-10428/data/, port 0)
+PASS U1 valid template passes upload checks
+PASS U2 wrong extension (.xls) rejected
+PASS U3 text renamed to .xlsx rejected (MIME)
+PASS U4 package containing vbaProject.bin (macro) rejected
+PASS U5 zip without workbook rejected
+PASS U6 file over 2 MB rejected
+PASS U7 upload error code handled
+PASS U8 non-uploaded tmp file rejected when is_uploaded_file required
+   (finfo MIME of PhpSpreadsheet output: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+PASS R1 missing KPI_Import sheet rejected
+PASS R2 header mismatch rejected
+PASS R3 extra header column (e.g. score) rejected
+PASS R4 data outside A..G flagged on that row
+PASS R5 formula cell rejected (not evaluated)
+PASS R6 error cell (#N/A) rejected
+PASS R7 boolean cell rejected
+PASS R8 header-only file -> no data error
+PASS R9 more than 500 data rows rejected
+PASS R10 fully blank rows skipped, row numbers kept
+PASS V0 validation completed and reports not ok
+PASS V1 employee_code of another employee rejected
+PASS V2 unassigned/nonexistent KPI rejected without revealing ownership
+PASS V3 closed period rejected
+PASS V4 missing period/assignment year rejected
+PASS V5 month 13 rejected
+PASS V6 negative actual rejected
+PASS V7 actual with comma rejected
+PASS V8 actual with 3 decimals rejected
+PASS V9 blank actual rejected (not treated as 0)
+PASS V10 Performance + competency_score rejected
+PASS V11 Competency + actual rejected
+PASS V12 competency 6 rejected
+PASS V13 competency 3.5 rejected
+PASS V14 assignment not covering month rejected
+PASS V15 KPI without criteria: score delegated to kpiCalculateScore (system fallback Actual/Target), not invented by import
+PASS V15b KPI without criteria and Target 0 -> system cannot score -> row rejected
+PASS V16 existing Submitted cannot be overwritten
+PASS V17 existing Approved cannot be overwritten
+PASS V18 existing Rejected cannot be overwritten (Draft only)
+PASS V19 duplicate KPI+month in file flagged on both rows
+PASS V20 blank employee_code rejected
+PASS V21 text kpi_id rejected
+PASS V22 validation (preview) wrote nothing
+PASS V23 KPI assigned only to another employee rejected for this employee
+PASS C1 preview actions = update, update, insert x4
+PASS C2 commit ok with counts inserted 4 / updated 1 / skipped 1
+PASS C3 confirmed Draft updated: actual 96, status Draft, score = kpiCalculateScore
+PASS C4 unconfirmed Draft not updated (competency stays 3)
+PASS C5 new kpi1 Jun inserted Draft, actual 95.50, target 100.00, score from system
+PASS C6 KPI 9 uses system rule (Total R / Budget): 480000/500000 = 96% -> score 4
+PASS C7 competency inserted with score 4 and NULL actual
+PASS C8 KPI 2 (Jul-Dec) inserted for August
+PASS C9 Approved / Submitted / other employee rows untouched
+PASS C10 re-upload: confirmed row + inserts now 'unchanged', unconfirmed Draft still 'update'
+PASS C11 re-upload commit writes nothing (unchanged 5, skipped 1, no duplicates)
+PASS K9a KPI 9 uses the row Budget (600000) not the Assignment Budget (500000): 480000/600000 = 80% -> score 1
+PASS K9b KPI 9 from the company file without a monthly Budget -> error (no fallback to the Assignment Budget)
+PASS K9c Budget 0 -> error, no score
+PASS K9d negative Budget -> error, no score
+PASS K9e Budget with 3 decimals -> error, no score
+PASS K9f Budget above the system maximum -> error, no score
+PASS K9g Budget not a number -> error, no score
+PASS K9h a row Target on a KPI other than 9 -> error (only KPI 9 may carry a monthly Target)
+PASS K9i template origin: row Target ignored and the row is still rejected (template closed)
+PASS K9j validation only (nothing written)
+PASS X0 preview: insert Jul + update Jun Draft
+PASS X1 status changed after preview -> whole batch rolled back (Jul insert NOT written)
+PASS X2 row inserted elsewhere after preview -> rollback, nothing written
+PASS X3 period closed after preview -> rollback
+PASS X4 file with one invalid row (Approved target) -> nothing saved, even the valid row
+PASS X5 preview of employee A replayed as employee B -> rejected, nothing written
+PASS TC1 template origin (default): every row of every KPI is an error 'ปิดการนำเข้าผ่าน Template'
+PASS TC2 commit with template origin (default) and a forged clean preview -> refused, nothing written
+PASS TC3 commit with explicit template origin + forged confirmations -> refused, nothing written
+PASS TC4 unknown origin value -> treated as closed, nothing written
+
+TOTAL 74 · PASS 74 · FAIL 0

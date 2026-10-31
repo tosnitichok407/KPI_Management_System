@@ -113,3 +113,37 @@ function assignmentQuarterRangeLabel(?string $startDate, ?string $endDate): stri
 
     return $startQuarter === $endQuarter ? $startQuarter : $startQuarter . " - " . $endQuarter;
 }
+
+/*
+| รอบประเมินเริ่มต้นของหน้า Dashboard (เมื่อผู้ใช้ยังไม่ได้เลือก)
+| เดือนปัจจุบัน > รอบล่าสุดที่เริ่มแล้ว > รอบแรกในรายการ
+| (รอบของเดือนในอนาคตยังไม่มีผลงาน จึงไม่ใช้เป็นค่าเริ่มต้น)
+*/
+function defaultEvaluationPeriodId(array $periods): int
+{
+    $today = date("Y-m-d");
+    $latestStarted = null;
+
+    foreach ($periods as $period) {
+
+        if ($period["start_date"] === null) {
+            continue;
+        }
+
+        if ($period["start_date"] <= $today && $today <= (string) $period["end_date"]) {
+            return (int) $period["period_id"];
+        }
+
+        if ($period["start_date"] <= $today
+            && ($latestStarted === null || $period["start_date"] > $latestStarted["start_date"])) {
+            $latestStarted = $period;
+        }
+    }
+
+    if ($latestStarted !== null) {
+        return (int) $latestStarted["period_id"];
+    }
+
+    return empty($periods) ? 0 : (int) $periods[0]["period_id"];
+}
+

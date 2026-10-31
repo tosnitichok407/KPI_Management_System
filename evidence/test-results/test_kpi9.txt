@@ -1,0 +1,41 @@
+PASS A1 real map: KPI 9 confirmed with kpi_id 9, rule non_renewal_count_t_over_c_percent (สรุปทั้งปี!U, January = U23), exact system name
+PASS A2 January READY from สรุปทั้งปี69!U23 (= H23/C23 = 5/5): Actual 100.00 (%), row Target 100.00
+PASS A3 preview details: rule, U23 = H23 ÷ C23 (5 ÷ 5 ราย), Actual 100.00, Target 100.00
+PASS A4 every month uses U of its own row: Jan 100 (U23) · Feb 87.50 (7/8) · Mar 100 · Apr 90.00 (9/10) · May 33.33 (1/3 truncated) · Jun 100 (U28, month-sheet row 39) · Jul 0 flagged · Aug-Dec empty (skipped)
+PASS A5 KPI 14 in the same file unchanged (value table, January 95.00, no row target)
+PASS A6a U23 typed (not a formula) → KPI 9 REJECTED, no row
+PASS A6b U23 = C23/H23 (reversed, like the real U34) → KPI 9 REJECTED, no row
+PASS A6i Renew 3Y (F23, new column) filled → not confirmed → KPI 9 REJECTED, no row
+PASS A6c Renew D23 links another month's sheet → KPI 9 REJECTED, no row
+PASS A6d Budget C23 typed → KPI 9 REJECTED, no row
+PASS A6e no count table (only value tables) → KPI 9 REJECTED, no row
+PASS A6f December not ended, Budget 5 / renewed 0 → KPI 9 REJECTED, no row
+PASS A6g error in the VALUE table (KPI 14 source) does not affect KPI 9 (count table is independent): KPI 9 READY
+PASS A6h empty month (Aug) → KPI 9 skipped
+PASS A7a KPI 9 with the KPI 14 rule → NEEDS_CONFIRMATION, never READY
+PASS A7c KPI 9 with another system name → NEEDS_CONFIRMATION, never READY
+PASS A7d KPI 9 label mapped to kpi_id 12 → NEEDS_CONFIRMATION, never READY
+PASS A7e KPI 9 rule put on the KPI 8 row → NEEDS_CONFIRMATION, never READY
+PASS A7b KPI 9 with the × 100 form rule → never READY in any month (items found carry the KPI 9 rule reason; empty cells skipped)
+PASS A7f KPI 9 unconfirmed → NEEDS_CONFIRMATION; KPI 14 still READY
+PASS B1 Feb prepare: KPI 9 insert, Actual 87.50 (U24 = 7/8), Target 100.00, score 2, commit open, nothing written
+PASS B2 the Assignment target (500000) is NOT used: it would give score 1
+PASS B3 rows changed after preview (KPI 9 Target 100 → 100000) → whole batch rolled back
+PASS B4 commit: KPI 14 + KPI 9 inserted; KPI 9 Feb = Draft / Actual 87.50 / score 2 / Target 100.00
+PASS B5 re-import → unchanged (no duplicate)
+PASS B6 Assignment target changed to 1.00 → KPI 9 still unchanged, Target 100.00 (assignment value not used)
+PASS B7 existing KPI 9 Draft differs → update; not confirmed → skipped, nothing written
+PASS B8 confirmed → Draft updated back to Actual 87.50 / Target 100.00, still Draft
+PASS B9 KPI 9 row Submitted → REJECTED, commit closed
+PASS B10 July (ended) renewed 0 of 4 → READY with confirmation flag, Target 100.00
+PASS B11 not confirmed → declined, nothing written
+PASS B12 KPI 9 confirmed only → KPI 9 July Draft 0.00 / score 1 / Target 100.00; KPI 14 July still declined
+PASS B13 December (not ended) Budget 5 / renewed 0 → KPI 9 REJECTED, commit closed
+PASS B14 January (Closed period) → KPI 9 REJECTED, commit closed
+PASS B15 KPI 9 name in system differs from the confirmed name → REJECTED, commit closed
+PASS B16 KPI 9 not assigned in March → REJECTED, commit closed
+PASS B17 same KPI 9 rows (with Target) replayed with TEMPLATE origin → refused, nothing written
+PASS B18 other employees' / other KPIs' rows untouched by the whole run
+PASS B19 no Submitted / Approved KPI 9 rows created
+
+TOTAL 39 · PASS 39 · FAIL 0

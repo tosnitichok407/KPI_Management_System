@@ -1,0 +1,74 @@
+PASS T1 Actual = Total R / Budget x 100 truncated to 2dp: Jan 95.00 (0.95 float-safe), Feb 99.99 (99.995%), Mar 100.00, Apr 110.00, May 85.00, Jun 40.00 (shifted rows), Jul 0.00
+PASS T2 source = สรุปทั้งปี69!R{row} of the value table (R5..R11, form 2026-10-19), not KPI AM
+PASS T3 New sales excluded: H = SUM(D:G) only (New 77777 in column J ignored) and preview shows Total R / Budget / ratio
+PASS T4 KPI AM cells of this KPI ignored (K12 linked / N12 typed 0.5): Feb still 99.99 from summary
+PASS T5 empty month (Aug: Budget 0 and Total R 0) skipped, nothing READY
+PASS T6 grades follow the system criteria of KPI 14 (not Excel): 95->3, 99.99->3, 100->4, 110->5, 85->2, 40->1, 0->1
+PASS T7 new_in_g (month 1) -> REJECTED: H5 ต้องเป็นสูตร =SUM(D5:G5)
+PASS T7 q_typed (month 2) -> REJECTED: R6 ต้องเป็นสูตร =H6/C6
+PASS T7 zero_budget (month 7) -> REJECTED: Budget (C11) ต้องเป็นตัวเลขมากกว่า 0
+PASS T7 error_src (month 1) -> REJECTED: ค่า Error
+PASS T7 text_budget (month 1) -> REJECTED: Budget (C5) ต้องเป็นตัวเลขมากกว่า 0
+PASS T7 q_mismatch (month 1) -> REJECTED: ค่าใน R5 ไม่เท่ากับ H5/C5
+PASS T7 renew3y_filled (month 2) -> REJECTED: Renew 3Y (F6)
+PASS T7 header (month 2) -> REJECTED: หัวตารางของชีต
+PASS T7 no_value_table (month 2) -> REJECTED: ไม่พบตาราง "Portfolio(มูลค่า)"
+PASS T7 two_value_tables (month 2) -> REJECTED: ไม่พบตาราง "Portfolio(มูลค่า)"
+PASS T7 dup_month (month 1) -> REJECTED: ไม่พบแถวของเดือนมกราคม
+PASS T8 weight in form differs (25 vs 30) -> NEEDS_CONFIRMATION, not imported
+PASS T9 employee code in file is another employee -> file error, no items
+PASS T10 month not selected (0) -> error
+PASS T11 other KPIs of the form stay NEEDS_CONFIRMATION (only kpi 14 READY)
+PASS T12 Feb prepare: READY insert, actual 99.99, target 100.00, score 3, commit open
+PASS T13 prepare wrote nothing
+PASS T14 commit Feb: inserted 1 as Draft, actual 99.99, score 3, target 100.00
+PASS T15 other employee's Feb Draft and all other KPIs untouched
+PASS T16 re-import same month -> unchanged, nothing written (no duplicate)
+PASS T17 month 3 existing Approved -> REJECTED, commit closed, row unchanged
+PASS T17 month 4 existing Submitted -> REJECTED, commit closed, row unchanged
+PASS T17 month 5 existing Rejected -> REJECTED, commit closed, row unchanged
+PASS T18 January (Closed period) -> REJECTED, commit closed
+PASS T19 June existing Draft 80.00 -> update needs confirmation; without it nothing changes
+PASS T20 with confirmation -> Draft updated to 40.00 / score 1, still Draft (not Submitted/Approved)
+PASS T21 Target in system not 100 -> REJECTED (unit would be wrong), commit closed
+PASS T22 KPI 14 name in system differs from confirmed name -> REJECTED
+PASS Z1 July (ended) Budget 100,000 / Total R 0 -> READY but flagged: warning shows Budget, Total R = 0, 0%; preview carries flag + details
+PASS Z2 not confirmed (user cancels the warning) -> declined 1, nothing written
+PASS Z3 same rows replayed with TEMPLATE origin (even with the flag key) -> refused, nothing written
+PASS Z4 confirmed -> inserted Draft 0.00 score 1 (existing rules)
+PASS Z5 re-import July -> unchanged, no duplicate
+PASS Z6 December (not ended) Budget > 0 / Total R = 0 -> REJECTED: source data may be incomplete, not saved
+PASS Z7 Total R formula cannot be computed (#DIV/0! in source) -> REJECTED as error, not treated as 0
+PASS P1 Template rows for kpi 14 -> error (template channel closed)
+PASS P2 forged preview + direct commit (template origin) for kpi 14 -> refused, nothing written
+PASS P3 Template rejected for other KPIs too (kpi 1, policy: company file only)
+PASS P4 company-only list = confirmed map entries only (14, 8, 9, 10, 11, 12, 15-19 since 2026-10-19)
+PASS M1 renewal rule attached to another KPI's row -> NEEDS_CONFIRMATION, never READY
+PASS M2 renewal rule with another KPI name in the mapping -> NEEDS_CONFIRMATION
+PASS T23 closed period -> REJECTED, commit closed
+PASS T24 another employee's session with this file -> code error, no items
+PASS Z8 two flagged rows, only Aug confirmed -> Aug inserted, Sep declined (one confirmation does not confirm another)
+PASS Z9 flagged row for a month not yet ended + confirmation sent directly -> declined, nothing written
+PASS Z10 confirmation cannot bypass status: flagged row over an Approved month -> refused, Approved unchanged
+PASS S1 valid file still passes all source/decimal checks (Jan-Jul READY)
+PASS S2 month sheet with a trailing space in its name ('ส.ค.69 ') is matched -> August READY 90.00
+PASS S3 B1 Budget + Renew point to January -> REJECTED with clear reason
+PASS S4 B1 Renew (D-F) points to January -> REJECTED with clear reason
+PASS S5 B2 Budget typed (no formula) -> REJECTED with clear reason
+PASS S6 B2 Budget refers to another column -> REJECTED with clear reason
+PASS S7 B2 O41 sums a wrong range -> REJECTED with clear reason
+PASS S8 B2 O41 sums another sheet -> REJECTED with clear reason
+PASS S9 B1 Renew block in month sheet swapped -> REJECTED with clear reason
+PASS S10 B1 month sheet not found by confirmed name -> REJECTED with clear reason
+PASS S11 B3 3-decimal Total R displayed as 2 decimals -> REJECTED with clear reason
+PASS S12 B3 3-decimal Budget -> REJECTED with clear reason
+PASS S13 B3 sub-cent at 100% boundary (was 100.00) -> REJECTED with clear reason
+PASS S14 the hidden-decimals probe really displays 2 decimals (check is on the internal value)
+PASS S15 exactly 2 decimals still READY
+PASS S16 rejection messages name month/field only (no amounts)
+PASS S17 none of the 11 rejected probes can reach Commit/Save (commit closed, no rows, nothing written)
+PASS S18 valid probe still prepares with commit open
+PASS T26 after all imports: other KPIs and other employee untouched
+PASS T27 Approved/Submitted/Rejected rows of KPI 14 unchanged
+
+TOTAL 72 · PASS 72 · FAIL 0

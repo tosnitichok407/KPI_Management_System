@@ -400,6 +400,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         } catch (PDOException $e) {
 
+        error_log("admin/user-accounts/user-account-add: " . $e->getMessage());
+
             $error = "Unable to create account.";
 
         }
@@ -425,6 +427,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="stylesheet"
@@ -694,7 +698,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     type="submit"
                     class="btn btn-primary"
                 >
-                    สร้างบัญชี
+                    <?= icon("user-plus") ?>สร้างบัญชี
                 </button>
 
 
@@ -702,7 +706,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
             </div>

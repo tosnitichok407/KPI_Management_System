@@ -1,0 +1,31 @@
+runtime date.timezone = Europe/Berlin
+PASS T-Oct, Bangkok 2026-10-31 23:59:59 (last day) -> not ended
+PASS T-Oct, Bangkok 2026-11-01 00:00:00 (first day of next month) -> ended
+PASS T-Oct, UTC 2026-10-31 16:59:59 = Bangkok 23:59:59 -> not ended
+PASS T-Oct, UTC 2026-10-31 17:00:00 = Bangkok 00:00:00 Nov 1 -> ended
+PASS T-Oct, Berlin 2026-10-31 18:30 = Bangkok 00:30 Nov 1 (Berlin still Oct 31) -> ended
+PASS T-Oct, Los Angeles 2026-10-31 09:59:59 = Bangkok 23:59:59 -> not ended
+PASS T-Oct, Kiritimati 2026-11-01 06:00 (+14) = Bangkok 23:00 Oct 31 -> not ended
+PASS T-Dec, Bangkok 2026-12-31 23:59:59 -> not ended
+PASS T-Dec, Bangkok 2027-01-01 00:00:00 (year rollover) -> ended
+PASS T-Feb leap year, Bangkok 2028-02-29 23:59:59 -> not ended
+PASS T-Feb leap year, Bangkok 2028-03-01 00:00:00 -> ended
+PASS T-Feb non-leap, Bangkok 2026-02-28 23:59:59 -> not ended
+PASS T-mid-month, Bangkok 2026-10-15 12:00 -> not ended
+PASS T-future month, Bangkok 2026-10-18 (Dec not ended) -> not ended
+PASS T-past month, Bangkok 2026-10-18 (Jan ended) -> ended
+PASS T-runtime date.timezone is not modified by the rule
+PASS T-same instants give the same answer under 5 runtime zones (Bangkok 23:59:59 not ended / 00:00:00 ended)
+PASS R-Feb KPI 8 at 2026-02-28T23:59:59+07:00 -> REJECTED (month not ended, no Actual)
+PASS R-Feb KPI 8 at 2026-03-01T00:00:00+07:00 -> READY Actual 20
+PASS R-Feb KPI 8 at 2026-02-28T16:59:59Z -> REJECTED (month not ended, no Actual)
+PASS R-Feb KPI 8 at 2026-02-28T17:30:00Z -> READY Actual 20
+PASS R-KPI 14 Feb in the same workbook is identical for every injected clock (READY 99.99): the clock is not passed to KPI 14
+PASS R-Dec at Bangkok 2026-12-31 23:59:59 -> REJECTED only for month not ended
+PASS R-Dec at Bangkok 2027-01-01 00:00 -> month rule passed, continues to the data checks (R blank -> REJECTED for that reason)
+PASS R-no clock injected (real clock, page behaviour): Feb 2026 already ended -> READY 20
+PASS P-Jun at Bangkok 2026-06-30 23:59:59 -> KPI 8 REJECTED, commit closed
+PASS P-Jun at Bangkok 2026-07-01 00:00:00 -> KPI 8 READY Actual 57, commit open
+PASS P-prepare wrote nothing
+
+TOTAL 28 · PASS 28 · FAIL 0

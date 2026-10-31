@@ -1,0 +1,24 @@
+PASS Q1 real map (unconfirmed): no READY, no rows, commit closed
+PASS Q2 confirmed competency rows READY: N24 (Feb) update Draft, W24 (May) insert, N28 (Feb) insert
+PASS Q3 commit_ok true although out-of-scope Performance items are REJECTED/NEEDS_CONFIRMATION
+PASS Q4 all 6 Performance rows + KPI 9 stay out of the import rows
+PASS Q5 preview (prepare) wrote nothing
+PASS Q6 commit: inserted 2, updated 1 (confirmed Draft)
+PASS Q7 DB: kpi3 Feb=4 (was 3), kpi3 May=5, kpi6 Feb=3, all Draft with NULL actual
+PASS Q8 Approved row, other employee's row and Performance Feb Draft untouched
+PASS Q9 re-upload after commit: all READY rows 'unchanged' (nothing to write)
+PASS Q10 kpi_id of a Performance KPI mapped to a competency row -> REJECTED, commit closed
+PASS Q11 Competency KPI without assignment for this employee (assigned to someone else) -> REJECTED, commit closed
+PASS Q12 confirmed name differs from the system's KPI name -> REJECTED
+PASS Q13 confirmation record incomplete (no confirmed_by) -> NEEDS_CONFIRMATION, not imported
+PASS Q14 two form rows confirmed to the same kpi_id -> NEEDS_CONFIRMATION (no import)
+PASS Q15 competency row confirmed to KPI 9 -> never READY
+PASS Q16 existing Approved for the same KPI/month -> REJECTED, commit closed for the whole file (other READY rows not saved)
+PASS Q17 existing Submitted -> REJECTED (Draft only), commit closed
+PASS Q18 confirmed rows in a Closed month (Jan K24/K28) -> REJECTED, commit closed
+PASS Q19 confirmed row with invalid value (Q25 = 6) is not in scope unless mapped; mapped invalid value blocks
+PASS Q20 another employee's session -> code error, no items
+PASS Q21 KPI renamed after preview -> recheck refuses before commit
+PASS Q22 unchanged KPIs -> recheck passes
+
+TOTAL 22 · PASS 22 · FAIL 0

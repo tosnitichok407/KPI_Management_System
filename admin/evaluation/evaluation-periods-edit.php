@@ -297,6 +297,8 @@ $submitLabel = "Save Changes";
         rel="stylesheet"
     >
 
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
+
     <link
         rel="stylesheet"
         href="../../assets/css/evaluation.css?v=period-form-2"

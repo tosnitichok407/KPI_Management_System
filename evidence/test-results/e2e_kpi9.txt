@@ -1,0 +1,12 @@
+PASS K1 Feb preview: KPI 9 row = สรุปทั้งปี69!U24 = 0.875 (7 ÷ 8 ราย) → Actual 87.50%, Target 100.00, 2 new rows, confirm button
+PASS K2 preview wrote nothing
+PASS K3 confirm -> 2 inserted; KPI 9 Feb Draft, Actual 87.50, score 2, Target 100.00 (Assignment value 500000 not used)
+PASS K4 other KPIs / other employee untouched
+PASS K5 performance page Feb: KPI 9 like other KPIs — Target 100%, Actual 88% (87.50 rounded up, integer display), no Budget / Total R wording
+PASS K6 performance page March (no KPI 9 result): KPI 9 row shows no result, February value not carried over
+PASS K7 dashboard Feb: KPI 9 Target 100%, Actual 87.50%, no Budget / Total R wording
+PASS K8 KPI detail history: Feb row Target 100%, Actual 87.50%, current-rule check 2 / 5 (87.50%), no amounts
+PASS K9 export data (PDF/Excel) Feb: KPI 9 target 100.00, achievement 87.50
+PASS K10 export data March (no result): Assignment Budget 500000.00, no achievement
+
+TOTAL 10 · PASS 10 · FAIL 0

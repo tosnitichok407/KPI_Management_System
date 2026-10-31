@@ -317,6 +317,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
                 } catch (PDOException $e) {
 
+        error_log("admin/user-accounts/user-account-edit: " . $e->getMessage());
+
                     $error =
                         "ไม่สามารถแก้ไข Account ได้";
                 }
@@ -359,6 +361,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&display=swap"
         rel="stylesheet"
     >
+
+    <link rel="stylesheet" href="../../assets/css/icons.css?v=1">
 
     <link
         rel="stylesheet"
@@ -617,14 +621,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     href="../index.php?page=accounts"
                     class="btn btn-secondary"
                 >
-                    ยกเลิก
+                    <?= icon("x") ?>ยกเลิก
                 </a>
 
                 <button
                     type="submit"
                     class="btn btn-primary"
                 >
-                    บันทึกการแก้ไข
+                    <?= icon("save") ?>บันทึกการแก้ไข
                 </button>
             </div>
         </form>

@@ -142,7 +142,7 @@ $errorMessage = [
                 href="evaluation/evaluation-periods-add.php"
                 class="btn btn-primary"
             >
-                + เพิ่มรอบการประเมิน
+                <?= icon("plus") ?>เพิ่มรอบการประเมิน
             </a>
 
         </div>
@@ -345,7 +345,7 @@ $errorMessage = [
                                         href="evaluation/evaluation-periods-edit.php?id=<?= (int) $period["period_id"] ?>"
                                         class="btn-small edit"
                                     >
-                                        แก้ไข
+                                        <?= icon("square-pen") ?>แก้ไข
                                     </a>
 
                                     <?php $inUse = (int) $period["usage_count"] > 0; ?>
@@ -370,7 +370,7 @@ $errorMessage = [
                                                 ? "มีข้อมูลที่ใช้รอบนี้อยู่ " . (int) $period["usage_count"] . " รายการ จึงลบไม่ได้"
                                                 : "ลบรอบประเมิน" ?>"
                                         >
-                                            ลบ
+                                            <?= icon("trash-2") ?>ลบ
                                         </button>
                                     </form>
 

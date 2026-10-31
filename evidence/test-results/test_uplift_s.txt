@@ -1,0 +1,70 @@
+PASS U1 [tests 2-6] FLOOR(S42 x 100): 0.2075->20, 0.2099->20, 0.2000->20, 0.1549->15, 0.0749->7
+PASS U2 [test 7] near-integer values floor exactly (0.57->57, 0.29->29, 0.58->58, 1.13->113, 0.21->21, 0.2099999999->20, 0.069999999999->6 ...) while naive float floor would give 56/28/57/112
+PASS U3 floor from totals agrees: 103750/500000->20, 62999.99/300000->20, 142500/250000->57, 52500/250000->21
+PASS U4 negative ratio / zero or negative denominator -> not computed (null), never clamped to 0
+PASS U5 plain decimal keeps 15 significant digits without exponent
+PASS R1 [tests 1-6] S42 formula checked and Actual = FLOOR(S42 x 100): Jan 20 (0.2075), Feb 20 (0.2099), Mar 20 (0.2000), Apr 15 (0.1549), May 7 (0.0749), Jun 57
+PASS R2 [test 19] source is the month sheet: S42 (=S41/$O$41) for Jan-May, June uses its own summary row S41 (=S40/$O$40)
+PASS R3 KPI AM K13 (linked) / N13 (typed 0.5) are not used: Feb still 20 from ก.พ.69!S42
+PASS R4 preview details: base O41, diff S41, ratio S42 -> Actual 20, Target 20.00
+PASS R5 [test 7] boundary workbook (Excel-cached ratios): 0.29->29, 0.58->58, 1.13->113, 0.2099999667->20, 0.069999975->6, 0.21->21
+PASS R6 no gain (S41 = 0, ratio 0) -> READY Actual 0 (0 is not negative)
+PASS R-T8 negative result (S41 < 0) [test 8] -> REJECTED, no Actual, reason names the cell
+PASS R-T9 O41 = 0 [test 9] -> REJECTED, no Actual, reason names the cell
+PASS R-T10 R blank for the whole month (Jul) [test 10] -> REJECTED, no Actual, reason names the cell
+PASS R-T10b no data at all (Aug, sheet 'ส.ค.69 ' with trailing space) -> REJECTED, no Actual, reason names the cell
+PASS R-T11 S7 = R7-O7 while R7 is blank (S computed from missing data) -> REJECTED, no Actual, reason names the cell
+PASS R-S1 S blank while R has a value (row 10) -> REJECTED, no Actual, reason names the cell
+PASS R-S2 S blank while O and R have values (row 6) -> REJECTED, no Actual, reason names the cell
+PASS R-S3 S formula error (#DIV/0!) -> REJECTED, no Actual, reason names the cell
+PASS R-S4 selected month sheet not found (February renamed) -> REJECTED, no Actual, reason names the cell
+PASS R-T13c S = R5-O5 formula but cached value != R-O -> REJECTED, no Actual, reason names the cell
+PASS R-T14a S41 sums a wrong range [test 14] -> REJECTED, no Actual, reason names the cell
+PASS R-T14b S41 cached != sum of S rows [test 14] -> REJECTED, no Actual, reason names the cell
+PASS R-T14c S41 typed [test 18] -> REJECTED, no Actual, reason names the cell
+PASS R-T15 S42 cached != S41/O41 [test 15] -> REJECTED, no Actual, reason names the cell
+PASS R-T16a source of another month (Feb O5 = 'ม.ค.69'!O5) [test 16] -> REJECTED, no Actual, reason names the cell
+PASS R-T16b S42 of Feb computed from Jan cells [test 16] -> REJECTED, no Actual, reason names the cell
+PASS R-T17 external workbook in S5 (Mar) [test 17] -> REJECTED, no Actual, reason names the cell
+PASS R-T18a S42 typed constant [test 18] -> REJECTED, no Actual, reason names the cell
+PASS R-T18b O41 typed (lineage lost: no summary row) [test 18] -> REJECTED, no Actual, reason names the cell
+PASS R-T18c no cached value in S42 -> REJECTED, no Actual, reason names the cell
+PASS R-T19 two summary rows (ambiguous) (Apr) -> REJECTED, no Actual, reason names the cell
+PASS R-T20 headers not as confirmed (May R3) -> REJECTED, no Actual, reason names the cell
+PASS R-T21 text in a data cell -> REJECTED, no Actual, reason names the cell
+PASS R-msg rejection reasons contain no amounts (no grouped / 5+ digit numbers)
+PASS R-neg negative is not converted to 0 and no KPI 8 row is produced
+PASS R-A1 O blank, R typed, S typed = R (like real Jan row 32) -> 153750/500000 = 0.3075 -> READY Actual 30
+PASS R-A2 S typed with a value different from R-O -> S is used as is (0.1) -> READY Actual 10
+PASS R-A3 R without O, S = R-O formula (= R) -> accepted (46980/200000 = 0.2349) -> READY Actual 23
+PASS R-A4 S typed over formula with the same value -> READY Actual 20
+PASS R-A5 S formula other than R-O of the row (=R5-O6), lineage checked -> READY Actual 20
+PASS R-A6 FLOOR not round: 104995/500000 = 0.20999 -> 20 (round would be 21) -> READY Actual 20
+PASS R-A6b round() would differ from the expected FLOOR result
+PASS R-S5 selected year 2025 does not match the sheets (69 = 2026) -> file error, nothing READY
+PASS M1 [test 21] uplift rule mapped to kpi_id 7 -> NEEDS_CONFIRMATION (rule only for kpi_id 8), no row
+PASS M2 [test 21] confirmed name differs -> NEEDS_CONFIRMATION
+PASS M3 [test 21] uplift rule put on the KPI 14 row -> NEEDS_CONFIRMATION (not applied to KPI 14)
+PASS M4 REAL map file (KPI 8 confirmed 2026-10-18): KPI 8 READY from ก.พ.69!S42 with Actual 20 and a KPI 8 import row
+PASS M5 REAL map file: confirmed KPI ids = {14, 8, 9, 10, 11, 12, 15-19} (2026-10-19)
+PASS M6 [test 23] KPI 14 in the same workbook with KPI 8 enabled: unchanged (Jan 95.00, Feb 99.99, Jun 40.00 READY)
+PASS P1 Feb prepare: KPI 8 READY insert, Actual 20, Target 20.00, score 4 from the system criteria, commit open
+PASS P2 floored integer Actual goes through the unchanged kpiCalculateScore(): 0->1, 4->1, 5->2, 9->2, 10->3, 14->3, 15->4, 20->4, 21->5, 57->5
+PASS P3 prepare wrote nothing
+PASS P4 [test 25] commit Feb: KPI 8 saved as Draft only (actual 20.00, score 4, target 20.00); KPI 14 Feb saved as before (99.99)
+PASS P5 no Submitted / Approved created by the import
+PASS P6 [test 22] January period is Closed -> existing rule rejects (period closed), nothing to commit
+PASS P7 May existing Approved row -> rejected, never overwritten
+PASS P8 re-upload Feb (same value) -> action unchanged
+PASS P9 [test 20] Target 25 in the assignment -> REJECTED (must be 20), commit closed
+PASS P10 [test 21] KPI 8 name in DB differs from the confirmed name -> REJECTED
+PASS P11 [section 4] criteria like the real DB (levels 5 '>20%' and 4 '15-20%' only) -> REJECTED: levels 1-3 missing, KPI 8 not opened
+PASS P12 [section 4] criteria with a gap (level 3 = 11-14%, so 10% fits nowhere) -> REJECTED naming Actual 10%
+PASS P13 criteria restored -> Jun READY again (Actual 57)
+PASS P14 [test 24] Template origin for KPI 8 is still rejected server side
+PASS P15 [test 24] Template commit for KPI 8 writes nothing
+PASS P16 negative month cannot reach commit (no rows, commit closed, DB unchanged)
+PASS P17 other employees' / other KPIs' rows untouched by the whole run (KPI 9 checked in P17b)
+PASS P17b KPI 9 February: one new Draft, Actual 87.50 (สรุปทั้งปี69!U24), Target 100.00 (not the Assignment 500000), score = nonRenewalKpiGrade
+
+TOTAL 68 · PASS 68 · FAIL 0

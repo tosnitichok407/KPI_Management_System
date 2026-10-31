@@ -1,0 +1,28 @@
+Edit KPI
+
+* = ช่องที่ต้องกรอก
+
+กรุณาตรวจสอบข้อมูลที่ไม่ถูกต้อง (4 ช่อง)
+KPI Category *
+-- Select Category --
+SYN Category
+กรุณาเลือกหมวดหมู่ KPI
+KPI Type *
+Performance (วัดจาก Target / Actual)
+Competency (เลือกระดับ 1 - 5)
+KPI Name *
+กรุณากรอกชื่อ KPI
+Description
+Weight *
+กรุณากรอก Weight
+Unit
+Max Score *
+กรุณากรอกคะแนนสูงสุด
+เกณฑ์คะแนน
+คะแนน 5
+คะแนน 4
+คะแนน 3
+คะแนน 2
+คะแนน 1
+บันทึกการแก้ไข
+ยกเลิก
