@@ -222,6 +222,7 @@ const KPI_COMPANY_VISIT_HEADER_ROW = 5;
 const KPI_COMPANY_VISIT_MONTH_ROW = 6;
 const KPI_COMPANY_VISIT_FIRST_ROW = 7;
 const KPI_COMPANY_VISIT_SCAN_ROWS = 400;
+const KPI_COMPANY_VISIT_OVERFLOW_ROWS = 100;   // ตรวจคอลัมน์ B ต่ออีกเท่านี้แถว เพื่อปฏิเสธไฟล์ที่มีลูกค้าเลยแถวที่ระบบตรวจได้
 const KPI_COMPANY_VISIT_SCAN_COLUMNS = 60;
 /* ชื่อเดือนในแถว 6 สะกด "เม.ย." ส่วนคอลัมน์ A / ชื่อชีตเดือนสะกด "เม.ษ." (ตัวสะกดของแบบฟอร์ม) */
 const KPI_COMPANY_VISIT_MONTH_ALIASES = ["เม.ย" => 4];
@@ -1766,6 +1767,7 @@ function kpiCompanyVisitMonth(string $text): ?int
 |
 | รอบแรกโหลด A1 หัวคอลัมน์ (แถว 5-6) และคอลัมน์ A เพื่อหาบล็อกเดือนสัญญา
 | รอบถัดไปโหลด B / D / คอลัมน์เข้าเยี่ยมเฉพาะแถวของบล็อกเดือนที่เลือก (และเซลล์ต้นทางของสูตรราคา)
+| บล็อกสุดท้ายโหลดคอลัมน์ B ก่อน เพื่อหยุดที่แถวลูกค้าสุดท้ายแทนการโหลดถึงแถว KPI_COMPANY_VISIT_SCAN_ROWS
 |
 */
 function kpiCompanyEvaluateVisits(
@@ -1955,6 +1957,39 @@ function kpiCompanyEvaluateVisits(
         $first = $starts[0];
         $later = array_filter(array_keys($blockStarts), fn($r) => $r > $first);
         $last = $later ? min($later) - 1 : KPI_COMPANY_VISIT_SCAN_ROWS;
+
+        /* บล็อกสุดท้ายไม่มีบล็อกถัดไปบอกจุดสิ้นสุด: อ่านคอลัมน์ B ก่อน แล้วจบที่แถวลูกค้าสุดท้าย (แถวที่ B ว่างไม่ถูกนับอยู่แล้ว) */
+        if (!$later) {
+            $customerColumnNeed = [];
+            $last = KPI_COMPANY_VISIT_SCAN_ROWS + KPI_COMPANY_VISIT_OVERFLOW_ROWS;
+            for ($r = $first; $r <= $last; $r++) {
+                if (!isset($loadedCells[$sheetName]["B{$r}"])) {
+                    $customerColumnNeed["B{$r}"] = true;
+                }
+            }
+
+            if ($customerColumnNeed) {
+                if (!$final) {
+                    $out["need"][$sheetName] = ($out["need"][$sheetName] ?? []) + $customerColumnNeed;
+                    continue;
+                }
+                $push($month, "{$sheetName}!B{$first}:B{$last} (ลูกค้าเดือนสัญญา{$monthName})", false, null, ["อ่านข้อมูลลูกค้าเดือนสัญญา{$monthName}ไม่ครบ"], []);
+                continue;
+            }
+
+            while ($last > $first && in_array($read("B{$last}"), [null, ""], true)) {
+                $last--;
+            }
+
+            /* มีลูกค้าถึงหรือเลยแถวที่ระบบตรวจได้ → ปฏิเสธ เพื่อไม่ให้นับลูกค้าขาดโดยไม่แจ้ง */
+            if ($last >= KPI_COMPANY_VISIT_SCAN_ROWS) {
+                $push($month, "{$sheetName}!B{$first}:B{$last} (ลูกค้าเดือนสัญญา{$monthName})", false, null, [
+                    "ข้อมูลในชีต {$sheetName} ยาวเกิน " . KPI_COMPANY_VISIT_SCAN_ROWS . " แถวที่ระบบตรวจได้"
+                ], []);
+                continue;
+            }
+        }
+
         $source = "{$sheetName}!A{$first}:{$lastVisitColumn}{$last} (ลูกค้าเดือนสัญญา{$monthName})";
 
         /* รอบถัดไป: B / D / คอลัมน์เข้าเยี่ยมของแถวในบล็อก */
@@ -1984,10 +2019,6 @@ function kpiCompanyEvaluateVisits(
         $usesFormula = false;
         $sourceNeed = [];
         $contractSerial = $yearCode * 12 + $month;
-
-        if (!$later && !in_array($read("B{$last}"), [null, ""], true)) {
-            $reasons[] = "ข้อมูลในชีต {$sheetName} ยาวเกิน " . KPI_COMPANY_VISIT_SCAN_ROWS . " แถวที่ระบบตรวจได้";
-        }
 
         for ($r = $first; $r <= $last; $r++) {
 
