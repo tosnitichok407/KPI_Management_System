@@ -14,6 +14,7 @@
 require_once __DIR__ . "/../includes/security.php";
 require_once __DIR__ . "/../config/database.php";
 require_once __DIR__ . "/../includes/kpi-import-helper.php";
+require_once __DIR__ . "/../includes/kpi-contract-return.php";
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: ../login.php");
@@ -48,6 +49,11 @@ if (!csrfVerify()) {
 
 if (!$validMonth) {
     $flash("error", "เดือนที่เลือกไม่ถูกต้อง");
+}
+
+/* ติดตั้งโมดูลรับคืนสัญญาแล้ว (Migration 20261028) → KPI 12 บันทึกรายสัญญาเท่านั้น · ช่องกรอกจำนวนรวมปิด */
+if (kpiContractReturnEnabled($pdo)) {
+    $flash("error", "KPI อัตราค้างสัญญาตัวจริงนำกลับ บันทึกรายสัญญาที่เมนู KPI12 รับคืนสัญญา");
 }
 
 $codeStmt = $pdo->prepare("SELECT employee_code FROM employees WHERE employee_id = :employee_id LIMIT 1");

@@ -644,7 +644,7 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
 
                     <?php
                     /* แถวของตาราง "KPI ที่ได้รับมอบหมาย" ในหน้าต่าง "ดูเดือนนี้" ($month = เดือนนั้น) */
-                    $renderKpiRows = function (array $items, int $month): void {
+                    $renderKpiRows = function (array $items, int $month) use ($pdo, $yearData, $filterEmployee): void {
                     ?>
 
                     <?php if (empty($items)): ?>
@@ -692,7 +692,30 @@ $feedbackMap = static function (int $employeeId) use ($yearData): string {
                                 <td class="col-number"><?= number_format((float) $assignment["weight"]) ?>%</td>
 
                                 <td>
-                                    <?php if ($item["avg_score"] === null && !empty($item["score_pending"])): ?>
+                                    <?php
+                                    /* KPI 12 จากโมดูลรับคืนสัญญา: ผลของเดือนจากรายการที่อนุมัติแล้ว · ไม่เขียน kpi_performances · ผลเดิมไม่ถูกเขียนทับ */
+                                    $moduleSummary = (int) $assignment["kpi_id"] === KPI_CONTRACT_RETURN_KPI_ID && $month > 0
+                                        && isset($yearData["periods"][$month]) && kpiContractReturnEnabled($pdo)
+                                        ? kpiContractReturnSummary($pdo, $filterEmployee, (int) $yearData["periods"][$month]["period_id"], kpiContractReturnToday())
+                                        : null;
+                                    ?>
+                                    <?php if ($moduleSummary !== null): ?>
+                                        <?php if ($moduleSummary["state"] === "graded"): ?>
+                                            <div class="stat-main">5 <small>/ 5</small></div>
+                                        <?php elseif ($moduleSummary["state"] === "awaiting_criteria"): ?>
+                                            <span class="approval-badge approval-submitted">รอการกำหนดเกณฑ์</span>
+                                        <?php else: ?>
+                                            <span class="cell-muted">ไม่มีผลรายสัญญาที่อนุมัติ</span>
+                                        <?php endif; ?>
+                                        <div class="cell-sub">รายสัญญาที่อนุมัติแล้ว: <?= htmlspecialchars(kpiContractReturnSummaryText($moduleSummary), ENT_QUOTES, "UTF-8") ?></div>
+                                        <?php foreach ($moduleSummary["warnings"] as $moduleWarning): ?>
+                                            <div class="cell-sub"><?= htmlspecialchars($moduleWarning, ENT_QUOTES, "UTF-8") ?></div>
+                                        <?php endforeach; ?>
+                                        <?php if ($item["avg_score"] !== null): ?>
+                                            <div class="cell-sub">ผลเดิมในระบบ (ไม่ถูกเขียนทับ · ยังนับในคะแนนรวม): คะแนน <?= kpiScoreLevel((float) $item["avg_score"]) ?></div>
+                                        <?php endif; ?>
+                                        <div class="cell-sub"><a href="index.php?page=contract-returns&amp;status=all">ตรวจรายการรับคืนสัญญา</a></div>
+                                    <?php elseif ($item["avg_score"] === null && !empty($item["score_pending"])): ?>
                                         <?php $pendingPerf = end($item["score_pending"]); ?>
                                         <span class="approval-badge approval-submitted" title="ผลอยู่ในช่วงที่เกณฑ์ไม่กำหนดคะแนน รอเจ้าของระบบยืนยัน">รอยืนยันคะแนน</span>
                                         <div class="cell-sub">Actual <?= htmlspecialchars(rtrim(rtrim(number_format((float) $pendingPerf["actual"], 2, ".", ","), "0"), "."), ENT_QUOTES, "UTF-8") ?>%</div>

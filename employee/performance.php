@@ -482,6 +482,15 @@ $evidenceFlash = $_SESSION["perf_evidence_flash"] ?? null;
 unset($_SESSION["perf_evidence_flash"]);
 
 /* ขั้นตอนส่งผล / อนุมัติของเดือนที่เลือก (ปิดอัตโนมัติเมื่อยังไม่ได้รัน Migration 20261025) */
+/*
+| KPI 12 จากโมดูลรับคืนสัญญา (มีตาราง kpi_contract_* เท่านั้น · ไม่มี → ใช้ช่องกรอกจำนวนรวมตามเดิม)
+|   ผลของเดือน = kpiContractReturnSummary(): เฉพาะรายการอนุมัติแล้ว · 100% = ระดับ 5 · ต่ำกว่า 100% = รอการกำหนดเกณฑ์
+|   อ่านอย่างเดียว ไม่เขียน kpi_performances จึงยังไม่รวมในคะแนนรวมรายเดือน · ผลงาน KPI 12 เดิมไม่ถูกเขียนทับ
+*/
+$kpi12Summary = kpiContractReturnEnabled($pdo) && $selectedPeriodId > 0
+    ? kpiContractReturnSummary($pdo, $employeeId, $selectedPeriodId, kpiContractReturnToday())
+    : null;
+
 $approvalFlash = $_SESSION["perf_approval_flash"] ?? null;
 unset($_SESSION["perf_approval_flash"]);
 $approvalEnabled = kpiApprovalEnabled($pdo) && $selectedPeriodId > 0;
@@ -1182,7 +1191,8 @@ function perfFormatValue($value, string $unit): string
                                             $detailUrl = "kpi-detail.php?assignment_id=" . (int) $kpi["assignment_id"] . "&year={$selectedYear}&month={$selectedMonth}&period_id={$selectedPeriodId}";
                                             /* KPI 12: กรอก "ทั้งหมด" / "นำกลับ" ในหน้านี้ (employee/kpi12-entry-action.php) · แก้ได้เมื่อรอบ Open และยังไม่ส่ง / ไม่อนุมัติ */
                                             $isFormKpi = $groupKey === "performance" && (int) $kpi["kpi_id"] === KPI12_FORM_KPI_ID;
-                                            $formEditable = $isFormKpi && ($selectedPeriod["status"] ?? "") === "Open"
+                                            $moduleSummary = $isFormKpi ? $kpi12Summary : null;
+                                            $formEditable = $isFormKpi && $moduleSummary === null && ($selectedPeriod["status"] ?? "") === "Open"
                                                 && ($kpi["assignment_status"] ?? "Active") === "Active"
                                                 && !in_array($statusText, ["Submitted", "Approved"], true);
                                             $formValues = $isFormKpi && $hasResult ? kpi12FormParseComment($kpi["comment_value"] ?? null) : null;
@@ -1220,6 +1230,22 @@ function perfFormatValue($value, string $unit): string
                                                         </span>
                                                     <?php endif; ?>
 
+                                                    <?php if ($moduleSummary !== null): ?>
+                                                        <span class="perf-kpi-comment">
+                                                            ผลรายสัญญาที่อนุมัติแล้ว: <?= htmlspecialchars(kpiContractReturnSummaryText($moduleSummary), ENT_QUOTES, "UTF-8") ?>
+                                                            · ยังไม่รวมในคะแนนรวมรายเดือน
+                                                        </span>
+                                                        <?php foreach ($moduleSummary["warnings"] as $moduleWarning): ?>
+                                                            <span class="perf-kpi-comment"><?= htmlspecialchars($moduleWarning, ENT_QUOTES, "UTF-8") ?></span>
+                                                        <?php endforeach; ?>
+                                                        <?php if ($hasResult): ?>
+                                                            <span class="perf-kpi-comment">
+                                                                ผลเดิมในระบบ (ไม่ถูกเขียนทับ · ยังนับในคะแนนรวม): Actual <?= $kpi["actual_value"] === null ? "-" : htmlspecialchars(perfFormatValue($kpi["actual_value"], $unit), ENT_QUOTES, "UTF-8") ?>
+                                                                · คะแนน <?= $level === null ? "-" : (int) $level ?>
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
+
                                                 </th>
 
                                                 <td class="num" data-label="น้ำหนัก"><?= perfFormatNumber((float) $kpi["weight"]) ?>%</td>
@@ -1240,7 +1266,13 @@ function perfFormatValue($value, string $unit): string
                                                     </td>
 
                                                     <td class="num" data-label="Actual">
-                                                        <?php if (!$hasResult || $kpi["actual_value"] === null): ?>
+                                                        <?php if ($moduleSummary !== null): ?>
+                                                            <?php if ($moduleSummary["percent"] === null): ?>
+                                                                <span class="perf-muted">-</span>
+                                                            <?php else: ?>
+                                                                <?= htmlspecialchars($moduleSummary["percent"], ENT_QUOTES, "UTF-8") ?>%
+                                                            <?php endif; ?>
+                                                        <?php elseif (!$hasResult || $kpi["actual_value"] === null): ?>
                                                             <span class="perf-muted">-</span>
                                                         <?php elseif ($isBudget): ?>
                                                             <?php $achievement = nonRenewalAchievement($kpi["actual_value"], $kpi["target_value"]); ?>
@@ -1251,7 +1283,18 @@ function perfFormatValue($value, string $unit): string
                                                     </td>
 
                                                     <td class="perf-progress-cell" data-label="ความสำเร็จ">
-                                                        <?php if ($hasResult && $kpi["actual_value"] !== null): ?>
+                                                        <?php if ($moduleSummary !== null): ?>
+                                                            <?php if ($moduleSummary["percent"] === null): ?>
+                                                                <span class="perf-muted">ยังไม่มีผลที่อนุมัติ</span>
+                                                            <?php else: ?>
+                                                                <div class="perf-progress">
+                                                                    <div class="perf-progress-bar" aria-hidden="true">
+                                                                        <span style="width: <?= (int) floor((float) $moduleSummary["percent"]) ?>%;"></span>
+                                                                    </div>
+                                                                    <strong><?= (int) floor((float) $moduleSummary["percent"]) ?>%</strong>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        <?php elseif ($hasResult && $kpi["actual_value"] !== null): ?>
                                                             <div class="perf-progress">
                                                                 <div class="perf-progress-bar" aria-hidden="true">
                                                                     <span style="width: <?= (int) round((float) $kpi["progress"]) ?>%;"></span>
@@ -1266,7 +1309,15 @@ function perfFormatValue($value, string $unit): string
                                                 <?php endif; ?>
 
                                                 <td class="center" data-label="คะแนน">
-                                                    <?php if ($level === null && $hasResult && $kpi["actual_value"] !== null): ?>
+                                                    <?php if ($moduleSummary !== null): ?>
+                                                        <?php if ($moduleSummary["state"] === "graded"): ?>
+                                                            <span class="perf-score perf-score-5">5<small>/5</small></span>
+                                                        <?php elseif ($moduleSummary["state"] === "awaiting_criteria"): ?>
+                                                            <span class="perf-badge-pending">รอการกำหนดเกณฑ์</span>
+                                                        <?php else: ?>
+                                                            <span class="perf-muted">-</span>
+                                                        <?php endif; ?>
+                                                    <?php elseif ($level === null && $hasResult && $kpi["actual_value"] !== null): ?>
                                                         <?php /* มีผลการดำเนินงานแต่ไม่มีคะแนน (เช่น KPI 14 อยู่ในช่องว่างของเกณฑ์บริษัท) → ไม่เดาคะแนน */ ?>
                                                         <span class="perf-badge-pending" title="ผลอยู่ในช่วงที่เกณฑ์ไม่กำหนดคะแนน รอเจ้าของระบบยืนยัน">รอยืนยันคะแนน</span>
                                                     <?php elseif ($level === null): ?>
@@ -1282,7 +1333,9 @@ function perfFormatValue($value, string $unit): string
                                                 </td>
 
                                                 <td class="center" data-label="สถานะ">
-                                                    <?php if ($hasResult): ?>
+                                                    <?php if ($moduleSummary !== null): ?>
+                                                        <span class="perf-status perf-status-none"><?= (int) $moduleSummary["total"] ?> สัญญา</span>
+                                                    <?php elseif ($hasResult): ?>
                                                         <span class="perf-status perf-status-<?= htmlspecialchars(strtolower($statusText), ENT_QUOTES, "UTF-8") ?>">
                                                             <?= htmlspecialchars($statusText, ENT_QUOTES, "UTF-8") ?>
                                                         </span>
@@ -1295,6 +1348,11 @@ function perfFormatValue($value, string $unit): string
                                                     <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, "UTF-8") ?>" class="perf-link">
                                                         <?= icon("eye") ?>รายละเอียด
                                                     </a>
+                                                    <?php if ($moduleSummary !== null): ?>
+                                                        <a href="kpi-contract-returns.php" class="perf-link perf-link-correction">
+                                                            <?= icon("file-text") ?>บันทึกรายสัญญา
+                                                        </a>
+                                                    <?php endif; ?>
                                                     <?php if ($hasResult && kpiCorrectionEnabled($pdo)): ?>
                                                         <a href="kpi-correction.php?performance_id=<?= (int) $kpi["performance_id"] ?>" class="perf-link perf-link-correction">
                                                             <?= icon("square-pen") ?>ขอแก้ไข

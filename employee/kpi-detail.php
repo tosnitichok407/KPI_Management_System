@@ -161,6 +161,7 @@ $competencyCriteria = COMPETENCY_CRITERIA[(int) $kpi["kpi_id"]] ?? null;
 
 /* ช่องทางบันทึกผล: KPI 12 และ Competency 15-19 กรอกในหน้าผลการปฏิบัติงาน · KPI อื่นนำเข้าจาก Excel */
 $recordInPerformancePage = in_array((int) $kpi["kpi_id"], [12, 15, 16, 17, 18, 19], true);
+$recordInContractModule = (int) $kpi["kpi_id"] === KPI_CONTRACT_RETURN_KPI_ID && kpiContractReturnEnabled($pdo);
 
 $currentYear = (int) date("Y");
 $currentMonth = (int) date("n");
@@ -469,7 +470,22 @@ $performances =
             </h2>
 
 
-            <?php if ($recordInPerformancePage): ?>
+            <?php if ($recordInContractModule): ?>
+
+                <p>
+                    KPI นี้บันทึกรายสัญญา แนบหลักฐาน แล้วให้ Manager อนุมัติทีละรายการ
+                    ผลของเดือนคิดจากรายการที่อนุมัติแล้วเท่านั้น
+                </p>
+
+                <a
+                    href="kpi-contract-returns.php"
+                    class="submit-button">
+
+                    <?= icon("file-text") ?>ไปบันทึกรายสัญญา
+
+                </a>
+
+            <?php elseif ($recordInPerformancePage): ?>
 
                 <p>
                     KPI นี้กรอกในหน้า "ผลการปฏิบัติงาน"

@@ -256,8 +256,12 @@ $readiness = array_map(
     $readinessStmt->fetchAll(PDO::FETCH_ASSOC)
 );
 
-/* KPI12 กรอกในหน้าผลการปฏิบัติงาน (ช่อง "ทั้งหมด" / "นำกลับ" · employee/kpi12-entry-action.php) */
-$kpi12Link = '<span class="import-sub"><a href="performance.php#kpi12-entry">ไปกรอกที่หน้าผลการปฏิบัติงาน →</a></span>';
+/* KPI12: ติดตั้งโมดูลรับคืนสัญญาแล้ว → บันทึกรายสัญญา · ยังไม่ติดตั้ง → ช่องกรอกจำนวนรวมในหน้าผลการปฏิบัติงาน (employee/kpi12-entry-action.php) */
+$kpi12ModuleEnabled = kpiContractReturnEnabled($pdo);
+$kpi12ChannelText = $kpi12ModuleEnabled ? "บันทึกรายสัญญาที่เมนู KPI12 รับคืนสัญญา" : "กรอกในหน้าผลการปฏิบัติงาน";
+$kpi12Link = $kpi12ModuleEnabled
+    ? '<span class="import-sub"><a href="kpi-contract-returns.php">ไปบันทึกรายสัญญา →</a></span>'
+    : '<span class="import-sub"><a href="performance.php#kpi12-entry">ไปกรอกที่หน้าผลการปฏิบัติงาน →</a></span>';
 
 $counts = ["insert" => 0, "update" => 0, "unchanged" => 0, "error" => 0];
 
@@ -382,7 +386,13 @@ $actionLabels = [
                         </thead>
                         <tbody>
                             <?php foreach ($companyResult["items"] as $item): ?>
-                                <?php [$label, $class] = $statusLabels[$item["status"]]; ?>
+                                <?php
+                                [$label, $class] = $statusLabels[$item["status"]];
+                                if (($item["channel"] ?? null) === "system_form_kpi12" && $kpi12ModuleEnabled) {
+                                    $item["source"] = "โมดูล KPI12 รับคืนสัญญา (รายสัญญา)";
+                                    $item["warnings"] = ["KPI นี้บันทึกรายสัญญา แนบหลักฐาน และให้ Manager อนุมัติที่เมนู KPI12 รับคืนสัญญา · ไม่นำเข้าจากไฟล์ Excel"];
+                                }
+                                ?>
                                 <tr class="row-<?= $item["status"] === "REJECTED" ? "error" : "ok" ?>">
                                     <td><?= $item["section"] === "performance" ? "Performance" : "Competency" ?></td>
                                     <td><?= $e($item["label"]) ?><span class="import-sub">น้ำหนัก <?= $e($item["weight"] ?? "-") ?></span></td>
@@ -438,7 +448,7 @@ $actionLabels = [
                                     <td><?= $e($kpi["kpi_type"]) ?></td>
                                     <td>
                                         <?php if ($kpi["channel"] === "system_form_kpi12"): ?>
-                                            <span class="badge-unchanged">ไม่นำเข้าจาก Excel · กรอกในหน้าผลการปฏิบัติงาน</span>
+                                            <span class="badge-unchanged">ไม่นำเข้าจาก Excel · <?= $e($kpi12ChannelText) ?></span>
                                             <?= $kpi12Link ?>
                                         <?php elseif ($kpi["channel"] === "system_form_competency"): ?>
                                             <span class="badge-unchanged">ไม่นำเข้าจาก Excel · กรอกคะแนนในหน้าผลการปฏิบัติงาน</span>

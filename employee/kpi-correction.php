@@ -310,7 +310,7 @@ $criteriaPending = $selectedPerformance ? (KPI_CRITERIA_PENDING_CONFIRMATION[(in
         text("เอกสาร: " + (files.length ? files.join(", ") : "(ยังไม่ได้แนบ)"));
         reviewed.checked = false;
     }
-    form.addEventListener("input", update);
+    form.addEventListener("input", function (event) { if (event.target !== reviewed) update(); });
     form.addEventListener("change", function (event) { if (event.target !== reviewed) update(); });
     update();
 })();
